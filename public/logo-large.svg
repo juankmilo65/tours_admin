@@ -1,0 +1,37 @@
+<svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Icono de monumento/torre -->
+  <g transform="translate(10, 10)">
+    <!-- Base del monumento -->
+    <path d="M20 40 L20 35 L15 30 L5 30 L0 35 L0 40 Z" fill="url(#gradient1)"/>
+    <!-- Torre principal -->
+    <rect x="8" y="10" width="14" height="25" rx="2" fill="url(#gradient1)"/>
+    <!-- Cúpula superior -->
+    <path d="M8 10 Q15 0 22 10" fill="url(#gradient2)"/>
+    <!-- Ventana -->
+    <rect x="11" y="16" width="8" height="10" rx="1" fill="white" fill-opacity="0.3"/>
+    <!-- Detalle superior -->
+    <rect x="13" y="4" width="4" height="6" fill="url(#gradient2)"/>
+    <!-- Bandera -->
+    <path d="M15 4 L15 0 L28 2 L15 4" fill="#E11D48"/>
+  </g>
+  
+  <!-- Texto Tours Admin -->
+  <text x="50" y="28" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="24" fill="url(#gradient1)">
+    Tours
+  </text>
+  <text x="50" y="48" font-family="Inter, system-ui, sans-serif" font-weight="500" font-size="16" fill="#64748B">
+    Admin
+  </text>
+  
+  <!-- Definiciones de gradientes -->
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10B981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#34D399"/>
+      <stop offset="100%" style="stop-color:#10B981"/>
+    </linearGradient>
+  </defs>
+</svg>

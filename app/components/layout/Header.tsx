@@ -122,7 +122,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
             </button>
           )}
 
-          {/* Desktop: Collapse/Expand Button */}
+          {/* Desktop: Collapse/Expand Button (Hamburger) */}
           {!isMobile && (
             <button
               type="button"
@@ -131,57 +131,36 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '32px',
-                height: '32px',
+                width: '40px',
+                height: '40px',
                 backgroundColor: 'transparent',
                 border: 'none',
-                borderRadius: 'var(--radius-md)',
+                borderRadius: 'var(--radius-lg)',
                 cursor: 'pointer',
-                padding: 'var(--space-2)',
-                transition: 'background-color var(--transition-base)',
+                padding: '4px',
+                transition: 'all var(--transition-base)',
                 zIndex: 2,
               }}
               onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';
+                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)';
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
               title={isSidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
             >
-              {isSidebarCollapsed ? (
-                // Icono para expandir (flecha derecha)
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ color: 'var(--color-neutral-700)' }}
-                >
-                  <line x1="19" y1="12" x2="5" y2="12"></line>
-                  <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-              ) : (
-                // Icono para colapsar (flecha izquierda)
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ color: 'var(--color-neutral-700)' }}
-                >
-                  <line x1="19" y1="12" x2="5" y2="12"></line>
-                  <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
-              )}
+              <img
+                src="/hamburger-icon.svg"
+                alt={isSidebarCollapsed ? 'Expandir' : 'Colapsar'}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  transform: isSidebarCollapsed ? 'rotate(90deg)' : 'rotate(0deg)',
+                  transition: 'transform var(--transition-base)',
+                }}
+              />
             </button>
           )}
           <h2 

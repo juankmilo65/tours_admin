@@ -126,26 +126,23 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
         {/* Logo/Title Section */}
         <div 
           style={{
-            padding: isCollapsed ? 'var(--space-4)' : 'var(--space-6)',
+            padding: isCollapsed ? 'var(--space-3)' : 'var(--space-4)',
             borderBottom: '1px solid var(--color-neutral-200)',
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: isCollapsed ? 'center' : 'flex-start',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            alignItems: 'center',
           }}
         >
-          {!isCollapsed && (
-            <>
-              <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary-700)' }}>
-                Tours Admin
-              </h1>
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-1)' }}>
-                Management Dashboard
-              </p>
-            </>
-          )}
-          {isCollapsed && (
-            <span style={{ fontSize: '28px' }}>🏛️</span>
-          )}
+          <img
+            src={isCollapsed ? '/logo-small.svg' : '/logo-large.svg'}
+            alt="Tours Admin"
+            style={{
+              width: isCollapsed ? '40px' : '160px',
+              height: isCollapsed ? '40px' : '48px',
+              objectFit: 'contain',
+              transition: 'all var(--transition-base)',
+            }}
+          />
         </div>
 
         <nav style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
