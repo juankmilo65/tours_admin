@@ -67,6 +67,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
           {/* Mobile: Hamburger Menu Button */}
           {isMobile && (
             <button
+              type="button"
               onClick={onToggleSidebar}
               style={{
                 display: 'flex',
@@ -74,15 +75,22 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
                 justifyContent: 'center',
                 alignItems: 'center',
                 gap: '4px',
-                width: '32px',
-                height: '32px',
+                width: '44px',
+                height: '44px',
+                minWidth: '44px',
+                minHeight: '44px',
                 backgroundColor: 'transparent',
                 border: 'none',
                 borderRadius: 'var(--radius-md)',
                 cursor: 'pointer',
-                padding: 'var(--space-1)',
+                padding: '8px',
                 transition: 'background-color var(--transition-base)',
+                zIndex: 10,
+                position: 'relative',
+                WebkitTapHighlightColor: 'transparent',
               }}
+              aria-label="Abrir menú"
+              aria-expanded={isSidebarOpen}
               onMouseOver={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';
               }}
@@ -117,6 +125,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
           {/* Desktop: Collapse/Expand Button */}
           {!isMobile && (
             <button
+              type="button"
               onClick={onToggleSidebarCollapse}
               style={{
                 display: 'flex',
@@ -130,6 +139,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
                 cursor: 'pointer',
                 padding: 'var(--space-2)',
                 transition: 'background-color var(--transition-base)',
+                zIndex: 2,
               }}
               onMouseOver={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';

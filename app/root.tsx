@@ -41,21 +41,17 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Solo para desktop
   const [isMobile, setIsMobile] = useState(false);
 
-  // Check if screen is mobile
+  // Detectar si es móvil al montar y cuando cambia el tamaño
   useEffect(() => {
     function checkMobile() {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
-      // Auto-close sidebar on mobile
-      if (mobile && isSidebarOpen) {
-        setIsSidebarOpen(false);
-      }
     }
     
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, [isSidebarOpen]);
+  }, []);
 
   // Toggle sidebar (mobile)
   function toggleSidebar() {
