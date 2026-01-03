@@ -201,7 +201,7 @@ select:disabled {
 
 /* Selection */
 ::selection {
-  background-color: var(--color-primary-200);
+  background-color: var(--color-primary-300);
   color: var(--color-primary-900);
 }
 

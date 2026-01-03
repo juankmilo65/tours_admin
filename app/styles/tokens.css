@@ -4,17 +4,29 @@
  */
 
 :root {
-  /* Colors - Primary */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+  /* Colors - Primary - Military Green */
+  --color-primary-50: #f0fdf4;
+  --color-primary-100: #dcfce7;
+  --color-primary-200: #bbf7d0;
+  --color-primary-300: #86efac;
+  --color-primary-400: #4ade80;
+  --color-primary-500: #22c55e;
+  --color-primary-600: #16a34a;
+  --color-primary-700: #15803d;
+  --color-primary-800: #166534;
+  --color-primary-900: #14532d;
+
+  /* Colors - Primary Dark - Military Green Dark */
+  --color-primary-dark-50: #1a2f1a;
+  --color-primary-dark-100: #243d24;
+  --color-primary-dark-200: #2f4b2f;
+  --color-primary-dark-300: #3a593a;
+  --color-primary-dark-400: #456745;
+  --color-primary-dark-500: #507550;
+  --color-primary-dark-600: #5b835b;
+  --color-primary-dark-700: #4a6b4a;
+  --color-primary-dark-800: #3d563d;
+  --color-primary-dark-900: #304130;
 
   /* Colors - Secondary */
   --color-secondary-50: #f5f3ff;

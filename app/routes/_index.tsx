@@ -2,6 +2,8 @@
  * Home Route - Tours Admin Dashboard
  */
 
+import { Link } from '@remix-run/react';
+
 export default function Index() {
   return (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
@@ -19,94 +21,151 @@ export default function Index() {
           marginInline: 'auto',
         }}
       >
-        <FeatureCard
+        <LinkCard
           title="Dashboard"
           description="View analytics and key performance indicators"
-          status="Coming Soon"
+          to="/dashboard"
+          icon="📊"
         />
-        <FeatureCard
+        <LinkCard
           title="Tours Management"
           description="Create and manage tours with full CRUD operations"
-          status="Coming Soon"
+          to="/tours"
+          icon="🗺️"
         />
-        <FeatureCard
+        <LinkCard
           title="Reservations"
           description="Track and manage all tour reservations"
-          status="Coming Soon"
+          to="/reservations"
+          icon="📅"
         />
-        <FeatureCard
+        <LinkCard
           title="Users & Roles"
           description="Manage users and assign administrative roles"
-          status="Coming Soon"
+          to="/users"
+          icon="👥"
         />
-        <FeatureCard
-          title="Payments"
-          description="Integrate with Mercado Pago for secure payments"
-          status="Coming Soon"
+        <LinkCard
+          title="Categories"
+          description="Manage tour categories and classifications"
+          to="/categories"
+          icon="🏷️"
         />
-        <FeatureCard
+        <LinkCard
+          title="Cities"
+          description="Manage available tour destinations"
+          to="/cities"
+          icon="🏙️"
+        />
+        <LinkCard
+          title="News"
+          description="Publish and manage news articles"
+          to="/news"
+          icon="📰"
+        />
+        <LinkCard
+          title="Offers"
+          description="Create and manage special offers"
+          to="/offers"
+          icon="🎁"
+        />
+        <LinkCard
           title="Settings"
           description="Configure application settings and integrations"
-          status="Coming Soon"
+          to="/settings"
+          icon="⚙️"
         />
       </div>
     </div>
   );
 }
 
-function FeatureCard({
+function LinkCard({
   title,
   description,
-  status,
+  to,
+  icon,
 }: {
   title: string;
   description: string;
-  status: string;
+  to: string;
+  icon: string;
 }) {
   return (
-    <div
+    <Link
+      to={to}
       style={{
-        padding: '1.5rem',
-        borderRadius: 'var(--radius-lg)',
-        backgroundColor: 'var(--color-neutral-50)',
-        border: '1px solid var(--color-neutral-200)',
-        boxShadow: 'var(--shadow-sm)',
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        textDecoration: 'none',
+        display: 'block',
       }}
     >
-      <h3
+      <div
         style={{
-          fontSize: '1.25rem',
-          fontWeight: '600',
-          marginBottom: '0.5rem',
-          color: 'var(--color-neutral-900)',
+          padding: '1.5rem',
+          borderRadius: 'var(--radius-lg)',
+          backgroundColor: 'var(--color-neutral-50)',
+          border: '1px solid var(--color-neutral-200)',
+          boxShadow: 'var(--shadow-sm)',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+          cursor: 'pointer',
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.transform = 'translateY(-4px)';
+          e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+          e.currentTarget.style.borderColor = 'var(--color-primary-300)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+          e.currentTarget.style.borderColor = 'var(--color-neutral-200)';
         }}
       >
-        {title}
-      </h3>
-      <p
-        style={{
-          fontSize: '0.875rem',
-          color: 'var(--color-neutral-600)',
-          marginBottom: '1rem',
-          lineHeight: '1.5',
-        }}
-      >
-        {description}
-      </p>
-      <span
-        style={{
-          display: 'inline-block',
-          padding: '0.25rem 0.75rem',
-          borderRadius: 'var(--radius-full)',
-          backgroundColor: 'var(--color-primary-100)',
-          color: 'var(--color-primary-700)',
-          fontSize: '0.75rem',
-          fontWeight: '600',
-        }}
-      >
-        {status}
-      </span>
-    </div>
+        <div
+          style={{
+            fontSize: '2.5rem',
+            marginBottom: '0.75rem',
+          }}
+        >
+          {icon}
+        </div>
+        <h3
+          style={{
+            fontSize: '1.25rem',
+            fontWeight: '600',
+            marginBottom: '0.5rem',
+            color: 'var(--color-neutral-900)',
+          }}
+        >
+          {title}
+        </h3>
+        <p
+          style={{
+            fontSize: '0.875rem',
+            color: 'var(--color-neutral-600)',
+            marginBottom: '1rem',
+            lineHeight: '1.5',
+          }}
+        >
+          {description}
+        </p>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            padding: '0.25rem 0.75rem',
+            borderRadius: 'var(--radius-full)',
+            backgroundColor: 'var(--color-primary-50)',
+            color: 'var(--color-primary-700)',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            transition: 'background-color 0.2s ease',
+          }}
+        >
+          Access
+          <span style={{ fontSize: '0.875rem' }}>→</span>
+        </span>
+      </div>
+    </Link>
   );
 }

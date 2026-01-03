@@ -1,9 +1,14 @@
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from '@remix-run/react';
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from '@remix-run/react';
 import type { LinksFunction } from '@remix-run/node';
+import { useMemo } from 'react';
 
 import './styles/global.css';
+import { Header } from './components/layout/Header';
+import { Sidebar } from './components/layout/Sidebar';
+import { Footer } from './components/layout/Footer';
 
 export const links: LinksFunction = () => [
+  { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
   { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
   {
@@ -21,7 +26,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body>
+      <body style={{ backgroundColor: 'var(--color-neutral-50)' }}>
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -31,5 +36,57 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  const location = useLocation();
+  
+  // Dynamic page title based on current path
+  const pageTitle = useMemo((): string => {
+    const pathMap: Record<string, string> = {
+      '/': 'Dashboard',
+      '/dashboard': 'Dashboard',
+      '/tours': 'Tours Management',
+      '/cities': 'Cities',
+      '/categories': 'Categories',
+      '/news': 'News',
+      '/offers': 'Offers',
+      '/reservations': 'Reservations',
+      '/users': 'Users & Roles',
+      '/settings': 'Settings',
+    };
+    
+    // Check exact path match first
+    if (pathMap[location.pathname]) {
+      return pathMap[location.pathname]!;
+    }
+    
+    // Check for partial matches (e.g., /tours/123)
+    const matchedPath = Object.keys(pathMap).find(path => 
+      location.pathname.startsWith(`${path}/`)
+    );
+    
+    if (matchedPath && pathMap[matchedPath]) {
+      return pathMap[matchedPath]!;
+    }
+    
+    return 'Tours Admin';
+  }, [location.pathname]);
+
+  return (
+    <div style={{ minHeight: '100vh' }}>
+      <Sidebar />
+      <div style={{ marginLeft: 'var(--sidebar-width)' }}>
+        <Header title={pageTitle} />
+        <main 
+          style={{
+            paddingTop: 'var(--header-height)',
+            paddingBottom: '80px',
+            paddingLeft: 'var(--space-6)',
+            paddingRight: 'var(--space-6)',
+          }}
+        >
+          <Outlet />
+        </main>
+        <Footer />
+      </div>
+    </div>
+  );
 }
