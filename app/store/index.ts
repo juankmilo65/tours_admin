@@ -4,15 +4,15 @@
  */
 
 import { configureStore } from '@reduxjs/toolkit';
-import authReducer from './slices/authSlice';
-import toursReducer from './slices/toursSlice';
-import usersReducer from './slices/usersSlice';
-import reservationsReducer from './slices/reservationsSlice';
-import citiesReducer from './slices/citiesSlice';
-import categoriesReducer from './slices/categoriesSlice';
-import newsReducer from './slices/newsSlice';
-import offersReducer from './slices/offersSlice';
-import uiReducer from './slices/uiSlice';
+import authReducer from '~/store/slices/authSlice';
+import toursReducer from '~/store/slices/toursSlice';
+import usersReducer from '~/store/slices/usersSlice';
+import reservationsReducer from '~/store/slices/reservationsSlice';
+import citiesReducer from '~/store/slices/citiesSlice';
+import categoriesReducer from '~/store/slices/categoriesSlice';
+import newsReducer from '~/store/slices/newsSlice';
+import offersReducer from '~/store/slices/offersSlice';
+import uiReducer from '~/store/slices/uiSlice';
 
 export const store = configureStore({
   reducer: {

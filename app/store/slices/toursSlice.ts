@@ -1,30 +1,18 @@
 /**
  * Tours Slice
- * Manages tours state
+ * Manages tours state - UI state only, data fetching is handled by Remix loaders
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-
-export interface Tour {
-  id: string;
-  title: string;
-  description: string;
-  price: number;
-  duration: string;
-  capacity: number;
-  categoryId: string;
-  cityId: string;
-  imageUrl?: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Tour, Pagination, TourFilters } from '~/types/PayloadTourDataProps';
 
 interface ToursState {
   tours: Tour[];
   selectedTour: Tour | null;
   isLoading: boolean;
   error: string | null;
+  filters: TourFilters;
+  pagination: Pagination;
 }
 
 const initialState: ToursState = {
@@ -32,55 +20,71 @@ const initialState: ToursState = {
   selectedTour: null,
   isLoading: false,
   error: null,
+  filters: {
+    countryCode: 'CO',
+    city: '',
+    category: '',
+    difficulty: '',
+    minPrice: '',
+    maxPrice: '',
+    page: '1',
+    limit: '10',
+  },
+  pagination: {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+  },
 };
 
 const toursSlice = createSlice({
   name: 'tours',
   initialState,
   reducers: {
-    fetchToursStart: (state) => {
-      state.isLoading = true;
-      state.error = null;
-    },
-    fetchToursSuccess: (state, action: PayloadAction<Tour[]>) => {
+    setTours: (state, action: PayloadAction<Tour[]>) => {
       state.tours = action.payload;
       state.isLoading = false;
       state.error = null;
     },
-    fetchToursFailure: (state, action: PayloadAction<string>) => {
-      state.tours = [];
-      state.isLoading = false;
-      state.error = action.payload;
+    setPagination: (state, action: PayloadAction<Pagination>) => {
+      state.pagination = action.payload;
     },
-    addTour: (state, action: PayloadAction<Tour>) => {
-      state.tours.push(action.payload);
+    setFilters: (state, action: PayloadAction<Partial<TourFilters>>) => {
+      state.filters = { ...state.filters, ...action.payload };
     },
-    updateTour: (state, action: PayloadAction<Tour>) => {
-      const index = state.tours.findIndex((t) => t.id === action.payload.id);
-      if (index !== -1) {
-        state.tours[index] = action.payload;
-      }
-    },
-    deleteTour: (state, action: PayloadAction<string>) => {
-      state.tours = state.tours.filter((t) => t.id !== action.payload);
+    setPage: (state, action: PayloadAction<number>) => {
+      state.pagination.page = action.payload;
     },
     setSelectedTour: (state, action: PayloadAction<Tour | null>) => {
       state.selectedTour = action.payload;
     },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+      state.isLoading = false;
+    },
     clearError: (state) => {
       state.error = null;
+    },
+    clearFilters: (state) => {
+      state.filters = initialState.filters;
     },
   },
 });
 
 export const {
-  fetchToursStart,
-  fetchToursSuccess,
-  fetchToursFailure,
-  addTour,
-  updateTour,
-  deleteTour,
+  setTours,
+  setPagination,
+  setFilters,
+  setPage,
   setSelectedTour,
+  setLoading,
+  setError,
   clearError,
+  clearFilters,
 } = toursSlice.actions;
+
 export default toursSlice.reducer;
