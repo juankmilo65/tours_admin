@@ -4,29 +4,41 @@
  */
 
 :root {
-  /* Colors - Primary - Military Green */
-  --color-primary-50: #f0fdf4;
-  --color-primary-100: #dcfce7;
-  --color-primary-200: #bbf7d0;
-  --color-primary-300: #86efac;
-  --color-primary-400: #4ade80;
+  /* Colors - Primary - Soft Military Green */
+  --color-primary-50: #f0fdf9;
+  --color-primary-100: #dcfce8;
+  --color-primary-200: #b6f7c8;
+  --color-primary-300: #7ce4a3;
+  --color-primary-400: #4bcd7c;
   --color-primary-500: #22c55e;
   --color-primary-600: #16a34a;
   --color-primary-700: #15803d;
   --color-primary-800: #166534;
   --color-primary-900: #14532d;
 
-  /* Colors - Primary Dark - Military Green Dark */
-  --color-primary-dark-50: #1a2f1a;
-  --color-primary-dark-100: #243d24;
-  --color-primary-dark-200: #2f4b2f;
-  --color-primary-dark-300: #3a593a;
-  --color-primary-dark-400: #456745;
-  --color-primary-dark-500: #507550;
-  --color-primary-dark-600: #5b835b;
-  --color-primary-dark-700: #4a6b4a;
-  --color-primary-dark-800: #3d563d;
-  --color-primary-dark-900: #304130;
+  /* Colors - Primary Light - Lighter Military Green */
+  --color-primary-light-50: #f7fdfb;
+  --color-primary-light-100: #ecfccb;
+  --color-primary-light-200: #d9f99d;
+  --color-primary-light-300: #bef264;
+  --color-primary-light-400: #a3e635;
+  --color-primary-light-500: #84cc16;
+  --color-primary-light-600: #65a30d;
+  --color-primary-light-700: #4d7c0f;
+  --color-primary-light-800: #3f6212;
+  --color-primary-light-900: #365314;
+
+  /* Colors - Primary Dark - Softer Military Green */
+  --color-primary-dark-50: #e2e8f0;
+  --color-primary-dark-100: #cbd5e1;
+  --color-primary-dark-200: #94a3b8;
+  --color-primary-dark-300: #64748b;
+  --color-primary-dark-400: #475569;
+  --color-primary-dark-500: #334155;
+  --color-primary-dark-600: #1e293b;
+  --color-primary-dark-700: #0f172a;
+  --color-primary-dark-800: #020617;
+  --color-primary-dark-900: #0f172a;
 
   /* Colors - Secondary */
   --color-secondary-50: #f5f3ff;
@@ -76,17 +88,17 @@
   --color-error-800: #991b1b;
   --color-error-900: #7f1d1d;
 
-  /* Colors - Neutral */
-  --color-neutral-50: #fafafa;
-  --color-neutral-100: #f4f4f5;
-  --color-neutral-200: #e4e4e7;
-  --color-neutral-300: #d4d4d8;
-  --color-neutral-400: #a1a1aa;
-  --color-neutral-500: #71717a;
-  --color-neutral-600: #52525b;
-  --color-neutral-700: #3f3f46;
-  --color-neutral-800: #27272a;
-  --color-neutral-900: #18181b;
+  /* Colors - Neutral - Softer and Lighter */
+  --color-neutral-50: #ffffff;
+  --color-neutral-100: #f8fafc;
+  --color-neutral-200: #f1f5f9;
+  --color-neutral-300: #e2e8f0;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
 
   /* Typography - Font Families */
   --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',

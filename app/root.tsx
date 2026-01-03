@@ -1,6 +1,6 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from '@remix-run/react';
 import type { LinksFunction } from '@remix-run/node';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 import './styles/global.css';
 import { Header } from './components/layout/Header';
@@ -37,7 +37,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const location = useLocation();
-  
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Solo para móvil
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Solo para desktop
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if screen is mobile
+  useEffect(() => {
+    function checkMobile() {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      // Auto-close sidebar on mobile
+      if (mobile && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      }
+    }
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [isSidebarOpen]);
+
+  // Toggle sidebar (mobile)
+  function toggleSidebar() {
+    setIsSidebarOpen(!isSidebarOpen);
+  }
+
+  // Toggle sidebar collapse (desktop)
+  function toggleSidebarCollapse() {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  }
+
   // Dynamic page title based on current path
   const pageTitle = useMemo((): string => {
     const pathMap: Record<string, string> = {
@@ -72,9 +101,15 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Sidebar />
-      <div style={{ marginLeft: 'var(--sidebar-width)' }}>
-        <Header title={pageTitle} />
+      <Sidebar isOpen={isSidebarOpen} isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
+      <div style={{ marginLeft: isMobile ? 0 : (isSidebarCollapsed ? '80px' : '280px'), transition: 'margin-left var(--transition-base)' }}>
+        <Header 
+          title={pageTitle} 
+          isSidebarOpen={isSidebarOpen} 
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={toggleSidebar} 
+          onToggleSidebarCollapse={toggleSidebarCollapse}
+        />
         <main 
           style={{
             paddingTop: 'var(--header-height)',

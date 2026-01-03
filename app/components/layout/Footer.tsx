@@ -2,28 +2,45 @@
  * Footer Component - Copyright Information
  */
 
+import { useState, useEffect } from 'react';
+
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if screen is mobile
+  useEffect(() => {
+    function checkMobile() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
     <footer 
       style={{
-        backgroundColor: 'white',
+        backgroundColor: 'var(--color-neutral-50)',
         borderTop: '1px solid var(--color-neutral-200)',
-        padding: 'var(--space-4) var(--space-6)',
+        padding: isMobile ? 'var(--space-4) var(--space-4)' : 'var(--space-4) var(--space-6)',
       }}
     >
       <div 
         style={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          justifyContent: isMobile ? 'center' : 'space-between',
           fontSize: 'var(--text-sm)',
-          color: 'var(--color-neutral-600)',
+          color: 'var(--color-neutral-500)',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? 'var(--space-4)' : 0,
+          textAlign: isMobile ? 'center' : 'left',
         }}
       >
         <p style={{ margin: 0 }}>© {currentYear} Tours Admin. All rights reserved.</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 'var(--space-3)' : 'var(--space-4)', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
           <a 
             href="#"
             style={{
@@ -32,7 +49,7 @@ export function Footer() {
               transition: 'color var(--transition-base)',
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.color = 'var(--color-neutral-900)';
+              e.currentTarget.style.color = 'var(--color-neutral-700)';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.color = 'inherit';
@@ -48,7 +65,7 @@ export function Footer() {
               transition: 'color var(--transition-base)',
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.color = 'var(--color-neutral-900)';
+              e.currentTarget.style.color = 'var(--color-neutral-700)';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.color = 'inherit';
@@ -64,7 +81,7 @@ export function Footer() {
               transition: 'color var(--transition-base)',
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.color = 'var(--color-neutral-900)';
+              e.currentTarget.style.color = 'var(--color-neutral-700)';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.color = 'inherit';

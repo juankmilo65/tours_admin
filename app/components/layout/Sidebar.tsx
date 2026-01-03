@@ -3,6 +3,7 @@
  */
 
 import { Link, useLocation } from '@remix-run/react';
+import { useState, useEffect } from 'react';
 
 interface NavItem {
   path: string;
@@ -19,116 +20,218 @@ const navItems: NavItem[] = [
   { path: '/offers', label: 'Offers', icon: '🎁' },
   { path: '/reservations', label: 'Reservations', icon: '📅' },
   { path: '/users', label: 'Users', icon: '👥' },
-  { path: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  isCollapsed: boolean;
+  onToggle: () => void;
+}
+
+export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const currentPath = location.pathname;
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if screen is mobile
+  useEffect(() => {
+    function checkMobile() {
+      setIsMobile(window.innerWidth < 1024);
+    }
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Close sidebar when clicking on a link (mobile only)
+  function handleLinkClick() {
+    if (isMobile) {
+      onToggle();
+    }
+  }
 
   return (
-    <aside 
-      style={{
-        width: 'var(--sidebar-width)',
-        backgroundColor: 'var(--color-primary-dark-900)',
-        color: 'white',
-        height: '100vh',
-        position: 'fixed',
-        left: 0,
-        top: 0,
-        overflowY: 'auto',
-      }}
-    >
-      <div 
+    <>
+      {/* Backdrop Overlay for Mobile */}
+      {isMobile && isOpen && (
+        <div
+          onClick={onToggle}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 'var(--z-modal-backdrop)',
+            transition: 'opacity var(--transition-base)',
+          }}
+        ></div>
+      )}
+
+      <aside 
         style={{
-          padding: 'var(--space-6)',
-          borderBottom: '1px solid var(--color-primary-dark-700)',
+          width: isMobile ? '280px' : (isCollapsed ? '80px' : '280px'),
+          backgroundColor: 'var(--color-primary-light-50)',
+          color: 'var(--color-neutral-800)',
+          height: '100vh',
+          position: 'fixed',
+          left: isMobile ? (isOpen ? '0' : '-280px') : 0,
+          top: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          borderRight: '1px solid var(--color-neutral-200)',
+          zIndex: 'var(--z-modal)',
+          transition: 'width var(--transition-base), left var(--transition-base)',
         }}
       >
-        <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-weight-bold)' }}>
-          Tours Admin
-        </h1>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-primary-300)', marginTop: 'var(--space-1)' }}>
-          Management Dashboard
-        </p>
-      </div>
-
-      <nav style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {navItems.map((item) => {
-          const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
+        {isMobile && (
+          <div 
+            style={{
+              padding: 'var(--space-4)',
+              borderBottom: '1px solid var(--color-neutral-200)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <button
+              onClick={onToggle}
               style={{
-                textDecoration: 'none',
+                width: '32px',
+                height: '32px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 'var(--space-3)',
-                padding: 'var(--space-3) var(--space-4)',
-                borderRadius: 'var(--radius-lg)',
+                justifyContent: 'center',
+                fontSize: 'var(--text-lg)',
+                color: 'var(--color-neutral-700)',
                 transition: 'background-color var(--transition-base)',
-                color: isActive ? 'white' : 'var(--color-primary-300)',
-                backgroundColor: isActive ? 'var(--color-primary-600)' : 'transparent',
               }}
               onMouseOver={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'var(--color-primary-dark-700)';
-                  e.currentTarget.style.color = 'white';
-                }
+                e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';
               }}
               onMouseOut={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = 'var(--color-primary-300)';
-                }
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              <span style={{ fontSize: 'var(--text-xl)' }}>{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+              ✕
+            </button>
+          </div>
+        )}
 
-      <div 
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: 'var(--space-4)',
-          borderTop: '1px solid var(--color-primary-dark-700)',
-        }}
-      >
-        <button
+        {/* Logo/Title Section */}
+        <div 
           style={{
-            width: '100%',
+            padding: isCollapsed ? 'var(--space-4)' : 'var(--space-6)',
+            borderBottom: '1px solid var(--color-neutral-200)',
             display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-3)',
-            padding: 'var(--space-3) var(--space-4)',
-            color: 'var(--color-primary-300)',
-            backgroundColor: 'transparent',
-            border: 'none',
-            borderRadius: 'var(--radius-lg)',
-            fontSize: 'inherit',
-            cursor: 'pointer',
-            transition: 'background-color var(--transition-base)',
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-primary-dark-700)';
-            e.currentTarget.style.color = 'white';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--color-primary-300)';
+            flexDirection: 'column',
+            alignItems: isCollapsed ? 'center' : 'flex-start',
           }}
         >
-          <span style={{ fontSize: 'var(--text-xl)' }}>🚪</span>
-          <span>Logout</span>
-        </button>
-      </div>
-    </aside>
+          {!isCollapsed && (
+            <>
+              <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary-700)' }}>
+                Tours Admin
+              </h1>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)', marginTop: 'var(--space-1)' }}>
+                Management Dashboard
+              </p>
+            </>
+          )}
+          {isCollapsed && (
+            <span style={{ fontSize: '28px' }}>🏛️</span>
+          )}
+        </div>
+
+        <nav style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+          {navItems.map((item) => {
+            const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={handleLinkClick}
+                style={{
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: isCollapsed ? 0 : 'var(--space-3)',
+                  padding: isCollapsed ? 'var(--space-3)' : 'var(--space-3) var(--space-4)',
+                  borderRadius: 'var(--radius-lg)',
+                  transition: 'all var(--transition-base)',
+                  color: isActive ? 'var(--color-primary-700)' : 'var(--color-neutral-600)',
+                  backgroundColor: isActive ? 'var(--color-primary-50)' : 'transparent',
+                  fontWeight: isActive ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
+                  justifyContent: isCollapsed ? 'center' : 'flex-start',
+                }}
+                onMouseOver={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
+                    e.currentTarget.style.color = 'var(--color-neutral-800)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--color-neutral-600)';
+                  }
+                }}
+                title={isCollapsed ? item.label : ''}
+              >
+                <span style={{ fontSize: 'var(--text-xl)' }}>{item.icon}</span>
+                {!isCollapsed && <span>{item.label}</span>}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Logout Button */}
+        <div 
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: 'var(--space-4)',
+            borderTop: '1px solid var(--color-neutral-200)',
+          }}
+        >
+          <button
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: isCollapsed ? 0 : 'var(--space-3)',
+              padding: isCollapsed ? 'var(--space-3)' : 'var(--space-3) var(--space-4)',
+              color: 'var(--color-neutral-600)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderRadius: 'var(--radius-lg)',
+              fontSize: 'inherit',
+              cursor: 'pointer',
+              transition: 'all var(--transition-base)',
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
+              e.currentTarget.style.color = 'var(--color-error-600)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--color-neutral-600)';
+            }}
+            title={isCollapsed ? 'Logout' : ''}
+          >
+            <span style={{ fontSize: 'var(--text-xl)' }}>🚪</span>
+            {!isCollapsed && <span>Logout</span>}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
