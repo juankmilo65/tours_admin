@@ -16,7 +16,14 @@ export interface City {
   updatedAt: string;
 }
 
+export interface Country {
+  code: string;
+  name: string;
+  flag?: string;
+}
+
 interface CitiesState {
+  countries: Country[];
   cities: City[];
   selectedCity: City | null;
   isLoading: boolean;
@@ -24,6 +31,7 @@ interface CitiesState {
 }
 
 const initialState: CitiesState = {
+  countries: [],
   cities: [],
   selectedCity: null,
   isLoading: false,
@@ -34,6 +42,9 @@ const citiesSlice = createSlice({
   name: 'cities',
   initialState,
   reducers: {
+    setCountries: (state, action: PayloadAction<Country[]>) => {
+      state.countries = action.payload;
+    },
     fetchCitiesStart: (state) => {
       state.isLoading = true;
       state.error = null;
@@ -70,6 +81,7 @@ const citiesSlice = createSlice({
 });
 
 export const {
+  setCountries,
   fetchCitiesStart,
   fetchCitiesSuccess,
   fetchCitiesFailure,

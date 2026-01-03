@@ -23,14 +23,18 @@ const generatePayload = (formData: FormData, token: string = ''): ToursPayload =
  */
 const getToursBusiness = async (data: ToursPayload): Promise<ServiceResult<unknown>> => {
   try {
+    const { filters = {}, token, language = 'es' } = data;
+    const { cityId, ...queryParams } = filters;
+    
     const payload = {
-      data: data.filters || {},
-      token: data.token
+      cityId,
+      data: queryParams,
+      token,
+      language,
+      currency: 'MXN'
     };
 
-    console.log('🔧 Business Logic - Calling getTours with:', payload);
     const result = await getTours(payload);
-    console.log('🔧 Business Logic - Result from service:', result);
     
     return result;
   } catch (error) {

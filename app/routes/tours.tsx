@@ -2,189 +2,153 @@
  * Tours Route - Tours Management List with Remix Loader
  */
 
-import { useEffect, useState } from 'react';
-import { useLoaderData, useFetcher, useNavigation, useSearchParams } from '@remix-run/react';
-import { data, type LoaderFunctionArgs } from '@remix-run/node';
+import { useState, useContext } from 'react';
+import { useLoaderData, useNavigation, useSearchParams, useNavigate } from '@remix-run/react';
+import { json, type LoaderFunctionArgs } from '@remix-run/node';
+import type { Tour, Pagination, City } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
-import { getSession } from '~/utilities/sessions';
-import tourBL from '~/server/businessLogic/toursBusinessLogic';
-import type { Tour, PayloadTourDataProps, TourFilters, PayloadPropertyProps } from '~/types/PayloadTourDataProps';
+import toursBusinessLogic from '~/server/businessLogic/toursBusinessLogic';
+import { CitiesContext } from '~/root';
 
-/**
- * Get tours using business logic
- */
-const getTours = async (filters: TourFilters = {}, language: string = 'es') => {
-  try {
-    const formData = new FormData();
-    formData.append('action', 'getToursBusiness');
-    formData.append('filters', JSON.stringify(filters));
-    formData.append('language', language);
-  
-    const tours = await tourBL(formData);
-    
-  
-    return tours;
-  } catch (error) {
-    console.error('Error getting tours:', error);
-    return {
-      success: false,
-      data: [],
-      pagination: { page: 1, limit: 10, total: 0, totalPages: 1 }
-    };
-  }
-};
+interface ToursResponse {
+  success: boolean;
+  data: Tour[];
+  pagination: Pagination;
+}
 
-/**
- * Actions loader - handles different actions
- */
-const actionsLoader = async (action: string, parameters: PayloadPropertyProps) => {
-  const ACTIONS = {
-    getTours: async () => await getTours(parameters.filters || {}, parameters.language || 'es'),
-    // TODO: Add more actions here as needed
-    // updateTour: async () => await updateTour(...),
-    // deleteTour: async () => await deleteTour(...),
-    // createTour: async () => await createTour(...),
+interface ToursResult {
+  success: boolean;
+  data: Tour[];
+  pagination: Pagination;
+  error?: unknown;
+}
+
+// Loader function - runs on server
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const cityId = url.searchParams.get('cityId');
+
+  // If cityId is provided, load tours for that city
+  let toursResponse: ToursResponse = {
+    success: false,
+    data: [],
+    pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
   };
 
-  if (action && action in ACTIONS) {
-    return ACTIONS[action as keyof typeof ACTIONS]();
-  }
-  throw new Error(`Invalid action: ${action}`);
-};
-
-/**
- * Loader function - runs on the server
- */
-export async function loader({ request }: LoaderFunctionArgs) {
-  try {
-    const url = new URL(request.url);
-    const session = await getSession(request.headers.get('Cookie'));
-    const token = session.get('id_token');
-
-    // Get query parameters
+  if (cityId) {
     const page = url.searchParams.get('page') || '1';
     const limit = url.searchParams.get('limit') || '10';
     const category = url.searchParams.get('category') || '';
-    const city = url.searchParams.get('city') || '';
     const difficulty = url.searchParams.get('difficulty') || '';
     const minPrice = url.searchParams.get('minPrice') || '';
     const maxPrice = url.searchParams.get('maxPrice') || '';
-    const action = url.searchParams.get('action');
 
-    // Build filters
-    const filters: TourFilters = {
-      countryCode: 'CO',
+    // Build filters payload
+    const filters = {
+      cityId,
       page,
       limit,
-      ...(category && { category }),
-      ...(city && { city }),
-      ...(difficulty && { difficulty }),
-      ...(minPrice && { minPrice }),
-      ...(maxPrice && { maxPrice }),
+      category,
+      difficulty,
+      minPrice,
+      maxPrice,
     };
 
-    // Clear session status
-    session.set('statusCode', undefined);
-    session.set('statusText', undefined);
+    // Create FormData for business logic
+    const formData = new FormData();
+    formData.append('action', 'getToursBusiness');
+    formData.append('language', 'es');
+    formData.append('filters', JSON.stringify(filters));
 
-    let tours: PayloadTourDataProps;
-
-    // Handle different actions with switch
-    switch (action) {
-      case 'getTours':
-        tours = (await actionsLoader('getTours', { filters, language: 'es', token })) as PayloadTourDataProps;
-        break;
-      // TODO: Add more cases here
-      // case 'updateTour':
-      //   tours = (await actionsLoader('updateTour', { filters, language: 'es', token })) as PayloadTourDataProps;
-      //   break;
-      default:
-        tours = (await actionsLoader('getTours', { filters, language: 'es', token })) as PayloadTourDataProps;
-        break;
+    // Call business logic with FormData
+    const result = await toursBusinessLogic(formData, '') as ToursResult;
+    
+    if (!result.error && result.success) {
+      toursResponse = {
+        success: result.success,
+        data: result.data,
+        pagination: result.pagination,
+      };
     }
-console.log('📦 Loader fetched tours:', tours);
-    console.log('   - success:', tours?.success);
-    console.log('   - data length:', tours?.data?.length);
-    console.log('   - pagination:', tours?.pagination);
-    return data({ tours });
-  } catch (error) {
-    console.error('Error in loader:', error);
-    return data(
-      {
-        tours: {
-          success: false,
-          data: [],
-          pagination: { page: 1, limit: 10, total: 0, totalPages: 1 }
-        }
-      },
-      { status: 500 }
-    );
   }
+
+  return json({
+    tours: toursResponse,
+    cityId: cityId || '',
+  });
 }
 
 export default function Tours() {
   const loaderData = useLoaderData<typeof loader>();
+  const citiesContext = useContext(CitiesContext);
+  const cities = citiesContext?.cities || [];
+  
   const navigation = useNavigation();
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // Extract tours data from loader
-  console.log('🔍 Loader data:', loaderData);
-  // Access data.tours because data() wraps the response
-  const toursData = ((loaderData as any)?.data?.tours || (loaderData as any)?.tours) as PayloadTourDataProps;
-  console.log('🔍 Tours data extracted:', toursData);
+  const navigate = useNavigate();
   
-  const [tours, setTours] = useState<Tour[]>(toursData?.data || []);
-  const [pagination, setPagination] = useState(toursData?.pagination || {
+  // State for selected city and tours
+  const [selectedCityId, setSelectedCityId] = useState(loaderData.cityId || '');
+  const [tours, setTours] = useState<Tour[]>(loaderData.tours.data || []);
+  const [pagination, setPagination] = useState(loaderData.tours.pagination || {
     page: 1,
     limit: 10,
     total: 0,
     totalPages: 1,
   });
 
-  // Update state when loader data changes
-  useEffect(() => {
-    console.log('🔄 useEffect triggered - toursData:', toursData);
-    if (toursData) {
-      console.log('✅ Tours data found:', toursData);
-      console.log('   - data array:', toursData.data);
-      console.log('   - pagination:', toursData.pagination);
-      setTours(toursData.data || []);
-      setPagination(toursData.pagination || { page: 1, limit: 10, total: 0, totalPages: 1 });
-    } else {
-      console.log('❌ No tours data available');
-    }
-  }, [toursData]);
-
   // Check if navigation is loading
   const isLoading = navigation.state === 'loading';
 
-  // Handle page change - navigates to new URL
-  const handlePageChange = (newPage: number) => {
-    setSearchParams((prev) => {
-      prev.set('page', newPage.toString());
-      return prev;
+  // Handle filter button click - update URL with cityId
+  const handleFilter = () => {
+    if (!selectedCityId) {
+      alert('Por favor selecciona una ciudad');
+      return;
+    }
+
+    const category = searchParams.get('category') || '';
+    const difficulty = searchParams.get('difficulty') || '';
+    const minPrice = searchParams.get('minPrice') || '';
+    const maxPrice = searchParams.get('maxPrice') || '';
+
+    setSearchParams({
+      cityId: selectedCityId,
+      page: '1',
+      category,
+      difficulty,
+      minPrice,
+      maxPrice,
     });
   };
 
-  // Handle filter changes - navigates to new URL
+  // Handle page change - updates URL params
+  const handlePageChange = (newPage: number) => {
+    setSearchParams((prev) => ({
+      ...Object.fromEntries(prev.entries()),
+      page: newPage.toString(),
+    }));
+  };
+
+  // Handle filter changes - updates URL params
   const handleFilterChange = (key: string, value: string) => {
-    setSearchParams((prev) => {
-      prev.set(key, value);
-      prev.set('page', '1'); // Reset to first page
-      return prev;
-    });
+    setSearchParams((prev) => ({
+      ...Object.fromEntries(prev.entries()),
+      [key]: value,
+      page: '1', // Reset to first page
+    }));
   };
 
   // Clear all filters
   const handleClearFilters = () => {
-    setSearchParams((prev) => {
-      prev.delete('city');
-      prev.delete('category');
-      prev.delete('difficulty');
-      prev.delete('minPrice');
-      prev.delete('maxPrice');
-      prev.set('page', '1');
-      return prev;
+    setSelectedCityId('');
+    setSearchParams({
+      cityId: '',
+      page: '1',
+      category: '',
+      difficulty: '',
+      minPrice: '',
+      maxPrice: '',
     });
   };
 
@@ -251,7 +215,7 @@ export default function Tours() {
               alignItems: 'end',
             }}
           >
-            {/* City Filter */}
+            {/* City Filter - Required */}
             <div>
               <label
                 style={{
@@ -262,24 +226,19 @@ export default function Tours() {
                   marginBottom: 'var(--space-2)',
                 }}
               >
-                Ciudad
+                Ciudad *
               </label>
-              <input
-                type="text"
-                name="city"
-                defaultValue={searchParams.get('city') || ''}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleFilterChange('city', e.currentTarget.value);
-                  }
-                }}
-                placeholder="Todas las ciudades"
+              <select
+                value={selectedCityId}
+                onChange={(e) => setSelectedCityId(e.target.value)}
                 style={{
                   width: '100%',
                   padding: 'var(--space-3)',
                   border: '1px solid var(--color-neutral-300)',
                   borderRadius: 'var(--radius-md)',
                   fontSize: 'var(--text-base)',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
                   transition: 'border-color 0.2s ease',
                 }}
                 onFocus={(e) => {
@@ -290,7 +249,14 @@ export default function Tours() {
                   e.currentTarget.style.borderColor = 'var(--color-neutral-300)';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
-              />
+              >
+                <option value="">Selecciona una ciudad</option>
+                {cities.map((city: City) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name}, {city.country}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Category Filter */}
@@ -308,7 +274,7 @@ export default function Tours() {
               </label>
               <select
                 name="category"
-                defaultValue={searchParams.get('category') || ''}
+                value={searchParams.get('category') || ''}
                 onChange={(e) => handleFilterChange('category', e.target.value)}
                 style={{
                   width: '100%',
@@ -353,7 +319,7 @@ export default function Tours() {
               </label>
               <select
                 name="difficulty"
-                defaultValue={searchParams.get('difficulty') || ''}
+                value={searchParams.get('difficulty') || ''}
                 onChange={(e) => handleFilterChange('difficulty', e.target.value)}
                 style={{
                   width: '100%',
@@ -399,11 +365,7 @@ export default function Tours() {
                   type="number"
                   name="minPrice"
                   defaultValue={searchParams.get('minPrice') || ''}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleFilterChange('minPrice', e.currentTarget.value);
-                    }
-                  }}
+                  onChange={(e) => handleFilterChange('minPrice', e.target.value)}
                   placeholder="Mín"
                   style={{
                     flex: 1,
@@ -427,11 +389,7 @@ export default function Tours() {
                   type="number"
                   name="maxPrice"
                   defaultValue={searchParams.get('maxPrice') || ''}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleFilterChange('maxPrice', e.currentTarget.value);
-                    }
-                  }}
+                  onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
                   placeholder="Máx"
                   style={{
                     flex: 1,
@@ -451,6 +409,35 @@ export default function Tours() {
                   }}
                 />
               </div>
+            </div>
+
+            {/* Filter Button */}
+            <div>
+              <button
+                onClick={handleFilter}
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: 'var(--space-3) var(--space-4)',
+                  backgroundColor: 'var(--color-primary-500)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  transition: 'background-color 0.2s ease',
+                }}
+                onMouseOver={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-primary-600)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary-500)';
+                }}
+              >
+                Filtrar
+              </button>
             </div>
 
             {/* Clear Filters Button */}
@@ -527,7 +514,7 @@ export default function Tours() {
         )}
 
         {/* Empty State */}
-        {!isLoading && tours.length === 0 && (
+        {!isLoading && tours.length === 0 && selectedCityId && (
           <div
             style={{
               textAlign: 'center',
@@ -552,6 +539,36 @@ export default function Tours() {
             </h3>
             <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-4)' }}>
               Intenta ajustar los filtros para ver más resultados.
+            </p>
+          </div>
+        )}
+
+        {/* Initial State - No city selected */}
+        {!isLoading && tours.length === 0 && !selectedCityId && (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: 'var(--space-12)',
+              backgroundColor: 'white',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--color-neutral-200)',
+            }}
+          >
+            <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>
+              🌍
+            </div>
+            <h3
+              style={{
+                fontSize: 'var(--text-xl)',
+                fontWeight: 'var(--font-weight-semibold)',
+                color: 'var(--color-neutral-900)',
+                marginBottom: 'var(--space-2)',
+              }}
+            >
+              Selecciona una ciudad
+            </h3>
+            <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-4)' }}>
+              Elige una ciudad para ver los tours disponibles.
             </p>
           </div>
         )}

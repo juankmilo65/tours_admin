@@ -20,6 +20,13 @@ export interface Category {
   name: string;
 }
 
+// Country Types
+export interface Country {
+  code: string;
+  name: string;
+  flag?: string;
+}
+
 // City Types
 export interface City {
   id: string;
@@ -67,8 +74,7 @@ export interface Pagination {
 
 // Tour Filters
 export interface TourFilters {
-  countryCode?: string;
-  city?: string;
+  cityId?: string;
   category?: string;
   difficulty?: string;
   minPrice?: string;
@@ -108,4 +114,7 @@ export interface PayloadPropertyProps {
 export interface ServicePayload {
   data?: TourFilters;
   token?: string;
+  cityId?: string;
+  language?: string;
+  currency?: string;
 }
