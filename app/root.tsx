@@ -1,5 +1,5 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation, useLoaderData } from '@remix-run/react';
-import {data, type  LinksFunction, type LoaderFunctionArgs, type ActionFunctionArgs } from '@remix-run/node';
+import { data, type LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
 import { useMemo, useState, useEffect, createContext } from 'react';
 
 import './styles/global.css';
@@ -26,17 +26,16 @@ function CitiesReduxDispatcher({ cities, countries, selectedCountryCode }: { cit
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    if (cities.length > 0) {
-      dispatch(fetchCitiesSuccess(cities));
-    }
+    // Always update cities, even if empty (important for country changes)
+    dispatch(fetchCitiesSuccess(cities));
     
     if (countries.length > 0) {
       dispatch(fetchCountriesSuccess(countries));
-      
-      // Set selected country in Redux
-      if (selectedCountryCode) {
-        dispatch(setSelectedCountryByCode(selectedCountryCode));
-      }
+    }
+    
+    // Always set selected country in Redux
+    if (selectedCountryCode) {
+      dispatch(setSelectedCountryByCode(selectedCountryCode));
     }
   }, [cities, countries, selectedCountryCode, dispatch]);
 
@@ -200,37 +199,7 @@ interface LoaderData {
   };
 }
 
-// Action to handle country change
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const _action = formData.get('_action');
-  
-  console.log('[root.tsx action] _action:', _action);
-  
-  if (_action === 'changeCountry') {
-    const countryCode = formData.get('countryCode') as string;
-    console.log('[root.tsx action] Changing country to:', countryCode);
-    
-    const session = await getSession(request.headers.get("Cookie"));
-    session.set("filters", { country: countryCode });
-    session.set("selectedCountryCode", countryCode);
-    
-    return data(
-      { success: true },
-      {
-        headers: {
-          "Set-Cookie": await commitSession(session),
-        },
-      }
-    );
-  }
-  
-  return data({ success: false });
-}
-
 export async function loader({ request }: LoaderFunctionArgs) {
-  console.log('[root.tsx loader] ====== LOADER START ======');
-  
   // Load cities and countries globally for all routes
   const session = await getSession(request.headers.get("Cookie"));
   
@@ -238,23 +207,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const cachedCountries = session.get("cachedCountries") as Country[] | undefined;
   const selectedCountryCode = session.get("selectedCountryCode") as string | undefined;
   
-  console.log('[root.tsx loader] Session selectedCountryCode:', selectedCountryCode);
-  console.log('[root.tsx loader] Has cached countries:', !!cachedCountries);
-  
   let countries: Country[] = [];
   
   // Only fetch countries if not cached
   if (cachedCountries && cachedCountries.length > 0) {
-    console.log('[root.tsx loader] Using cached countries:', cachedCountries);
     countries = cachedCountries;
   } else {
-    console.log('[root.tsx loader] Fetching countries from server...');
     // Fetch countries
     const countriesResult = await actionsLoader('getCountries', { language: 'es' });
-    console.log('[root.tsx loader] Countries result from server:', countriesResult);
-    
     const countriesData: string[] = countriesResult.success ? countriesResult.data : [];
-    console.log('[root.tsx loader] Countries data:', countriesData);
     
     // Transform countries data to match the Country interface
     countries = countriesData.map((countryName: string, index: number) => ({
@@ -264,7 +225,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
       isActive: true
     }));
     
-    console.log('[root.tsx loader] Transformed countries:', countries);
+    // Add demo countries for testing
+    const demoCountries: Country[] = [
+      { id: 'country-demo-1', code: 'colombia', name: 'Colombia', flag: '🇨🇴', isActive: true },
+      { id: 'country-demo-2', code: 'ecuador', name: 'Ecuador', flag: '🇪🇨', isActive: true },
+      { id: 'country-demo-3', code: 'brasil', name: 'Brasil', flag: '🇧🇷', isActive: true },
+      { id: 'country-demo-4', code: 'peru', name: 'Perú', flag: '🇵🇪', isActive: true },
+    ];
+    
+    // Add flag to Mexico if it exists
+    countries = countries.map(c => ({
+      ...c,
+      flag: c.name.toLowerCase() === 'mexico' ? '🇲🇽' : c.flag
+    }));
+    
+    // Merge with demo countries
+    countries = [...countries, ...demoCountries];
     
     // Cache countries in session
     session.set("cachedCountries", countries);
@@ -278,7 +254,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // Use first country from the list (default to Mexico if it exists)
     const mexicoCountry = countries.find(c => c.name.toLowerCase() === 'mexico');
     countryFilter = mexicoCountry ? mexicoCountry.code : countries[0]?.code;
-    console.log('[root.tsx loader] No selectedCountryCode, defaulting to:', countryFilter);
     
     // Save the default selection to session
     session.set("selectedCountryCode", countryFilter);
@@ -286,21 +261,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   if (!countryFilter) {
     countryFilter = 'mexico';
-    console.log('[root.tsx loader] Fallback to mexico');
   }
   
   const filters = { country: countryFilter };
-  console.log('[root.tsx loader] Filters for cities:', filters);
 
   // Fetch cities
-  console.log('[root.tsx loader] Fetching cities...');
   const citiesResult = await actionsLoader('getCitiesByCountry', { filters, language: 'es' });
-  console.log('[root.tsx loader] Cities result from server:', citiesResult);
-  
   const cities: City[] = citiesResult.success ? citiesResult.data : [];
-  console.log('[root.tsx loader] Cities count:', cities.length);
-
-  console.log('[root.tsx loader] ====== LOADER END ======');
   
   return data(
   {
@@ -327,14 +294,9 @@ export default function App() {
 
   // Load cities and countries into state
   useEffect(() => {
-    console.log('[App] loaderData changed:', loaderData);
     const citiesData = loaderData?.data?.cities || loaderData?.cities || [];
     const countriesData = loaderData?.data?.countries || loaderData?.countries || [];
     const countryCode = loaderData?.data?.selectedCountryCode || loaderData?.selectedCountryCode || '';
-
-    console.log('[App] citiesData:', citiesData);
-    console.log('[App] countriesData:', countriesData);
-    console.log('[App] selectedCountryCode:', countryCode);
 
     if (citiesData.length > 0) {
       setCities(citiesData);

@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCountries, selectSelectedCountry, setSelectedCountryByCode } from '~/store/slices/countriesSlice';
-import { useFetcher, useRevalidator } from '@remix-run/react';
+import { useSubmit, useNavigation, useLocation } from '@remix-run/react';
 
 interface HeaderProps {
   title: string;
@@ -25,28 +25,28 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
   const countries = useAppSelector(selectCountries);
   const selectedCountry = useAppSelector(selectSelectedCountry);
   
-  // Fetcher for triggering country change
-  const fetcher = useFetcher();
-  const revalidator = useRevalidator();
-
-  // Revalidate after fetcher completes
-  useEffect(() => {
-    if (fetcher.state === 'idle' && fetcher.data) {
-      console.log('[Header] Fetcher completed, revalidating...');
-      revalidator.revalidate();
-    }
-  }, [fetcher.state, fetcher.data]);
+  // Form submission for country change
+  const submit = useSubmit();
+  const navigation = useNavigation();
+  const location = useLocation();
+  
+  const isChangingCountry = navigation.state === 'submitting' || navigation.state === 'loading';
 
   // Handle country change
   const handleCountryChange = (countryCode: string) => {
-    console.log('[Header] Country changed to:', countryCode);
+    // Don't trigger if same country
+    if (countryCode === selectedCountry?.code) {
+      return;
+    }
+    
     dispatch(setSelectedCountryByCode(countryCode));
     
-    // Submit to the action to update session and reload cities
-    fetcher.submit(
-      { _action: 'changeCountry', countryCode },
-      { method: 'post', action: '/' }
-    );
+    // Use submit to the API resource route
+    const formData = new FormData();
+    formData.append('countryCode', countryCode);
+    formData.append('returnTo', location.pathname);
+    
+    submit(formData, { method: 'post', action: '/api/changeCountry' });
   };
 
   // Check if screen is mobile
@@ -208,21 +208,23 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           {/* Country Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', position: 'relative' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>🌍</span>
             <select
               value={selectedCountry?.code || ''}
               onChange={(e) => handleCountryChange(e.target.value)}
+              disabled={isChangingCountry}
               style={{
                 padding: 'var(--space-2) var(--space-3)',
                 fontSize: 'var(--text-sm)',
                 color: 'var(--color-neutral-700)',
-                backgroundColor: 'var(--color-neutral-100)',
+                backgroundColor: isChangingCountry ? 'var(--color-neutral-200)' : 'var(--color-neutral-100)',
                 border: '1px solid var(--color-neutral-200)',
                 borderRadius: 'var(--radius-md)',
-                cursor: 'pointer',
+                cursor: isChangingCountry ? 'wait' : 'pointer',
                 outline: 'none',
-                minWidth: '120px',
+                minWidth: '140px',
+                opacity: isChangingCountry ? 0.7 : 1,
               }}
             >
               {countries.length === 0 && (
@@ -234,6 +236,17 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
                 </option>
               ))}
             </select>
+            {isChangingCountry && (
+              <span style={{ 
+                position: 'absolute', 
+                right: '8px', 
+                top: '50%', 
+                transform: 'translateY(-50%)',
+                fontSize: 'var(--text-xs)',
+              }}>
+                ⏳
+              </span>
+            )}
           </div>
 
           <button
