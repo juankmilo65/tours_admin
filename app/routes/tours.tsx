@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLoaderData, useNavigation, useSearchParams } from '@remix-run/react';
-import { json, type LoaderFunctionArgs } from '@remix-run/node';
+import { data, type LoaderFunctionArgs } from '@remix-run/node';
 import type { Tour, City } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
 import { useAppSelector } from '~/store/hooks';
@@ -19,7 +19,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // If no cityId, return empty state
   if (!cityId) {
-    return json({
+    return data({
       cityId: null,
       tours: {
         data: [],
@@ -53,7 +53,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const result = await toursBL(formData);
 
   if (result.success) {
-    return json({
+    return data({
       cityId,
       tours: {
         data: result.data || [],
@@ -68,7 +68,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   // Return empty on error
-  return json({
+  return data({
     cityId,
     tours: {
       data: [],
@@ -82,9 +82,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 }
 
+// Helper to extract data from loader response (data() wraps differently than json())
+function extractLoaderData(loaderData: unknown) {
+  const raw = loaderData as { data?: { cityId?: string | null; tours?: { data: Tour[]; pagination: unknown } }; cityId?: string | null; tours?: { data: Tour[]; pagination: unknown } };
+  // data() may wrap the response in a 'data' property, or it may be direct
+  return {
+    cityId: raw?.data?.cityId ?? raw?.cityId ?? null,
+    tours: raw?.data?.tours ?? raw?.tours ?? { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 1 } }
+  };
+}
+
 // Client-only component that uses Redux
 function ToursClient() {
-  const loaderData = useLoaderData<typeof loader>();
+  const rawLoaderData = useLoaderData<typeof loader>();
+  const loaderData = extractLoaderData(rawLoaderData);
   const cities = useAppSelector(selectCities);
 
   const navigation = useNavigation();
@@ -102,13 +113,14 @@ function ToursClient() {
 
   // Update state when loaderData changes (after navigation)
   useEffect(() => {
-    if (loaderData.tours?.data) {
-      setTours(loaderData.tours.data);
+    const extracted = extractLoaderData(rawLoaderData);
+    if (extracted.tours?.data) {
+      setTours(extracted.tours.data);
     }
-    if (loaderData.tours?.pagination) {
-      setPagination(loaderData.tours.pagination);
+    if (extracted.tours?.pagination) {
+      setPagination(extracted.tours.pagination);
     }
-  }, [loaderData]);
+  }, [rawLoaderData]);
 
   // Check if navigation is loading
   const isLoading = navigation.state === 'loading';
