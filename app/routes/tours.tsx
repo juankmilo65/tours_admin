@@ -26,8 +26,7 @@ export async function loader({}: LoaderFunctionArgs) {
 function ToursClient() {
   const loaderData = useLoaderData<typeof loader>();
   const cities = useAppSelector(selectCities);
-  console.log('Cities from selector:', cities);
-  debugger
+
   const navigation = useNavigation();
   const [searchParams, setSearchParams] = useSearchParams();
   

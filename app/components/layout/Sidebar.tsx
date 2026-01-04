@@ -186,48 +186,6 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
             );
           })}
         </nav>
-
-        {/* Logout Button */}
-        <div 
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            padding: 'var(--space-4)',
-            borderTop: '1px solid var(--color-neutral-200)',
-          }}
-        >
-          <button
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: isCollapsed ? 0 : 'var(--space-3)',
-              padding: isCollapsed ? 'var(--space-3)' : 'var(--space-3) var(--space-4)',
-              color: 'var(--color-neutral-600)',
-              backgroundColor: 'transparent',
-              border: 'none',
-              borderRadius: 'var(--radius-lg)',
-              fontSize: 'inherit',
-              cursor: 'pointer',
-              transition: 'all var(--transition-base)',
-              justifyContent: isCollapsed ? 'center' : 'flex-start',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
-              e.currentTarget.style.color = 'var(--color-error-600)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = 'var(--color-neutral-600)';
-            }}
-            title={isCollapsed ? 'Logout' : ''}
-          >
-            <span style={{ fontSize: 'var(--text-xl)' }}>🚪</span>
-            {!isCollapsed && <span>Logout</span>}
-          </button>
-        </div>
       </aside>
     </>
   );

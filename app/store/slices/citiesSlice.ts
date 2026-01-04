@@ -50,7 +50,6 @@ const citiesSlice = createSlice({
       state.error = null;
     },
     fetchCitiesSuccess: (state, action: PayloadAction<City[]>) => {
-      console.log('Reducer: setting cities', action.payload);
       state.cities = action.payload;
       state.isLoading = false;
       state.error = null;

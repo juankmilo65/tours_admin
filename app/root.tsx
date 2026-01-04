@@ -22,9 +22,8 @@ function CitiesReduxDispatcher({ cities }: { cities: City[] }) {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    console.log('CitiesReduxDispatcher useEffect triggered, cities:', cities);
+  
     if (cities.length > 0) {
-      console.log('Dispatching cities to Redux:', cities);
       dispatch(fetchCitiesSuccess(cities));
     } else {
       console.log('No cities to dispatch');
@@ -178,8 +177,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const citiesResult = await actionsLoader('getCitiesByCountry', { filters, language: 'es' });
   const cities: City[] = citiesResult.success ? citiesResult.data : [];
-  console.log('Cities result from loader:', citiesResult);
-  console.log('Cities array:', cities);
 
   return data(
   {
@@ -203,7 +200,7 @@ export default function App() {
   // Load cities into state
   useEffect(() => {
     const citiesData = loaderData?.data?.cities || [];
-    console.log('Cities data from loader in App:', citiesData);
+
     if (citiesData.length > 0) {
       setCities(citiesData);
     }
