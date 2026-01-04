@@ -43,9 +43,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-const getCitiesByCountry = async (parameters: any) => {
-  let formData = new FormData();
+interface GetCitiesParameters {
+  filters: { country: string };
+  language?: string;
+}
 
+const getCitiesByCountry = async (parameters: GetCitiesParameters) => {
+  const formData = new FormData();
   const { filters } = parameters;
 
   formData.append("action", 'searchCitiesByCountryBusiness');
@@ -57,7 +61,7 @@ const getCitiesByCountry = async (parameters: any) => {
   return citiesByCountry;
 }
 
-const actionsLoader = async (action: string, parameters: any) => {
+const actionsLoader = async (action: string, parameters: GetCitiesParameters) => {
   const ACTIONS = {
     getCitiesByCountry: async () => await getCitiesByCountry(parameters)
   };
@@ -68,18 +72,23 @@ const actionsLoader = async (action: string, parameters: any) => {
   throw new Error('Invalid action');
 }
 
+interface LoaderData {
+  data: {
+    cities: City[];
+  };
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   // Load cities globally for all routes
-  let urlParameters: any = {};
   const session = await getSession(request.headers.get("Cookie"));
-  let filters = session.get("filters") === undefined ? { country:  'mexico' } : session.get("filters");
+  const filters = session.get("filters") === undefined ? { country: 'mexico' } : session.get("filters") as { country: string };
 
-  urlParameters = { ...filters };
-  const citiesResult = await actionsLoader('getCitiesByCountry', { filters: urlParameters, language: 'es' });
-  const cities = citiesResult.success ? citiesResult.data : [];
+  const citiesResult = await actionsLoader('getCitiesByCountry', { filters, language: 'es' });
+  const cities: City[] = citiesResult.success ? citiesResult.data : [];
 
-  return data({
-    cities,
+  return data(
+  {
+    cities
   },
   {
     headers: {
@@ -90,27 +99,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function App() {
   const location = useLocation();
-  const navigation = useNavigation();
-  const rootFetcher = useFetcher();
-  const loaderData = useLoaderData();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Solo para móvil
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Solo para desktop
-  const [isMobile, setIsMobile] = useState(false);
+  const loaderData = useLoaderData<LoaderData>();
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
   const [cities, setCities] = useState<City[]>([]);
 
-  const { data: rootFetcherData } = rootFetcher;
-  const { data } = loaderData;
-  
-debugger
   // Validate and store cities from loader
   useEffect(() => {
-    debugger
-    const { cities } = data || {};
-
-    if (cities.length > 0) {
-      setCities(cities);
+    const citiesData = loaderData?.data?.cities || [];
+    if (citiesData.length > 0) {
+      debugger
+      setCities(citiesData);
     }
-  }, [data]);
+  }, [loaderData]);
 
   // Detectar si es móvil al montar y cuando cambia el tamaño
   useEffect(() => {
