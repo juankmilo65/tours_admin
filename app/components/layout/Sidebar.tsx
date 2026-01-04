@@ -2,8 +2,10 @@
  * Sidebar Component - Navigation Menu
  */
 
-import { Link, useLocation } from '@remix-run/react';
+import { Link, useLocation, useNavigation } from '@remix-run/react';
 import { useState, useEffect } from 'react';
+import { useAppDispatch } from '~/store/hooks';
+import { setGlobalLoading } from '~/store/slices/uiSlice';
 
 interface NavItem {
   path: string;
@@ -30,8 +32,17 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation();
+  const navigation = useNavigation();
+  const dispatch = useAppDispatch();
   const currentPath = location.pathname;
   const [isMobile, setIsMobile] = useState(false);
+
+  // Turn off global loading when navigation completes
+  useEffect(() => {
+    if (navigation.state === 'idle') {
+      dispatch(setGlobalLoading({ isLoading: false }));
+    }
+  }, [navigation.state, dispatch]);
 
   // Check if screen is mobile
   useEffect(() => {
@@ -44,8 +55,13 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Close sidebar when clicking on a link (mobile only)
-  function handleLinkClick() {
+  // Handle link click - show loading and close sidebar on mobile
+  function handleLinkClick(targetPath: string) {
+    // Only show loading if navigating to a different page
+    if (targetPath !== currentPath) {
+      dispatch(setGlobalLoading({ isLoading: true }));
+    }
+    
     if (isMobile) {
       onToggle();
     }
@@ -152,7 +168,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={handleLinkClick}
+                onClick={() => handleLinkClick(item.path)}
                 style={{
                   textDecoration: 'none',
                   display: 'flex',

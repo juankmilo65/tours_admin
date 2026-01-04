@@ -56,7 +56,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
     }
     
     // Show global loading
-    dispatch(setGlobalLoading({ isLoading: true, message: 'Cambiando país...' }));
+    dispatch(setGlobalLoading({ isLoading: true }));
     
     // Clear all filters from URL
     setSearchParams({});
