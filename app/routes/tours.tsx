@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLoaderData, useNavigation, useSearchParams } from '@remix-run/react';
 import { data, type LoaderFunctionArgs } from '@remix-run/node';
 import type { Tour, City } from '~/types/PayloadTourDataProps';
@@ -8,6 +8,7 @@ import { selectCities } from '~/store/slices/citiesSlice';
 import { selectCategories, fetchCategoriesSuccess, type Category } from '~/store/slices/categoriesSlice';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
+import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
 
 // Loader function - runs on server
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -15,7 +16,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const cityId = url.searchParams.get('cityId');
   const page = url.searchParams.get('page') || '1';
   const category = url.searchParams.get('category') || '';
-  const difficulty = url.searchParams.get('difficulty') || '';
   const minPrice = url.searchParams.get('minPrice') || '';
   const maxPrice = url.searchParams.get('maxPrice') || '';
 
@@ -26,11 +26,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const categoriesResult = await categoriesBL(categoriesFormData);
   const categories = categoriesResult.success ? categoriesResult.data : [];
 
-  // If no cityId, return empty state with categories
+  // Fetch price range (based on current filters)
+  const priceRangeFormData = new FormData();
+  priceRangeFormData.append('action', 'getPriceRangeBusiness');
+  priceRangeFormData.append('filters', JSON.stringify({
+    city: cityId || '',
+    category: category || '',
+  }));
+  priceRangeFormData.append('language', 'es');
+  priceRangeFormData.append('currency', 'MXN');
+  const priceRangeResult = await priceRangeBL(priceRangeFormData);
+  const priceRange = priceRangeResult.success ? priceRangeResult.data : null;
+console.log('Loader fetched price range:', priceRange);
+  // If no cityId, return empty state with categories and price range
   if (!cityId) {
     return data({
       cityId: null,
       categories,
+      priceRange,
       tours: {
         data: [],
         pagination: {
@@ -50,7 +63,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   };
 
   if (category) filters.category = category;
-  if (difficulty) filters.difficulty = difficulty;
   if (minPrice) filters.minPrice = parseInt(minPrice, 10);
   if (maxPrice) filters.maxPrice = parseInt(maxPrice, 10);
 
@@ -66,6 +78,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return data({
       cityId,
       categories,
+      priceRange,
       tours: {
         data: result.data || [],
         pagination: result.pagination || {
@@ -82,6 +95,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return data({
     cityId,
     categories,
+    priceRange,
     tours: {
       data: [],
       pagination: {
@@ -94,22 +108,33 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 }
 
+// Price range type
+interface PriceRange {
+  minPrice: number;
+  maxPrice: number;
+  currency: string;
+  count: number;
+}
+
 // Helper to extract data from loader response (data() wraps differently than json())
 function extractLoaderData(loaderData: unknown) {
   const raw = loaderData as { 
     data?: { 
       cityId?: string | null; 
       categories?: Category[];
+      priceRange?: PriceRange | null;
       tours?: { data: Tour[]; pagination: unknown } 
     }; 
     cityId?: string | null; 
     categories?: Category[];
+    priceRange?: PriceRange | null;
     tours?: { data: Tour[]; pagination: unknown } 
   };
   // data() may wrap the response in a 'data' property, or it may be direct
   return {
     cityId: raw?.data?.cityId ?? raw?.cityId ?? null,
     categories: raw?.data?.categories ?? raw?.categories ?? [],
+    priceRange: raw?.data?.priceRange ?? raw?.priceRange ?? null,
     tours: raw?.data?.tours ?? raw?.tours ?? { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 1 } }
   };
 }
@@ -176,12 +201,38 @@ function ToursClient() {
   // Track if user changed city (to show "ready to search" state)
   const [hasCityChanged, setHasCityChanged] = useState(false);
 
+  // Price range state
+  const [priceRange, setPriceRange] = useState<PriceRange | null>(loaderData.priceRange);
+  const [selectedMinPrice, setSelectedMinPrice] = useState<number>(
+    searchParams.get('minPrice') ? parseInt(searchParams.get('minPrice')!, 10) : (loaderData.priceRange?.minPrice || 0)
+  );
+  const [selectedMaxPrice, setSelectedMaxPrice] = useState<number>(
+    searchParams.get('maxPrice') ? parseInt(searchParams.get('maxPrice')!, 10) : (loaderData.priceRange?.maxPrice || 10000)
+  );
+
+  // Check if price filter should be enabled (has tours and at least city filter is applied)
+  const isPriceFilterEnabled = priceRange !== null && priceRange.count > 0 && selectedCityId !== '';
+
   // Dispatch categories to Redux when loaded from server
   useEffect(() => {
     if (loaderData.categories && loaderData.categories.length > 0) {
       dispatch(fetchCategoriesSuccess(loaderData.categories));
     }
   }, [loaderData.categories, dispatch]);
+
+  // Update price range when loader data changes
+  useEffect(() => {
+    if (loaderData.priceRange) {
+      setPriceRange(loaderData.priceRange);
+      // Only reset price values if they haven't been set by URL params
+      if (!searchParams.get('minPrice')) {
+        setSelectedMinPrice(loaderData.priceRange.minPrice);
+      }
+      if (!searchParams.get('maxPrice')) {
+        setSelectedMaxPrice(loaderData.priceRange.maxPrice);
+      }
+    }
+  }, [loaderData.priceRange, searchParams]);
 
   // Handle city selection change - clear tours and mark as changed
   const handleCityChange = (newCityId: string) => {
@@ -190,6 +241,11 @@ function ToursClient() {
     setTours([]);
     setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 });
     setHasCityChanged(true);
+    // Reset price range when city changes
+    if (priceRange) {
+      setSelectedMinPrice(priceRange.minPrice);
+      setSelectedMaxPrice(priceRange.maxPrice);
+    }
   };
 
   // Update state when loaderData changes (after navigation)
@@ -215,18 +271,23 @@ function ToursClient() {
       return;
     }
 
-    const difficulty = searchParams.get('difficulty') || '';
-    const minPrice = searchParams.get('minPrice') || '';
-    const maxPrice = searchParams.get('maxPrice') || '';
-
-    setSearchParams({
+    const params: Record<string, string> = {
       cityId: selectedCityId,
       page: '1',
       category: selectedCategory,
-      difficulty,
-      minPrice,
-      maxPrice,
-    });
+    };
+
+    // Only include price filters if they differ from the default range
+    if (priceRange) {
+      if (selectedMinPrice !== priceRange.minPrice) {
+        params.minPrice = selectedMinPrice.toString();
+      }
+      if (selectedMaxPrice !== priceRange.maxPrice) {
+        params.maxPrice = selectedMaxPrice.toString();
+      }
+    }
+
+    setSearchParams(params);
   };
 
   // Handle page change - updates URL params
@@ -250,11 +311,15 @@ function ToursClient() {
   const handleClearFilters = () => {
     setSelectedCityId('');
     setSelectedCategory('');
+    // Reset price to default range
+    if (priceRange) {
+      setSelectedMinPrice(priceRange.minPrice);
+      setSelectedMaxPrice(priceRange.maxPrice);
+    }
     setSearchParams({
       cityId: '',
       page: '1',
       category: '',
-      difficulty: '',
       minPrice: '',
       maxPrice: '',
     });
@@ -412,111 +477,144 @@ function ToursClient() {
               </select>
             </div>
 
-            {/* Difficulty Filter */}
-            <div>
+            {/* Price Range Slider Filter */}
+            <div style={{ gridColumn: 'span 2' }}>
               <label
                 style={{
                   display: 'block',
                   fontSize: 'var(--text-sm)',
                   fontWeight: 'var(--font-weight-medium)',
-                  color: 'var(--color-neutral-700)',
+                  color: isPriceFilterEnabled ? 'var(--color-neutral-700)' : 'var(--color-neutral-400)',
                   marginBottom: 'var(--space-2)',
                 }}
               >
-                Dificultad
+                Precio ({priceRange?.currency || 'MXN'})
+                {!isPriceFilterEnabled && (
+                  <span style={{ fontWeight: 'normal', marginLeft: 'var(--space-2)', fontSize: 'var(--text-xs)' }}>
+                    (Selecciona una ciudad primero)
+                  </span>
+                )}
               </label>
-              <select
-                name="difficulty"
-                value={searchParams.get('difficulty') || ''}
-                onChange={(e) => handleFilterChange('difficulty', e.target.value)}
+              
+              {/* Price display label */}
+              <div
                 style={{
-                  width: '100%',
-                  padding: 'var(--space-3)',
-                  border: '1px solid var(--color-neutral-300)',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: 'var(--text-base)',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-primary-500)';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-neutral-300)';
-                  e.currentTarget.style.boxShadow = 'none';
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: 'var(--space-2)',
+                  fontSize: 'var(--text-sm)',
+                  color: isPriceFilterEnabled ? 'var(--color-neutral-900)' : 'var(--color-neutral-400)',
+                  fontWeight: 'var(--font-weight-medium)',
                 }}
               >
-                <option value="">Todas las dificultades</option>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
+                <span>${selectedMinPrice.toLocaleString()}</span>
+                <span>${selectedMaxPrice.toLocaleString()}</span>
+              </div>
 
-            {/* Price Range Filter */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--font-weight-medium)',
-                  color: 'var(--color-neutral-700)',
-                  marginBottom: 'var(--space-2)',
-                }}
-              >
-                Precio (MXN)
-              </label>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                <input
-                  type="number"
-                  name="minPrice"
-                  defaultValue={searchParams.get('minPrice') || ''}
-                  onChange={(e) => handleFilterChange('minPrice', e.target.value)}
-                  placeholder="Mín"
+              {/* Dual Range Slider Container */}
+              <div style={{ position: 'relative', height: '40px', opacity: isPriceFilterEnabled ? 1 : 0.5 }}>
+                {/* Track background */}
+                <div
                   style={{
-                    flex: 1,
-                    padding: 'var(--space-3)',
-                    border: '1px solid var(--color-neutral-300)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: 'var(--text-base)',
-                    transition: 'border-color 0.2s ease',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--color-primary-500)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--color-neutral-300)';
-                    e.currentTarget.style.boxShadow = 'none';
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    right: 0,
+                    height: '6px',
+                    backgroundColor: 'var(--color-neutral-200)',
+                    borderRadius: '3px',
+                    transform: 'translateY(-50%)',
                   }}
                 />
-                <span style={{ color: 'var(--color-neutral-500)' }}>-</span>
-                <input
-                  type="number"
-                  name="maxPrice"
-                  defaultValue={searchParams.get('maxPrice') || ''}
-                  onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-                  placeholder="Máx"
+                
+                {/* Active track (highlighted range) */}
+                <div
                   style={{
-                    flex: 1,
-                    padding: 'var(--space-3)',
-                    border: '1px solid var(--color-neutral-300)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: 'var(--text-base)',
-                    transition: 'border-color 0.2s ease',
+                    position: 'absolute',
+                    top: '50%',
+                    height: '6px',
+                    backgroundColor: isPriceFilterEnabled ? 'var(--color-primary-500)' : 'var(--color-neutral-300)',
+                    borderRadius: '3px',
+                    transform: 'translateY(-50%)',
+                    left: priceRange ? `${((selectedMinPrice - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%` : '0%',
+                    right: priceRange ? `${100 - ((selectedMaxPrice - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%` : '0%',
                   }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--color-primary-500)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                />
+
+                {/* Min price slider */}
+                <input
+                  type="range"
+                  min={priceRange?.minPrice || 0}
+                  max={priceRange?.maxPrice || 10000}
+                  value={selectedMinPrice}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value, 10);
+                    if (value < selectedMaxPrice) {
+                      setSelectedMinPrice(value);
+                    }
                   }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--color-neutral-300)';
-                    e.currentTarget.style.boxShadow = 'none';
+                  disabled={!isPriceFilterEnabled}
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    width: '100%',
+                    height: '6px',
+                    transform: 'translateY(-50%)',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    background: 'transparent',
+                    pointerEvents: 'auto',
+                    cursor: isPriceFilterEnabled ? 'pointer' : 'not-allowed',
+                    zIndex: 2,
+                  }}
+                />
+
+                {/* Max price slider */}
+                <input
+                  type="range"
+                  min={priceRange?.minPrice || 0}
+                  max={priceRange?.maxPrice || 10000}
+                  value={selectedMaxPrice}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value, 10);
+                    if (value > selectedMinPrice) {
+                      setSelectedMaxPrice(value);
+                    }
+                  }}
+                  disabled={!isPriceFilterEnabled}
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    width: '100%',
+                    height: '6px',
+                    transform: 'translateY(-50%)',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    background: 'transparent',
+                    pointerEvents: 'auto',
+                    cursor: isPriceFilterEnabled ? 'pointer' : 'not-allowed',
+                    zIndex: 3,
                   }}
                 />
               </div>
+
+              {/* Min/Max values display */}
+              {priceRange && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: 'var(--space-1)',
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--color-neutral-500)',
+                  }}
+                >
+                  <span>Mín: ${priceRange.minPrice.toLocaleString()}</span>
+                  <span>Máx: ${priceRange.maxPrice.toLocaleString()}</span>
+                </div>
+              )}
             </div>
 
             {/* Filter Button */}

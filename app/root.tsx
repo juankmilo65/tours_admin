@@ -6,6 +6,7 @@ import './styles/global.css';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
+import { GlobalLoader } from './components/ui/GlobalLoader';
 import citiesBL from './server/businessLogic/citiesBusinessLogic';
 import countriesBL from './server/businessLogic/countriesBusinessLogic';
 import type { City } from './store/slices/citiesSlice';
@@ -114,6 +115,21 @@ function ClientOnlyFooter() {
   }
 
   return <Footer />;
+}
+
+// Wrapper to only render GlobalLoader on client
+function ClientOnlyGlobalLoader() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return null;
+  }
+
+  return <GlobalLoader />;
 }
 
 export const links: LinksFunction = () => [
@@ -349,6 +365,7 @@ export default function App() {
   return (
     <CitiesContext.Provider value={{ cities, countries }}>
       <ClientOnlyCitiesDispatcher cities={cities} countries={countries} selectedCountryCode={selectedCountryCode} />
+      <ClientOnlyGlobalLoader />
       <div style={{ minHeight: '100vh' }}>
       <ClientOnlySidebar isOpen={isSidebarOpen} isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
       <div style={{ marginLeft: isMobile ? 0 : (isSidebarCollapsed ? '80px' : '280px'), transition: 'margin-left var(--transition-base)' }}>

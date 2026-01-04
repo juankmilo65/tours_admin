@@ -1,9 +1,10 @@
 /**
  * UI Slice
- * Manages UI state (modals, notifications, etc.)
+ * Manages UI state (modals, notifications, global loading, auth token, etc.)
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { RootState } from '~/store';
 
 export interface Notification {
   id: string;
@@ -17,7 +18,7 @@ export interface Modal {
   type: 'create' | 'edit' | 'delete' | 'confirm';
   title: string;
   isOpen: boolean;
-  data?: any;
+  data?: unknown;
 }
 
 interface UIState {
@@ -25,6 +26,12 @@ interface UIState {
   notifications: Notification[];
   modals: Modal[];
   isLoading: boolean;
+  // Global transversal state
+  isGlobalLoading: boolean;
+  globalLoadingMessage: string;
+  token: string | null;
+  language: string;
+  currency: string;
 }
 
 const initialState: UIState = {
@@ -32,6 +39,12 @@ const initialState: UIState = {
   notifications: [],
   modals: [],
   isLoading: false,
+  // Global transversal state
+  isGlobalLoading: false,
+  globalLoadingMessage: '',
+  token: null,
+  language: 'es',
+  currency: 'MXN',
 };
 
 const uiSlice = createSlice({
@@ -65,6 +78,20 @@ const uiSlice = createSlice({
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
     },
+    // Global transversal actions
+    setGlobalLoading: (state, action: PayloadAction<{ isLoading: boolean; message?: string }>) => {
+      state.isGlobalLoading = action.payload.isLoading;
+      state.globalLoadingMessage = action.payload.message || '';
+    },
+    setToken: (state, action: PayloadAction<string | null>) => {
+      state.token = action.payload;
+    },
+    setLanguage: (state, action: PayloadAction<string>) => {
+      state.language = action.payload;
+    },
+    setCurrency: (state, action: PayloadAction<string>) => {
+      state.currency = action.payload;
+    },
   },
 });
 
@@ -78,5 +105,18 @@ export const {
   closeModal,
   closeAllModals,
   setLoading,
+  setGlobalLoading,
+  setToken,
+  setLanguage,
+  setCurrency,
 } = uiSlice.actions;
+
+// Selectors
+export const selectIsGlobalLoading = (state: RootState) => state.ui.isGlobalLoading;
+export const selectGlobalLoadingMessage = (state: RootState) => state.ui.globalLoadingMessage;
+export const selectToken = (state: RootState) => state.ui.token;
+export const selectLanguage = (state: RootState) => state.ui.language;
+export const selectCurrency = (state: RootState) => state.ui.currency;
+export const selectSidebarCollapsed = (state: RootState) => state.ui.sidebarCollapsed;
+
 export default uiSlice.reducer;

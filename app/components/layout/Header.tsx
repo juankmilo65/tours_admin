@@ -5,7 +5,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCountries, selectSelectedCountry, setSelectedCountryByCode } from '~/store/slices/countriesSlice';
-import { useSubmit, useNavigation, useLocation } from '@remix-run/react';
+import { setGlobalLoading } from '~/store/slices/uiSlice';
+import { useSubmit, useNavigation, useLocation, useSearchParams } from '@remix-run/react';
 
 interface HeaderProps {
   title: string;
@@ -29,8 +30,16 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
   const submit = useSubmit();
   const navigation = useNavigation();
   const location = useLocation();
+  const [, setSearchParams] = useSearchParams();
   
   const isChangingCountry = navigation.state === 'submitting' || navigation.state === 'loading';
+
+  // Turn off global loading when navigation completes
+  useEffect(() => {
+    if (navigation.state === 'idle') {
+      dispatch(setGlobalLoading({ isLoading: false }));
+    }
+  }, [navigation.state, dispatch]);
 
   // Handle country change
   const handleCountryChange = (countryCode: string) => {
@@ -45,6 +54,12 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
       console.error('Country not found:', countryCode);
       return;
     }
+    
+    // Show global loading
+    dispatch(setGlobalLoading({ isLoading: true, message: 'Cambiando país...' }));
+    
+    // Clear all filters from URL
+    setSearchParams({});
     
     dispatch(setSelectedCountryByCode(countryCode));
     
