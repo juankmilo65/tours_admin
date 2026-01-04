@@ -39,10 +39,18 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
       return;
     }
     
+    // Find the country to get its id
+    const country = countries.find(c => c.code === countryCode);
+    if (!country) {
+      console.error('Country not found:', countryCode);
+      return;
+    }
+    
     dispatch(setSelectedCountryByCode(countryCode));
     
-    // Use submit to the API resource route
+    // Use submit to the API resource route - send both countryId and countryCode
     const formData = new FormData();
+    formData.append('countryId', country.id);
     formData.append('countryCode', countryCode);
     formData.append('returnTo', location.pathname);
     
@@ -232,7 +240,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
               )}
               {countries.map((country) => (
                 <option key={country.id} value={country.code}>
-                  {country.flag ? `${country.flag} ` : ''}{country.name}
+                  {country.name}
                 </option>
               ))}
             </select>

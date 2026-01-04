@@ -3,14 +3,14 @@ import { createServiceREST } from './_index';
 const BASE_URL = process.env.BACKEND_URL ;
 
 /**
- * Get countries from backend API
+ * Get cities from backend API by countryId
  */
-export const getCountries = async (language: string = 'es') => {
+export const getCitiesByCountryId = async (countryId: string, language: string = 'es') => {
   try {
-    const countriesEndpoint = 'cities/countries';
-    const countriesService = createServiceREST(BASE_URL, countriesEndpoint, 'Bearer');
+    const citiesEndpoint = `cities?countryId=${countryId}`;
+    const citiesService = createServiceREST(BASE_URL, citiesEndpoint, 'Bearer');
     
-    const result = await countriesService.get({
+    const result = await citiesService.get({
       headers: {
         'X-Language': language
       }
@@ -18,28 +18,7 @@ export const getCountries = async (language: string = 'es') => {
 
     return result;
   } catch (error) {
-    console.error('Error in getCountries service:', error);
-    return { error };
-  }
-};
-
-/**
- * Search cities from backend API
- */
-export const searchCitiesByCountry = async (country: string) => {
-  try {
-    const citiesEndpoint = `cities/search?q=${country}`;
-    const citiesService = createServiceREST(BASE_URL, citiesEndpoint, 'Bearer');
-    
-    const result = await citiesService.get({
-      headers: {
-        'X-Language': 'es'
-      }
-    });
-
-    return result;
-  } catch (error) {
-    console.error('Error in searchCities service:', error);
+    console.error('Error in getCitiesByCountryId service:', error);
     return { error };
   }
 };

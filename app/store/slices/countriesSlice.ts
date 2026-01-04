@@ -9,7 +9,8 @@ export interface Country {
   id: string;
   code: string;
   name: string;
-  flag?: string;
+  description?: string;
+  flagUrl?: string;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;

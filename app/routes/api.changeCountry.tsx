@@ -8,10 +8,11 @@ import { getSession, commitSession } from '~/utilities/sessions';
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
+  const countryId = formData.get('countryId') as string;
   const countryCode = formData.get('countryCode') as string;
   const returnTo = formData.get('returnTo') as string || '/';
   
-  if (!countryCode) {
+  if (!countryId || !countryCode) {
     return redirect(returnTo);
   }
   
@@ -20,8 +21,8 @@ export async function action({ request }: ActionFunctionArgs) {
   // Clear cached countries to force reload with new country filter
   session.unset("cachedCountries");
   
-  // Set the new country code
-  session.set("filters", { country: countryCode });
+  // Set the new country id and code
+  session.set("selectedCountryId", countryId);
   session.set("selectedCountryCode", countryCode);
   
   return redirect(returnTo, {

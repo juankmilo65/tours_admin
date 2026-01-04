@@ -1,11 +1,12 @@
-import { searchCitiesByCountry, getCountries } from '../cities';
+import { getCitiesByCountryId } from '../cities';
+import { getCountries } from '../countries';
 import { ServiceResult } from '../_index';
 
 interface CitiesPayload {
   token?: string;
   action: string;
   filters?: {
-    country: string;
+    countryId: string;
   };
   language?: string;
 }
@@ -40,20 +41,20 @@ const getCountriesBusiness = async (data: CitiesPayload): Promise<ServiceResult<
 };
 
 /**
- * Business logic for searching cities
+ * Business logic for getting cities by countryId
  */
-const searchCitiesByCountryBusiness = async (data: CitiesPayload): Promise<ServiceResult<unknown>> => {
+const getCitiesByCountryIdBusiness = async (data: CitiesPayload): Promise<ServiceResult<unknown>> => {
   try {
-    const { filters } = data;
-    const { country } = filters || {};
-    if (!country) {
-      return { error: 'Country is required' };
+    const { filters, language } = data;
+    const { countryId } = filters || {};
+    if (!countryId) {
+      return { error: 'Country ID is required' };
     }
-    const result = await searchCitiesByCountry(country);
+    const result = await getCitiesByCountryId(countryId, language);
 
     return result;
   } catch (error) {
-    console.error('Error in searchCitiesBusiness:', error);
+    console.error('Error in getCitiesByCountryIdBusiness:', error);
     return { error };
   }
 };
@@ -67,7 +68,7 @@ const citiesBusinessLogic = async (
 ): Promise<ServiceResult<unknown>> => {
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
     getCountriesBusiness: async () => await getCountriesBusiness(data),
-    searchCitiesByCountryBusiness: async () => await searchCitiesByCountryBusiness(data)
+    getCitiesByCountryIdBusiness: async () => await getCitiesByCountryIdBusiness(data)
   };
 
   const handler = ACTIONS[action];

@@ -145,15 +145,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 interface GetCitiesParameters {
-  filters: { country: string };
+  filters: { countryId: string };
   language?: string;
 }
 
-const getCitiesByCountry = async (parameters: GetCitiesParameters) => {
+const getCitiesByCountryId = async (parameters: GetCitiesParameters) => {
   const formData = new FormData();
   const { filters } = parameters;
 
-  formData.append("action", 'searchCitiesByCountryBusiness');
+  formData.append("action", 'getCitiesByCountryIdBusiness');
   formData.append("filters", JSON.stringify(filters));
   formData.append("language", parameters.language || 'es');
 
@@ -181,7 +181,7 @@ type ActionParameters = GetCitiesParameters | GetCountriesParameters;
 
 const actionsLoader = async (action: string, parameters: ActionParameters) => {
   const ACTIONS = {
-    getCitiesByCountry: async () => await getCitiesByCountry(parameters as GetCitiesParameters),
+    getCitiesByCountryId: async () => await getCitiesByCountryId(parameters as GetCitiesParameters),
     getCountries: async () => await getCountries(parameters as GetCountriesParameters)
   };
 
@@ -195,6 +195,7 @@ interface LoaderData {
   data: {
     cities: City[];
     countries: Country[];
+    selectedCountryId: string;
     selectedCountryCode: string;
   };
 }
@@ -205,6 +206,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   // Check if countries are already in session (to avoid reloading)
   const cachedCountries = session.get("cachedCountries") as Country[] | undefined;
+  const selectedCountryId = session.get("selectedCountryId") as string | undefined;
   const selectedCountryCode = session.get("selectedCountryCode") as string | undefined;
   
   let countries: Country[] = [];
@@ -213,51 +215,46 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (cachedCountries && cachedCountries.length > 0) {
     countries = cachedCountries;
   } else {
-    // Fetch countries
+    // Fetch countries from API - data comes already formatted
     const countriesResult = await actionsLoader('getCountries', { language: 'es' });
-    const countriesData: string[] = countriesResult.success ? countriesResult.data : [];
-    
-    // Transform countries data to match the Country interface
-    countries = countriesData.map((countryName: string, index: number) => ({
-      id: `country-${index}`,
-      code: countryName.toLowerCase().replace(/\s+/g, '-'),
-      name: countryName,
-      flag: countryName.toLowerCase() === 'mexico' ? '🇲🇽' : undefined,
-      isActive: true
-    }));
+    countries = countriesResult.success ? countriesResult.data : [];
     
     // Cache countries in session
     session.set("cachedCountries", countries);
   }
   
   // Determine the country to filter by
-  // Priority: 1. selectedCountryCode from session, 2. First country from list, 3. 'mexico' as fallback
-  let countryFilter = selectedCountryCode;
+  // Priority: 1. selectedCountryId from session, 2. First country from list (default to Mexico)
+  let countryId = selectedCountryId;
+  let countryCode = selectedCountryCode;
   
-  if (!countryFilter && countries.length > 0) {
+  if (!countryId && countries.length > 0) {
     // Use first country from the list (default to Mexico if it exists)
     const mexicoCountry = countries.find(c => c.name.toLowerCase() === 'mexico');
-    countryFilter = mexicoCountry ? mexicoCountry.code : countries[0]?.code;
+    const defaultCountry = mexicoCountry || countries[0];
+    countryId = defaultCountry?.id;
+    countryCode = defaultCountry?.code;
     
     // Save the default selection to session
-    session.set("selectedCountryCode", countryFilter);
+    session.set("selectedCountryId", countryId);
+    session.set("selectedCountryCode", countryCode);
   }
   
-  if (!countryFilter) {
-    countryFilter = 'mexico';
-  }
+  let cities: City[] = [];
   
-  const filters = { country: countryFilter };
-
-  // Fetch cities
-  const citiesResult = await actionsLoader('getCitiesByCountry', { filters, language: 'es' });
-  const cities: City[] = citiesResult.success ? citiesResult.data : [];
+  if (countryId) {
+    const filters = { countryId };
+    // Fetch cities
+    const citiesResult = await actionsLoader('getCitiesByCountryId', { filters, language: 'es' });
+    cities = citiesResult.success ? citiesResult.data : [];
+  }
   
   return data(
   {
     cities,
     countries,
-    selectedCountryCode: countryFilter
+    selectedCountryId: countryId || '',
+    selectedCountryCode: countryCode || ''
   },
   {
     headers: {
