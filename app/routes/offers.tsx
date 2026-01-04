@@ -2,8 +2,6 @@
  * Offers Route - Offers and Promotions Management
  */
 
-import { Sidebar } from '~/components/layout/Sidebar';
-import { Header } from '~/components/layout/Header';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
@@ -113,16 +111,11 @@ export default function Offers() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      <main className="ml-64 pt-16">
-        <Header title="Offers & Promotions" />
-
-        <div className="p-6 space-y-6">
-          <Card
-            title="All Offers"
-            actions={<Button variant="primary">Create New Offer</Button>}
-          >
+    <div className="space-y-6">
+      <Card
+        title="All Offers"
+        actions={<Button variant="primary">Create New Offer</Button>}
+      >
             <div className="mb-4 flex gap-4">
               <input
                 type="search"
@@ -163,8 +156,6 @@ export default function Offers() {
             </div>
           </Card>
         </div>
-      </main>
-    </div>
   );
 }
 

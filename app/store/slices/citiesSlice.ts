@@ -50,6 +50,7 @@ const citiesSlice = createSlice({
       state.error = null;
     },
     fetchCitiesSuccess: (state, action: PayloadAction<City[]>) => {
+      console.log('Reducer: setting cities', action.payload);
       state.cities = action.payload;
       state.isLoading = false;
       state.error = null;
@@ -91,4 +92,12 @@ export const {
   setSelectedCity,
   clearError,
 } = citiesSlice.actions;
+
+// Selectors
+export const selectCities = (state: { city: CitiesState }) => state.city.cities;
+export const selectCitiesLoading = (state: { city: CitiesState }) => state.city.isLoading;
+export const selectCitiesError = (state: { city: CitiesState }) => state.city.error;
+export const selectSelectedCity = (state: { city: CitiesState }) => state.city.selectedCity;
+export const selectCountries = (state: { city: CitiesState }) => state.city.countries;
+
 export default citiesSlice.reducer;

@@ -45,9 +45,12 @@ const getCountriesBusiness = async (data: CitiesPayload): Promise<ServiceResult<
 const searchCitiesByCountryBusiness = async (data: CitiesPayload): Promise<ServiceResult<unknown>> => {
   try {
     const { filters } = data;
-    const { country } = filters || {}; 
+    const { country } = filters || {};
+    if (!country) {
+      return { error: 'Country is required' };
+    }
     const result = await searchCitiesByCountry(country);
-    
+
     return result;
   } catch (error) {
     console.error('Error in searchCitiesBusiness:', error);

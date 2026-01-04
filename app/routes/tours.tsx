@@ -1,101 +1,40 @@
-/**
- * Tours Route - Tours Management List with Remix Loader
- */
-
-import { useState, useContext } from 'react';
-import { useLoaderData, useNavigation, useSearchParams, useNavigate } from '@remix-run/react';
+import { useState, useEffect } from 'react';
+import { useLoaderData, useNavigation, useSearchParams } from '@remix-run/react';
 import { json, type LoaderFunctionArgs } from '@remix-run/node';
-import type { Tour, Pagination, City } from '~/types/PayloadTourDataProps';
+import type { Tour, City } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
-import toursBusinessLogic from '~/server/businessLogic/toursBusinessLogic';
-import { CitiesContext } from '~/root';
-
-interface ToursResponse {
-  success: boolean;
-  data: Tour[];
-  pagination: Pagination;
-}
-
-interface ToursResult {
-  success: boolean;
-  data: Tour[];
-  pagination: Pagination;
-  error?: unknown;
-}
+import { useAppSelector } from '~/store/hooks';
+import { selectCities } from '~/store/slices/citiesSlice';
 
 // Loader function - runs on server
-export async function loader({ request }: LoaderFunctionArgs) {
-  const url = new URL(request.url);
-  const cityId = url.searchParams.get('cityId');
-
-  // If cityId is provided, load tours for that city
-  let toursResponse: ToursResponse = {
-    success: false,
-    data: [],
-    pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
-  };
-
-  if (cityId) {
-    const page = url.searchParams.get('page') || '1';
-    const limit = url.searchParams.get('limit') || '10';
-    const category = url.searchParams.get('category') || '';
-    const difficulty = url.searchParams.get('difficulty') || '';
-    const minPrice = url.searchParams.get('minPrice') || '';
-    const maxPrice = url.searchParams.get('maxPrice') || '';
-
-    // Build filters payload
-    const filters = {
-      cityId,
-      page,
-      limit,
-      category,
-      difficulty,
-      minPrice,
-      maxPrice,
-    };
-
-    // Create FormData for business logic
-    const formData = new FormData();
-    formData.append('action', 'getToursBusiness');
-    formData.append('language', 'es');
-    formData.append('filters', JSON.stringify(filters));
-
-    // Call business logic with FormData
-    const result = await toursBusinessLogic(formData, '') as ToursResult;
-    
-    if (!result.error && result.success) {
-      toursResponse = {
-        success: result.success,
-        data: result.data,
-        pagination: result.pagination,
-      };
-    }
-  }
-
+export async function loader({}: LoaderFunctionArgs) {
   return json({
-    tours: toursResponse,
-    cityId: cityId || '',
+    cityId: null,
+    tours: {
+      data: [],
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 1,
+      }
+    },
   });
 }
 
-export default function Tours() {
+// Client-only component that uses Redux
+function ToursClient() {
   const loaderData = useLoaderData<typeof loader>();
-  const citiesContext = useContext(CitiesContext);
-  const cities = citiesContext?.cities || [];
-  
+  const cities = useAppSelector(selectCities);
+  console.log('Cities from selector:', cities);
+  debugger
   const navigation = useNavigation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   
   // State for selected city and tours
   const [selectedCityId, setSelectedCityId] = useState(loaderData.cityId || '');
-  const [tours, setTours] = useState<Tour[]>(loaderData.tours.data || []);
-  const [pagination, setPagination] = useState(loaderData.tours.pagination || {
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
-  });
+  const [tours, setTours] = useState<Tour[]>([]);
+  const [pagination, setPagination] = useState(loaderData.tours.pagination);
 
   // Check if navigation is loading
   const isLoading = navigation.state === 'loading';
@@ -690,4 +629,30 @@ export default function Tours() {
       </main>
     </div>
   );
+}
+
+// Client-only wrapper component
+function ClientOnlyTours() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return <ToursClient />;
+}
+
+export default function Tours() {
+  return <ClientOnlyTours />;
 }

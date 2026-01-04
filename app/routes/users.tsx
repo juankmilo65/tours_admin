@@ -2,8 +2,6 @@
  * Users Route - Users and Roles Management
  */
 
-import { Sidebar } from '~/components/layout/Sidebar';
-import { Header } from '~/components/layout/Header';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
@@ -112,17 +110,12 @@ export default function Users() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      <main className="ml-64 pt-16">
-        <Header title="Users & Roles Management" />
-
-        <div className="p-6 space-y-6">
-          <Card
-            title="All Users"
-            actions={
-              <div className="flex gap-2">
-                <Button variant="secondary">Export</Button>
+    <div className="space-y-6">
+      <Card
+        title="All Users"
+        actions={
+          <div className="flex gap-2">
+            <Button variant="secondary">Export</Button>
                 <Button variant="primary">Add New User</Button>
               </div>
             }
@@ -203,8 +196,6 @@ export default function Users() {
             </div>
           </Card>
         </div>
-      </main>
-    </div>
   );
 }
 

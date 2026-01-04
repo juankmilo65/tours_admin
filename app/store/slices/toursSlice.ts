@@ -21,8 +21,7 @@ const initialState: ToursState = {
   isLoading: false,
   error: null,
   filters: {
-    countryCode: 'CO',
-    city: '',
+    cityId: '',
     category: '',
     difficulty: '',
     minPrice: '',

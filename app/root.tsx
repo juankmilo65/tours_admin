@@ -1,19 +1,112 @@
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation, useNavigation, useFetcher, useLoaderData } from '@remix-run/react';
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation, useLoaderData } from '@remix-run/react';
 import {data, type  LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
-import { useMemo, useState, useEffect, createContext, useContext } from 'react';
+import { useMemo, useState, useEffect, createContext } from 'react';
 
 import './styles/global.css';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
 import  citiesBL  from './server/businessLogic/citiesBusinessLogic';
-import type { City } from './types/PayloadTourDataProps';
+import type { City } from './store/slices/citiesSlice';
 import { getSession, commitSession } from '~/utilities/sessions';
+import { useAppDispatch } from '~/store/hooks';
+import { fetchCitiesSuccess } from '~/store/slices/citiesSlice';
 
 // Context for sharing cities globally
 export const CitiesContext = createContext<{
   cities: City[];
 } | null>(null);
+
+// Client component to dispatch cities to Redux
+function CitiesReduxDispatcher({ cities }: { cities: City[] }) {
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    console.log('CitiesReduxDispatcher useEffect triggered, cities:', cities);
+    if (cities.length > 0) {
+      console.log('Dispatching cities to Redux:', cities);
+      dispatch(fetchCitiesSuccess(cities));
+    } else {
+      console.log('No cities to dispatch');
+    }
+  }, [cities, dispatch]);
+
+  return null;
+}
+
+// Wrapper to only render on client
+function ClientOnlyCitiesDispatcher({ cities }: { cities: City[] }) {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return null;
+  }
+
+  return <CitiesReduxDispatcher cities={cities} />;
+}
+
+// Wrapper to only render Sidebar on client
+function ClientOnlySidebar({ isOpen, isCollapsed, onToggle }: { isOpen: boolean; isCollapsed: boolean; onToggle: () => void }) {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return null;
+  }
+
+  return <Sidebar isOpen={isOpen} isCollapsed={isCollapsed} onToggle={onToggle} />;
+}
+
+// Wrapper to only render Header on client
+function ClientOnlyHeader({ title, isSidebarOpen, isSidebarCollapsed, onToggleSidebar, onToggleSidebarCollapse }: {
+  title: string;
+  isSidebarOpen: boolean;
+  isSidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
+  onToggleSidebarCollapse: () => void;
+}) {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return <div style={{ height: 'var(--header-height)', backgroundColor: 'var(--color-white)' }} />;
+  }
+
+  return (
+    <Header
+      title={title}
+      isSidebarOpen={isSidebarOpen}
+      isSidebarCollapsed={isSidebarCollapsed}
+      onToggleSidebar={onToggleSidebar}
+      onToggleSidebarCollapse={onToggleSidebarCollapse}
+    />
+  );
+}
+
+// Wrapper to only render Footer on client
+function ClientOnlyFooter() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return <div style={{ height: '80px', backgroundColor: 'var(--color-white)' }} />;
+  }
+
+  return <Footer />;
+}
 
 export const links: LinksFunction = () => [
   { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
@@ -85,6 +178,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const citiesResult = await actionsLoader('getCitiesByCountry', { filters, language: 'es' });
   const cities: City[] = citiesResult.success ? citiesResult.data : [];
+  console.log('Cities result from loader:', citiesResult);
+  console.log('Cities array:', cities);
 
   return data(
   {
@@ -105,11 +200,11 @@ export default function App() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [cities, setCities] = useState<City[]>([]);
 
-  // Validate and store cities from loader
+  // Load cities into state
   useEffect(() => {
     const citiesData = loaderData?.data?.cities || [];
+    console.log('Cities data from loader in App:', citiesData);
     if (citiesData.length > 0) {
-      debugger
       setCities(citiesData);
     }
   }, [loaderData]);
@@ -170,29 +265,30 @@ export default function App() {
 
   return (
     <CitiesContext.Provider value={{ cities }}>
+      <ClientOnlyCitiesDispatcher cities={cities} />
       <div style={{ minHeight: '100vh' }}>
-        <Sidebar isOpen={isSidebarOpen} isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
-        <div style={{ marginLeft: isMobile ? 0 : (isSidebarCollapsed ? '80px' : '280px'), transition: 'margin-left var(--transition-base)' }}>
-          <Header 
-            title={pageTitle} 
-            isSidebarOpen={isSidebarOpen} 
-            isSidebarCollapsed={isSidebarCollapsed}
-            onToggleSidebar={toggleSidebar} 
-            onToggleSidebarCollapse={toggleSidebarCollapse}
-          />
-          <main 
-            style={{
-              paddingTop: 'var(--header-height)',
-              paddingBottom: '80px',
-              paddingLeft: 'var(--space-6)',
-              paddingRight: 'var(--space-6)',
-            }}
-          >
-            <Outlet />
-          </main>
-          <Footer />
-        </div>
+      <ClientOnlySidebar isOpen={isSidebarOpen} isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
+      <div style={{ marginLeft: isMobile ? 0 : (isSidebarCollapsed ? '80px' : '280px'), transition: 'margin-left var(--transition-base)' }}>
+        <ClientOnlyHeader 
+          title={pageTitle} 
+          isSidebarOpen={isSidebarOpen} 
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={toggleSidebar} 
+          onToggleSidebarCollapse={toggleSidebarCollapse}
+        />
+        <main 
+          style={{
+            paddingTop: 'var(--header-height)',
+            paddingBottom: '80px',
+            paddingLeft: 'var(--space-6)',
+            paddingRight: 'var(--space-6)',
+          }}
+        >
+          <Outlet />
+        </main>
+        <ClientOnlyFooter />
       </div>
+    </div>
     </CitiesContext.Provider>
   );
 }

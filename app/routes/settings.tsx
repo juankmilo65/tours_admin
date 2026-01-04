@@ -2,21 +2,14 @@
  * Settings Route - Application Settings
  */
 
-import { Sidebar } from '~/components/layout/Sidebar';
-import { Header } from '~/components/layout/Header';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 
 export default function Settings() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      <main className="ml-64 pt-16">
-        <Header title="Application Settings" />
-
-        <div className="p-6 space-y-6">
-          <Card title="General Settings" actions={<Button variant="primary">Save Changes</Button>}>
+    <div className="space-y-6">
+      <Card title="General Settings" actions={<Button variant="primary">Save Changes</Button>}>
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input label="Application Name" placeholder="Tours Admin" defaultValue="Tours Admin" />
@@ -207,8 +200,6 @@ export default function Settings() {
               </div>
             </div>
           </Card>
-        </div>
-      </main>
     </div>
   );
 }

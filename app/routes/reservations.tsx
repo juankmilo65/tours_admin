@@ -2,8 +2,6 @@
  * Reservations Route - Reservations Management
  */
 
-import { Sidebar } from '~/components/layout/Sidebar';
-import { Header } from '~/components/layout/Header';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
@@ -138,16 +136,11 @@ export default function Reservations() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      <main className="ml-64 pt-16">
-        <Header title="Reservations Management" />
-
-        <div className="p-6 space-y-6">
-          <Card
-            title="All Reservations"
-            actions={<Button variant="primary">Create Reservation</Button>}
-          >
+    <div className="space-y-6">
+      <Card
+        title="All Reservations"
+        actions={<Button variant="primary">Create Reservation</Button>}
+      >
             <div className="mb-4 flex gap-4 flex-wrap">
               <input
                 type="search"
@@ -221,8 +214,6 @@ export default function Reservations() {
             </div>
           </Card>
         </div>
-      </main>
-    </div>
   );
 }
 

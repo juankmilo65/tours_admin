@@ -2,21 +2,14 @@
  * Dashboard Route - Main Admin Dashboard
  */
 
-import { Sidebar } from '~/components/layout/Sidebar';
-import { Header } from '~/components/layout/Header';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 
 export default function Dashboard() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      <main className="ml-64 pt-16">
-        <Header title="Dashboard" />
-
-        <div className="p-6 space-y-6">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <KPICard
               title="Active Reservations"
               value="127"
@@ -100,10 +93,8 @@ export default function Dashboard() {
               description="See analytics and performance metrics"
               icon="📊"
             />
-          </div>
         </div>
-      </main>
-    </div>
+      </div>
   );
 }
 
