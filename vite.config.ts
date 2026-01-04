@@ -14,12 +14,17 @@ export default defineConfig({
     tsconfigPaths(),
   ],
   server: {
+    port: 5173,
+    host: true,
     watch: {
       usePolling: true,
-      interval: 1000,
+      interval: 100, // Reduced for faster detection
     },
     hmr: {
       overlay: true,
+      protocol: 'ws',
+      host: 'localhost',
+      port: 5173,
     },
   },
 });

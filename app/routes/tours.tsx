@@ -3,9 +3,11 @@ import { useLoaderData, useNavigation, useSearchParams } from '@remix-run/react'
 import { data, type LoaderFunctionArgs } from '@remix-run/node';
 import type { Tour, City } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
-import { useAppSelector } from '~/store/hooks';
+import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities } from '~/store/slices/citiesSlice';
+import { selectCategories, fetchCategoriesSuccess, type Category } from '~/store/slices/categoriesSlice';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
+import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 
 // Loader function - runs on server
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -17,10 +19,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const minPrice = url.searchParams.get('minPrice') || '';
   const maxPrice = url.searchParams.get('maxPrice') || '';
 
-  // If no cityId, return empty state
+  // Fetch categories
+  const categoriesFormData = new FormData();
+  categoriesFormData.append('action', 'getCategoriesBusiness');
+  categoriesFormData.append('language', 'es');
+  const categoriesResult = await categoriesBL(categoriesFormData);
+  const categories = categoriesResult.success ? categoriesResult.data : [];
+
+  // If no cityId, return empty state with categories
   if (!cityId) {
     return data({
       cityId: null,
+      categories,
       tours: {
         data: [],
         pagination: {
@@ -55,6 +65,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (result.success) {
     return data({
       cityId,
+      categories,
       tours: {
         data: result.data || [],
         pagination: result.pagination || {
@@ -70,6 +81,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Return empty on error
   return data({
     cityId,
+    categories,
     tours: {
       data: [],
       pagination: {
@@ -84,25 +96,76 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 // Helper to extract data from loader response (data() wraps differently than json())
 function extractLoaderData(loaderData: unknown) {
-  const raw = loaderData as { data?: { cityId?: string | null; tours?: { data: Tour[]; pagination: unknown } }; cityId?: string | null; tours?: { data: Tour[]; pagination: unknown } };
+  const raw = loaderData as { 
+    data?: { 
+      cityId?: string | null; 
+      categories?: Category[];
+      tours?: { data: Tour[]; pagination: unknown } 
+    }; 
+    cityId?: string | null; 
+    categories?: Category[];
+    tours?: { data: Tour[]; pagination: unknown } 
+  };
   // data() may wrap the response in a 'data' property, or it may be direct
   return {
     cityId: raw?.data?.cityId ?? raw?.cityId ?? null,
+    categories: raw?.data?.categories ?? raw?.categories ?? [],
     tours: raw?.data?.tours ?? raw?.tours ?? { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 1 } }
   };
+}
+
+// Internal reusable EmptyState component
+interface EmptyStateProps {
+  icon: string;
+  title: string;
+  description: string;
+}
+
+function EmptyState({ icon, title, description }: EmptyStateProps) {
+  return (
+    <div
+      style={{
+        textAlign: 'center',
+        padding: 'var(--space-12)',
+        backgroundColor: 'white',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--color-neutral-200)',
+      }}
+    >
+      <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>
+        {icon}
+      </div>
+      <h3
+        style={{
+          fontSize: 'var(--text-xl)',
+          fontWeight: 'var(--font-weight-semibold)',
+          color: 'var(--color-neutral-900)',
+          marginBottom: 'var(--space-2)',
+        }}
+      >
+        {title}
+      </h3>
+      <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-4)' }}>
+        {description}
+      </p>
+    </div>
+  );
 }
 
 // Client-only component that uses Redux
 function ToursClient() {
   const rawLoaderData = useLoaderData<typeof loader>();
   const loaderData = extractLoaderData(rawLoaderData);
+  const dispatch = useAppDispatch();
   const cities = useAppSelector(selectCities);
+  const categories = useAppSelector(selectCategories);
 
   const navigation = useNavigation();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // State for selected city and tours
+  // State for selected filters (only sent on "Filtrar" click)
   const [selectedCityId, setSelectedCityId] = useState(searchParams.get('cityId') || '');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [tours, setTours] = useState<Tour[]>(loaderData.tours?.data || []);
   const [pagination, setPagination] = useState(loaderData.tours?.pagination || {
     page: 1,
@@ -110,12 +173,32 @@ function ToursClient() {
     total: 0,
     totalPages: 1,
   });
+  // Track if user changed city (to show "ready to search" state)
+  const [hasCityChanged, setHasCityChanged] = useState(false);
+
+  // Dispatch categories to Redux when loaded from server
+  useEffect(() => {
+    if (loaderData.categories && loaderData.categories.length > 0) {
+      dispatch(fetchCategoriesSuccess(loaderData.categories));
+    }
+  }, [loaderData.categories, dispatch]);
+
+  // Handle city selection change - clear tours and mark as changed
+  const handleCityChange = (newCityId: string) => {
+    setSelectedCityId(newCityId);
+    // Clear tours when city changes (before clicking Filter)
+    setTours([]);
+    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 });
+    setHasCityChanged(true);
+  };
 
   // Update state when loaderData changes (after navigation)
   useEffect(() => {
     const extracted = extractLoaderData(rawLoaderData);
     if (extracted.tours?.data) {
       setTours(extracted.tours.data);
+      // Reset hasCityChanged when we get new data from server
+      setHasCityChanged(false);
     }
     if (extracted.tours?.pagination) {
       setPagination(extracted.tours.pagination);
@@ -125,14 +208,13 @@ function ToursClient() {
   // Check if navigation is loading
   const isLoading = navigation.state === 'loading';
 
-  // Handle filter button click - update URL with cityId
+  // Handle filter button click - update URL with all selected filters
   const handleFilter = () => {
     if (!selectedCityId) {
       alert('Por favor selecciona una ciudad');
       return;
     }
 
-    const category = searchParams.get('category') || '';
     const difficulty = searchParams.get('difficulty') || '';
     const minPrice = searchParams.get('minPrice') || '';
     const maxPrice = searchParams.get('maxPrice') || '';
@@ -140,7 +222,7 @@ function ToursClient() {
     setSearchParams({
       cityId: selectedCityId,
       page: '1',
-      category,
+      category: selectedCategory,
       difficulty,
       minPrice,
       maxPrice,
@@ -167,6 +249,7 @@ function ToursClient() {
   // Clear all filters
   const handleClearFilters = () => {
     setSelectedCityId('');
+    setSelectedCategory('');
     setSearchParams({
       cityId: '',
       page: '1',
@@ -255,7 +338,7 @@ function ToursClient() {
               </label>
               <select
                 value={selectedCityId}
-                onChange={(e) => setSelectedCityId(e.target.value)}
+                onChange={(e) => handleCityChange(e.target.value)}
                 style={{
                   width: '100%',
                   padding: 'var(--space-3)',
@@ -299,8 +382,8 @@ function ToursClient() {
               </label>
               <select
                 name="category"
-                value={searchParams.get('category') || ''}
-                onChange={(e) => handleFilterChange('category', e.target.value)}
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
                 style={{
                   width: '100%',
                   padding: 'var(--space-3)',
@@ -321,11 +404,11 @@ function ToursClient() {
                 }}
               >
                 <option value="">Todas las categorías</option>
-                <option value="Cultural">Cultural</option>
-                <option value="Food & Drink">Food & Drink</option>
-                <option value="Nature">Nature</option>
-                <option value="Adventure">Adventure</option>
-                <option value="Beach">Beach</option>
+                {categories.map((cat: Category) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -538,64 +621,31 @@ function ToursClient() {
           </div>
         )}
 
-        {/* Empty State */}
-        {!isLoading && tours.length === 0 && selectedCityId && (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: 'var(--space-12)',
-              backgroundColor: 'white',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-neutral-200)',
-            }}
-          >
-            <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>
-              🏛️
-            </div>
-            <h3
-              style={{
-                fontSize: 'var(--text-xl)',
-                fontWeight: 'var(--font-weight-semibold)',
-                color: 'var(--color-neutral-900)',
-                marginBottom: 'var(--space-2)',
-              }}
-            >
-              No se encontraron tours
-            </h3>
-            <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-4)' }}>
-              Intenta ajustar los filtros para ver más resultados.
-            </p>
-          </div>
+        {/* Ready to search state - City selected but user changed it */}
+        {!isLoading && tours.length === 0 && selectedCityId && hasCityChanged && (
+          <EmptyState
+            icon="🔍"
+            title="¡Listo para buscar!"
+            description="Haz clic en 'Filtrar' para consultar los tours disponibles y configurarlos."
+          />
+        )}
+
+        {/* Empty State - No tours found after search */}
+        {!isLoading && tours.length === 0 && selectedCityId && !hasCityChanged && (
+          <EmptyState
+            icon="🏛️"
+            title="No se encontraron tours"
+            description="Intenta ajustar los filtros para ver más resultados."
+          />
         )}
 
         {/* Initial State - No city selected */}
         {!isLoading && tours.length === 0 && !selectedCityId && (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: 'var(--space-12)',
-              backgroundColor: 'white',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-neutral-200)',
-            }}
-          >
-            <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>
-              🌍
-            </div>
-            <h3
-              style={{
-                fontSize: 'var(--text-xl)',
-                fontWeight: 'var(--font-weight-semibold)',
-                color: 'var(--color-neutral-900)',
-                marginBottom: 'var(--space-2)',
-              }}
-            >
-              Selecciona una ciudad
-            </h3>
-            <p style={{ color: 'var(--color-neutral-600)', marginBottom: 'var(--space-4)' }}>
-              Elige una ciudad para ver los tours disponibles.
-            </p>
-          </div>
+          <EmptyState
+            icon="🌍"
+            title="Selecciona una ciudad"
+            description="Elige una ciudad para ver los tours disponibles."
+          />
         )}
 
         {/* Pagination */}

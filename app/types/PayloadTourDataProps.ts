@@ -115,6 +115,11 @@ export interface ServicePayload {
   data?: TourFilters;
   token?: string;
   cityId?: string;
+  page?: number;
+  category?: string;
+  difficulty?: string;
+  minPrice?: number;
+  maxPrice?: number;
   language?: string;
   currency?: string;
 }

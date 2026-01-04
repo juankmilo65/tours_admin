@@ -78,4 +78,11 @@ export const {
   setSelectedCategory,
   clearError,
 } = categoriesSlice.actions;
+
+// Selectors
+export const selectCategories = (state: { category: CategoriesState }) => state.category.categories;
+export const selectSelectedCategory = (state: { category: CategoriesState }) => state.category.selectedCategory;
+export const selectCategoriesLoading = (state: { category: CategoriesState }) => state.category.isLoading;
+export const selectCategoriesError = (state: { category: CategoriesState }) => state.category.error;
+
 export default categoriesSlice.reducer;

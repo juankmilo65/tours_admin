@@ -24,7 +24,7 @@ const generatePayload = (formData: FormData, token: string = ''): ToursPayload =
 const getToursBusiness = async (data: ToursPayload): Promise<ServiceResult<unknown>> => {
   try {
     const { filters = {}, token, language = 'es' } = data;
-    const { cityId, page, category, difficulty, minPrice, maxPrice } = filters;
+    const { cityId, page = 1, category, difficulty, minPrice, maxPrice } = filters;
     
     const payload = {
       cityId,

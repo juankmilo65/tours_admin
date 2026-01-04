@@ -4,11 +4,11 @@ import { ServicePayload } from '../types/PayloadTourDataProps';
 const BASE_URL = process.env.BACKEND_URL;
 
 /**
- * Get tours from backend API by cityId
+ * Get tours from backend API with filters
  */
 export const getTours = async (payload: ServicePayload) => {
   try {
-    const { data = {}, cityId, language = 'es', currency = 'MXN' } = payload;
+    const { cityId, page = 1, category, difficulty, minPrice, maxPrice, language = 'es', currency = 'MXN' } = payload;
     
     if (!cityId) {
       return {
@@ -19,11 +19,23 @@ export const getTours = async (payload: ServicePayload) => {
       };
     }
     
-    const toursEndpoint = `cities/${cityId}/tours`;
+    // Build query params matching backend API
+    const params: Record<string, string | number> = {
+      page,
+      limit: 10,
+      city: cityId, // Backend expects 'city' not 'cityId'
+    };
+    
+    if (category) params.category = category;
+    if (difficulty) params.difficulty = difficulty;
+    if (minPrice) params.minPrice = minPrice;
+    if (maxPrice) params.maxPrice = maxPrice;
+    
+    const toursEndpoint = 'tours';
     const toursService = createServiceREST(BASE_URL, toursEndpoint, 'Bearer');
     
     const result = await toursService.get({
-      params: data,
+      params,
       headers: {
         'X-Language': language,
         'X-Currency': currency
