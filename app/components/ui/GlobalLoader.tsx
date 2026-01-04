@@ -6,10 +6,12 @@
 
 import { useAppSelector } from '~/store/hooks';
 import { selectIsGlobalLoading, selectGlobalLoadingMessage } from '~/store/slices/uiSlice';
+import { useTranslation } from '~/lib/i18n/utils';
 
 export function GlobalLoader() {
   const isLoading = useAppSelector(selectIsGlobalLoading);
   const message = useAppSelector(selectGlobalLoadingMessage);
+  const { t } = useTranslation();
 
   if (!isLoading) return null;
 
@@ -66,7 +68,7 @@ export function GlobalLoader() {
             color: 'var(--color-neutral-500)',
           }}
         >
-          Cargando...
+          {t('common.loading')}
         </p>
       )}
     </div>

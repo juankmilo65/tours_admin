@@ -2,9 +2,11 @@
  * i18n Utilities - Tours Admin Dashboard
  */
 
+import { useSelector } from 'react-redux';
 import { en } from './en';
 import { es } from './es';
 import type { Language, Translation } from './types';
+import { selectLanguage } from '~/store/slices/uiSlice';
 
 export const translations: Record<Language, Translation> = {
   en,
@@ -60,11 +62,11 @@ export function isLanguageSupported(lang: string): lang is Language {
  */
 export function getDefaultLanguage(): Language {
   if (typeof window === 'undefined') {
-    return 'en';
+    return 'es';
   }
 
   const browserLang = navigator.language.split('-')[0] as Language;
-  return isLanguageSupported(browserLang) ? browserLang : 'en';
+  return isLanguageSupported(browserLang) ? browserLang : 'es';
 }
 
 /**
@@ -77,4 +79,26 @@ export function formatTranslation(template: string, params: Record<string, strin
   return template.replace(/\{(\w+)\}/g, (match, key) => {
     return params[key]?.toString() ?? match;
   });
+}
+
+/**
+ * React hook for translations
+ * Uses Redux store for language state
+ * @returns Object with translation function and current language
+ */
+export function useTranslation() {
+  const language = useSelector(selectLanguage) as Language;
+
+  const translate = (key: string, params?: Record<string, string | number>): string => {
+    const translated = t(key, language);
+    if (params) {
+      return formatTranslation(translated, params);
+    }
+    return translated;
+  };
+
+  return {
+    t: translate,
+    language,
+  };
 }

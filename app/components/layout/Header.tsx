@@ -5,8 +5,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCountries, selectSelectedCountry, setSelectedCountryByCode } from '~/store/slices/countriesSlice';
-import { setGlobalLoading } from '~/store/slices/uiSlice';
+import { setGlobalLoading, setLanguage, selectLanguage } from '~/store/slices/uiSlice';
 import { useSubmit, useNavigation, useLocation, useSearchParams } from '@remix-run/react';
+import { useTranslation } from '~/lib/i18n/utils';
 
 interface HeaderProps {
   title: string;
@@ -21,10 +22,14 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
   const menuRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   
+  // i18n hook
+  const { t, language } = useTranslation();
+  
   // Redux state for countries
   const dispatch = useAppDispatch();
   const countries = useAppSelector(selectCountries);
   const selectedCountry = useAppSelector(selectSelectedCountry);
+  const currentLanguage = useAppSelector(selectLanguage);
   
   // Form submission for country change
   const submit = useSubmit();
@@ -33,6 +38,11 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
   const [, setSearchParams] = useSearchParams();
   
   const isChangingCountry = navigation.state === 'submitting' || navigation.state === 'loading';
+
+  // Handle language change
+  const handleLanguageChange = (lang: string) => {
+    dispatch(setLanguage(lang));
+  };
 
   // Turn off global loading when navigation completes
   useEffect(() => {
@@ -230,6 +240,29 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          {/* Language Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>🌐</span>
+            <select
+              value={currentLanguage}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+              style={{
+                padding: 'var(--space-2) var(--space-3)',
+                fontSize: 'var(--text-sm)',
+                color: 'var(--color-neutral-700)',
+                backgroundColor: 'var(--color-neutral-100)',
+                border: '1px solid var(--color-neutral-200)',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                outline: 'none',
+                minWidth: '100px',
+              }}
+            >
+              <option value="es">{t('common.spanish')}</option>
+              <option value="en">{t('common.english')}</option>
+            </select>
+          </div>
+
           {/* Country Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', position: 'relative' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>🌍</span>
@@ -251,7 +284,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
               }}
             >
               {countries.length === 0 && (
-                <option value="">Cargando países...</option>
+                <option value="">{t('common.loadingCountries')}</option>
               )}
               {countries.map((country) => (
                 <option key={country.id} value={country.code}>
@@ -395,7 +428,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
                   }}
                 >
                   <span>👤</span>
-                  <span>Profile</span>
+                  <span>{t('header.profile')}</span>
                 </button>
                 <button
                   style={{
@@ -420,7 +453,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
                   }}
                 >
                   <span>⚙️</span>
-                  <span>Settings</span>
+                  <span>{t('header.settings')}</span>
                 </button>
                 <div 
                   style={{
@@ -452,7 +485,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
                   }}
                 >
                   <span>🚪</span>
-                  <span>Logout</span>
+                  <span>{t('header.logout')}</span>
                 </button>
               </div>
             )}

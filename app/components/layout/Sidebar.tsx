@@ -6,22 +6,23 @@ import { Link, useLocation, useNavigation } from '@remix-run/react';
 import { useState, useEffect } from 'react';
 import { useAppDispatch } from '~/store/hooks';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
+import { useTranslation } from '~/lib/i18n/utils';
 
 interface NavItem {
   path: string;
-  label: string;
+  labelKey: string;
   icon: string;
 }
 
 const navItems: NavItem[] = [
-  { path: '/', label: 'Dashboard', icon: '📊' },
-  { path: '/tours', label: 'Tours', icon: '🏛️' },
-  { path: '/cities', label: 'Cities', icon: '🏙️' },
-  { path: '/categories', label: 'Categories', icon: '📁' },
-  { path: '/news', label: 'News', icon: '📰' },
-  { path: '/offers', label: 'Offers', icon: '🎁' },
-  { path: '/reservations', label: 'Reservations', icon: '📅' },
-  { path: '/users', label: 'Users', icon: '👥' },
+  { path: '/', labelKey: 'sidebar.dashboard', icon: '📊' },
+  { path: '/tours', labelKey: 'sidebar.tours', icon: '🏛️' },
+  { path: '/cities', labelKey: 'sidebar.cities', icon: '🏙️' },
+  { path: '/categories', labelKey: 'sidebar.categories', icon: '📁' },
+  { path: '/news', labelKey: 'sidebar.news', icon: '📰' },
+  { path: '/offers', labelKey: 'sidebar.offers', icon: '🎁' },
+  { path: '/reservations', labelKey: 'sidebar.reservations', icon: '📅' },
+  { path: '/users', labelKey: 'sidebar.users', icon: '👥' },
 ];
 
 interface SidebarProps {
@@ -34,6 +35,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const currentPath = location.pathname;
   const [isMobile, setIsMobile] = useState(false);
 
@@ -164,6 +166,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
         <nav style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
           {navItems.map((item) => {
             const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
+            const label = t(item.labelKey);
             return (
               <Link
                 key={item.path}
@@ -194,10 +197,10 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
                     e.currentTarget.style.color = 'var(--color-neutral-600)';
                   }
                 }}
-                title={isCollapsed ? item.label : ''}
+                title={isCollapsed ? label : ''}
               >
                 <span style={{ fontSize: 'var(--text-xl)' }}>{item.icon}</span>
-                {!isCollapsed && <span>{item.label}</span>}
+                {!isCollapsed && <span>{label}</span>}
               </Link>
             );
           })}

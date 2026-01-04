@@ -9,6 +9,7 @@ import { selectCategories, fetchCategoriesSuccess, type Category } from '~/store
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
+import { useTranslation } from '~/lib/i18n/utils';
 
 // Loader function - runs on server
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -37,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   priceRangeFormData.append('currency', 'MXN');
   const priceRangeResult = await priceRangeBL(priceRangeFormData);
   const priceRange = priceRangeResult.success ? priceRangeResult.data : null;
-console.log('Loader fetched price range:', priceRange);
+
   // If no cityId, return empty state with categories and price range
   if (!cityId) {
     return data({
@@ -184,6 +185,7 @@ function ToursClient() {
   const dispatch = useAppDispatch();
   const cities = useAppSelector(selectCities);
   const categories = useAppSelector(selectCategories);
+  const { t } = useTranslation();
 
   const navigation = useNavigation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -267,7 +269,7 @@ function ToursClient() {
   // Handle filter button click - update URL with all selected filters
   const handleFilter = () => {
     if (!selectedCityId) {
-      alert('Por favor selecciona una ciudad');
+      alert(t('validation.selectCity'));
       return;
     }
 
@@ -363,10 +365,10 @@ function ToursClient() {
               marginBottom: 'var(--space-2)',
             }}
           >
-            Gestión de Tours
+            {t('tours.sectionTitle')}
           </h1>
           <p style={{ fontSize: 'var(--text-lg)', color: 'var(--color-neutral-600)' }}>
-            Total: {pagination.total} tours
+            {t('common.total')}: {pagination.total} tours
           </p>
         </div>
 
@@ -399,7 +401,7 @@ function ToursClient() {
                   marginBottom: 'var(--space-2)',
                 }}
               >
-                Ciudad *
+                {t('tours.cityRequired')}
               </label>
               <select
                 value={selectedCityId}
@@ -423,7 +425,7 @@ function ToursClient() {
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                <option value="">Selecciona una ciudad</option>
+                <option value="">{t('common.selectCity')}</option>
                 {cities.map((city: City) => (
                   <option key={city.id} value={city.id}>
                     {city.name}, {city.country}
@@ -443,7 +445,7 @@ function ToursClient() {
                   marginBottom: 'var(--space-2)',
                 }}
               >
-                Categoría
+                {t('tours.category')}
               </label>
               <select
                 name="category"
@@ -468,7 +470,7 @@ function ToursClient() {
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                <option value="">Todas las categorías</option>
+                <option value="">{t('common.allCategories')}</option>
                 {categories.map((cat: Category) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name}
@@ -488,10 +490,10 @@ function ToursClient() {
                   marginBottom: 'var(--space-2)',
                 }}
               >
-                Precio ({priceRange?.currency || 'MXN'})
+                {t('tours.priceRange')} ({priceRange?.currency || 'MXN'})
                 {!isPriceFilterEnabled && (
                   <span style={{ fontWeight: 'normal', marginLeft: 'var(--space-2)', fontSize: 'var(--text-xs)' }}>
-                    (Selecciona una ciudad primero)
+                    ({t('tours.selectCityForPrice')})
                   </span>
                 )}
               </label>
@@ -611,8 +613,8 @@ function ToursClient() {
                     color: 'var(--color-neutral-500)',
                   }}
                 >
-                  <span>Mín: ${priceRange.minPrice.toLocaleString()}</span>
-                  <span>Máx: ${priceRange.maxPrice.toLocaleString()}</span>
+                  <span>{t('tours.minPrice')}: ${priceRange.minPrice.toLocaleString()}</span>
+                  <span>{t('tours.maxPrice')}: ${priceRange.maxPrice.toLocaleString()}</span>
                 </div>
               )}
             </div>
@@ -642,7 +644,7 @@ function ToursClient() {
                   e.currentTarget.style.backgroundColor = 'var(--color-primary-500)';
                 }}
               >
-                Filtrar
+                {t('common.filter')}
               </button>
             </div>
 
@@ -668,7 +670,7 @@ function ToursClient() {
                   e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
                 }}
               >
-                Limpiar Filtros
+                {t('common.clearFilters')}
               </button>
             </div>
           </div>
@@ -723,8 +725,8 @@ function ToursClient() {
         {!isLoading && tours.length === 0 && selectedCityId && hasCityChanged && (
           <EmptyState
             icon="🔍"
-            title="¡Listo para buscar!"
-            description="Haz clic en 'Filtrar' para consultar los tours disponibles y configurarlos."
+            title={t('tours.readyToSearch')}
+            description={t('tours.readyToSearchDescription')}
           />
         )}
 
@@ -732,8 +734,8 @@ function ToursClient() {
         {!isLoading && tours.length === 0 && selectedCityId && !hasCityChanged && (
           <EmptyState
             icon="🏛️"
-            title="No se encontraron tours"
-            description="Intenta ajustar los filtros para ver más resultados."
+            title={t('tours.noToursFound')}
+            description={t('tours.adjustFilters')}
           />
         )}
 
@@ -741,8 +743,8 @@ function ToursClient() {
         {!isLoading && tours.length === 0 && !selectedCityId && (
           <EmptyState
             icon="🌍"
-            title="Selecciona una ciudad"
-            description="Elige una ciudad para ver los tours disponibles."
+            title={t('tours.selectCityFirst')}
+            description={t('tours.selectCityDescription')}
           />
         )}
 
@@ -779,7 +781,7 @@ function ToursClient() {
                   pagination.page === 1 ? 'var(--color-neutral-100)' : 'white';
               }}
             >
-              Anterior
+              {t('pagination.previous')}
             </button>
 
             {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
@@ -856,7 +858,7 @@ function ToursClient() {
                     : 'white';
               }}
             >
-              Siguiente
+              {t('pagination.next')}
             </button>
           </div>
         )}

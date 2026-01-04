@@ -4,6 +4,7 @@
  */
 
 import type { Tour } from '~/types/PayloadTourDataProps';
+import { useTranslation } from '~/lib/i18n/utils';
 
 interface TourCardProps {
   tour: Tour;
@@ -13,6 +14,7 @@ interface TourCardProps {
 }
 
 export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProps) {
+  const { t } = useTranslation();
   const hasActiveOffer = tour.offers && tour.offers.length > 0 && tour.offers[0]?.isActive;
   const discount = hasActiveOffer ? parseInt(tour.offers[0]?.discountPercentage || '0') : 0;
   const discountedPrice = discount > 0 ? tour.base_price * (1 - discount / 100) : tour.base_price;
@@ -229,7 +231,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
               fontWeight: 'var(--font-weight-medium)',
             }}
           >
-            {tour.isActive ? '✅ Activo' : '❌ Inactivo'}
+            {tour.isActive ? `✅ ${t('common.active')}` : `❌ ${t('common.inactive')}`}
           </div>
         </div>
 
@@ -255,7 +257,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
               e.currentTarget.style.backgroundColor = 'var(--color-primary-500)';
             }}
           >
-            Ver Detalles
+            {t('tours.viewDetails')}
           </button>
           <button
             onClick={(e) => {
@@ -278,14 +280,14 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
             onMouseOut={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
             }}
-            title="Editar"
+            title={t('common.edit')}
           >
             ✏️
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (window.confirm('¿Estás seguro de eliminar este tour?')) {
+              if (window.confirm(t('common.confirm'))) {
                 onDelete(tour.id);
               }
             }}
@@ -305,7 +307,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
             onMouseOut={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
             }}
-            title="Eliminar"
+            title={t('common.delete')}
           >
             🗑️
           </button>

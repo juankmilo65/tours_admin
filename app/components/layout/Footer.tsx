@@ -3,8 +3,10 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useTranslation } from '~/lib/i18n/utils';
 
 export function Footer() {
+  const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
   const [isMobile, setIsMobile] = useState(false);
 
@@ -39,7 +41,7 @@ export function Footer() {
           textAlign: isMobile ? 'center' : 'left',
         }}
       >
-        <p style={{ margin: 0 }}>© {currentYear} Tours Admin. All rights reserved.</p>
+        <p style={{ margin: 0 }}>{t('footer.copyright', { year: currentYear })}</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 'var(--space-3)' : 'var(--space-4)', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
           <a 
             href="#"
@@ -55,7 +57,7 @@ export function Footer() {
               e.currentTarget.style.color = 'inherit';
             }}
           >
-            Privacy Policy
+            {t('footer.privacyPolicy')}
           </a>
           <a 
             href="#"
@@ -71,7 +73,7 @@ export function Footer() {
               e.currentTarget.style.color = 'inherit';
             }}
           >
-            Terms of Service
+            {t('footer.termsOfService')}
           </a>
           <a 
             href="#"
@@ -87,7 +89,7 @@ export function Footer() {
               e.currentTarget.style.color = 'inherit';
             }}
           >
-            Support
+            {t('footer.support')}
           </a>
         </div>
       </div>

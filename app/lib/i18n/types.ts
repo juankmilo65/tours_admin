@@ -18,6 +18,8 @@ export const defaultLanguage: Language = 'en' as const;
 
 export type TranslationKey =
   | 'common'
+  | 'sidebar'
+  | 'header'
   | 'auth'
   | 'dashboard'
   | 'tours'
@@ -28,4 +30,7 @@ export type TranslationKey =
   | 'reservations'
   | 'users'
   | 'settings'
-  | 'validation';
+  | 'validation'
+  | 'pagination'
+  | 'footer'
+  | 'emptyStates';
