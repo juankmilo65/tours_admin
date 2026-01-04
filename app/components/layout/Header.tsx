@@ -3,6 +3,9 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { useAppSelector, useAppDispatch } from '~/store/hooks';
+import { selectCountries, selectSelectedCountry, setSelectedCountryByCode } from '~/store/slices/countriesSlice';
+import { useFetcher, useRevalidator } from '@remix-run/react';
 
 interface HeaderProps {
   title: string;
@@ -16,6 +19,35 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Redux state for countries
+  const dispatch = useAppDispatch();
+  const countries = useAppSelector(selectCountries);
+  const selectedCountry = useAppSelector(selectSelectedCountry);
+  
+  // Fetcher for triggering country change
+  const fetcher = useFetcher();
+  const revalidator = useRevalidator();
+
+  // Revalidate after fetcher completes
+  useEffect(() => {
+    if (fetcher.state === 'idle' && fetcher.data) {
+      console.log('[Header] Fetcher completed, revalidating...');
+      revalidator.revalidate();
+    }
+  }, [fetcher.state, fetcher.data]);
+
+  // Handle country change
+  const handleCountryChange = (countryCode: string) => {
+    console.log('[Header] Country changed to:', countryCode);
+    dispatch(setSelectedCountryByCode(countryCode));
+    
+    // Submit to the action to update session and reload cities
+    fetcher.submit(
+      { _action: 'changeCountry', countryCode },
+      { method: 'post', action: '/' }
+    );
+  };
 
   // Check if screen is mobile
   useEffect(() => {
@@ -175,6 +207,35 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          {/* Country Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>🌍</span>
+            <select
+              value={selectedCountry?.code || ''}
+              onChange={(e) => handleCountryChange(e.target.value)}
+              style={{
+                padding: 'var(--space-2) var(--space-3)',
+                fontSize: 'var(--text-sm)',
+                color: 'var(--color-neutral-700)',
+                backgroundColor: 'var(--color-neutral-100)',
+                border: '1px solid var(--color-neutral-200)',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                outline: 'none',
+                minWidth: '120px',
+              }}
+            >
+              {countries.length === 0 && (
+                <option value="">Cargando países...</option>
+              )}
+              {countries.map((country) => (
+                <option key={country.id} value={country.code}>
+                  {country.flag ? `${country.flag} ` : ''}{country.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             style={{
               padding: 'var(--space-2)',

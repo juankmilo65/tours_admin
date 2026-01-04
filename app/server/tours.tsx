@@ -1,7 +1,7 @@
 import { createServiceREST } from './_index';
 import { ServicePayload } from '../types/PayloadTourDataProps';
 
-const BASE_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+const BASE_URL = process.env.BACKEND_URL;
 
 /**
  * Get tours from backend API by cityId

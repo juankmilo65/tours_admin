@@ -5,6 +5,7 @@
 
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import citiesReducer from '~/store/slices/citiesSlice';
+import countriesReducer from '~/store/slices/countriesSlice';
 /* import authReducer from '~/store/slices/authSlice';
 import toursReducer from '~/store/slices/toursSlice';
 import usersReducer from '~/store/slices/usersSlice';
@@ -16,6 +17,7 @@ import uiReducer from '~/store/slices/uiSlice'; */
 
 const rootReducer = combineReducers({
   city: citiesReducer,
+  country: countriesReducer,
   /* offers: offersReducer,
   ui: uiReducer, */
 })
