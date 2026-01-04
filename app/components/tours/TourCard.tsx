@@ -110,7 +110,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
               fontWeight: 'var(--font-weight-medium)',
             }}
           >
-            {tour.category.name}
+            {tour.category?.name || 'Sin categoría'}
           </span>
           <span style={{ color: 'var(--color-neutral-300)' }}>•</span>
           <span
@@ -119,7 +119,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
               color: 'var(--color-neutral-600)',
             }}
           >
-            {tour.city.name}, {tour.city.country}
+            {tour.city?.name || 'Ciudad'}{tour.city?.country ? `, ${tour.city.country}` : ''}
           </span>
         </div>
 
@@ -177,7 +177,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span>🗣️</span>
-            <span>{tour.language[0]}</span>
+            <span>{tour.language?.[0] || 'ES'}</span>
           </div>
         </div>
 

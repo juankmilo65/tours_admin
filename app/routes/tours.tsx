@@ -5,15 +5,75 @@ import type { Tour, City } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
 import { useAppSelector } from '~/store/hooks';
 import { selectCities } from '~/store/slices/citiesSlice';
+import toursBL from '~/server/businessLogic/toursBusinessLogic';
 
 // Loader function - runs on server
-export async function loader({}: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const cityId = url.searchParams.get('cityId');
+  const page = url.searchParams.get('page') || '1';
+  const category = url.searchParams.get('category') || '';
+  const difficulty = url.searchParams.get('difficulty') || '';
+  const minPrice = url.searchParams.get('minPrice') || '';
+  const maxPrice = url.searchParams.get('maxPrice') || '';
+
+  // If no cityId, return empty state
+  if (!cityId) {
+    return json({
+      cityId: null,
+      tours: {
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 0,
+          totalPages: 1,
+        }
+      },
+    });
+  }
+
+  // Build filters object
+  const filters: Record<string, string | number> = {
+    cityId,
+    page: parseInt(page, 10),
+  };
+
+  if (category) filters.category = category;
+  if (difficulty) filters.difficulty = difficulty;
+  if (minPrice) filters.minPrice = parseInt(minPrice, 10);
+  if (maxPrice) filters.maxPrice = parseInt(maxPrice, 10);
+
+  // Call business logic to get tours
+  const formData = new FormData();
+  formData.append('action', 'getToursBusiness');
+  formData.append('filters', JSON.stringify(filters));
+  formData.append('language', 'es');
+
+  const result = await toursBL(formData);
+
+  if (result.success) {
+    return json({
+      cityId,
+      tours: {
+        data: result.data || [],
+        pagination: result.pagination || {
+          page: parseInt(page, 10),
+          limit: 10,
+          total: 0,
+          totalPages: 1,
+        }
+      },
+    });
+  }
+
+  // Return empty on error
   return json({
-    cityId: null,
+    cityId,
     tours: {
       data: [],
       pagination: {
-        page: 1,
+        page: parseInt(page, 10),
         limit: 10,
         total: 0,
         totalPages: 1,
@@ -31,9 +91,24 @@ function ToursClient() {
   const [searchParams, setSearchParams] = useSearchParams();
   
   // State for selected city and tours
-  const [selectedCityId, setSelectedCityId] = useState(loaderData.cityId || '');
-  const [tours, setTours] = useState<Tour[]>([]);
-  const [pagination, setPagination] = useState(loaderData.tours.pagination);
+  const [selectedCityId, setSelectedCityId] = useState(searchParams.get('cityId') || '');
+  const [tours, setTours] = useState<Tour[]>(loaderData.tours?.data || []);
+  const [pagination, setPagination] = useState(loaderData.tours?.pagination || {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+  });
+
+  // Update state when loaderData changes (after navigation)
+  useEffect(() => {
+    if (loaderData.tours?.data) {
+      setTours(loaderData.tours.data);
+    }
+    if (loaderData.tours?.pagination) {
+      setPagination(loaderData.tours.pagination);
+    }
+  }, [loaderData]);
 
   // Check if navigation is loading
   const isLoading = navigation.state === 'loading';

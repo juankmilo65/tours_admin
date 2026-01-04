@@ -222,25 +222,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       id: `country-${index}`,
       code: countryName.toLowerCase().replace(/\s+/g, '-'),
       name: countryName,
+      flag: countryName.toLowerCase() === 'mexico' ? '🇲🇽' : undefined,
       isActive: true
     }));
-    
-    // Add demo countries for testing
-    const demoCountries: Country[] = [
-      { id: 'country-demo-1', code: 'colombia', name: 'Colombia', flag: '🇨🇴', isActive: true },
-      { id: 'country-demo-2', code: 'ecuador', name: 'Ecuador', flag: '🇪🇨', isActive: true },
-      { id: 'country-demo-3', code: 'brasil', name: 'Brasil', flag: '🇧🇷', isActive: true },
-      { id: 'country-demo-4', code: 'peru', name: 'Perú', flag: '🇵🇪', isActive: true },
-    ];
-    
-    // Add flag to Mexico if it exists
-    countries = countries.map(c => ({
-      ...c,
-      flag: c.name.toLowerCase() === 'mexico' ? '🇲🇽' : c.flag
-    }));
-    
-    // Merge with demo countries
-    countries = [...countries, ...demoCountries];
     
     // Cache countries in session
     session.set("cachedCountries", countries);
