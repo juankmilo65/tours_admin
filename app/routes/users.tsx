@@ -2,9 +2,11 @@
  * Users Route - Users and Roles Management
  */
 
+import { useState } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
+import Select from '~/components/ui/Select';
 import type { Column } from '~/components/ui/Table';
 
 interface User {
@@ -109,6 +111,10 @@ export default function Users() {
     { key: 'createdAt', label: 'Created' },
   ];
 
+  const [roleFilter, setRoleFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
   return (
     <div className="space-y-6">
       <Card
@@ -126,23 +132,27 @@ export default function Users() {
                 placeholder="Search users..."
                 className="flex-1 min-w-[200px] px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Roles</option>
-                <option value="Admin">Admin</option>
-                <option value="Staff">Staff</option>
-              </select>
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Plans</option>
-                <option value="Basic">Basic</option>
-                <option value="Premium">Premium</option>
-                <option value="Top">Top</option>
-              </select>
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Status</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
+              <Select
+                options={[{ value: '', label: 'All Roles' }, { value: 'Admin', label: 'Admin' }, { value: 'Staff', label: 'Staff' }]}
+                value={roleFilter}
+                onChange={setRoleFilter}
+                placeholder="All Roles"
+                className="select-compact"
+              />
+              <Select
+                options={[{ value: '', label: 'All Plans' }, { value: 'Basic', label: 'Basic' }, { value: 'Premium', label: 'Premium' }, { value: 'Top', label: 'Top' }]}
+                value={planFilter}
+                onChange={setPlanFilter}
+                placeholder="All Plans"
+                className="select-compact"
+              />
+              <Select
+                options={[{ value: '', label: 'All Status' }, { value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }, { value: 'Cancelled', label: 'Cancelled' }]}
+                value={statusFilter}
+                onChange={setStatusFilter}
+                placeholder="All Status"
+                className="select-compact"
+              />
             </div>
 
             <Table data={mockUsers} columns={columns} />

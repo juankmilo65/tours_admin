@@ -2,9 +2,11 @@
  * News Route - News and Content Management
  */
 
+import { useState } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
+import Select from '~/components/ui/Select';
 import type { Column } from '~/components/ui/Table';
 
 interface NewsItem {
@@ -53,6 +55,9 @@ export default function News() {
     { key: 'createdAt', label: 'Created At' },
   ];
 
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
   return (
     <div className="space-y-6">
       <Card
@@ -65,18 +70,30 @@ export default function News() {
                 placeholder="Search news..."
                 className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Categories</option>
-                <option value="Announcement">Announcement</option>
-                <option value="Promotion">Promotion</option>
-                <option value="Information">Information</option>
-              </select>
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Status</option>
-                <option value="Published">Published</option>
-                <option value="Scheduled">Scheduled</option>
-                <option value="Draft">Draft</option>
-              </select>
+              <Select
+                options={[
+                  { value: '', label: 'All Categories' },
+                  { value: 'Announcement', label: 'Announcement' },
+                  { value: 'Promotion', label: 'Promotion' },
+                  { value: 'Information', label: 'Information' },
+                ]}
+                value={categoryFilter}
+                onChange={setCategoryFilter}
+                placeholder="All Categories"
+                className="select-compact"
+              />
+              <Select
+                options={[
+                  { value: '', label: 'All Status' },
+                  { value: 'Published', label: 'Published' },
+                  { value: 'Scheduled', label: 'Scheduled' },
+                  { value: 'Draft', label: 'Draft' },
+                ]}
+                value={statusFilter}
+                onChange={setStatusFilter}
+                placeholder="All Status"
+                className="select-compact"
+              />
             </div>
 
             <Table data={mockNews} columns={columns} />

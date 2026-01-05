@@ -2,11 +2,15 @@
  * Settings Route - Application Settings
  */
 
+import { useState } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
+import Select from '~/components/ui/Select';
 
 export default function Settings() {
+  const [language, setLanguage] = useState('en');
+  const [currency, setCurrency] = useState('USD');
   return (
     <div className="space-y-6">
       <Card title="General Settings" actions={<Button variant="primary">Save Changes</Button>}>
@@ -15,20 +19,32 @@ export default function Settings() {
                 <Input label="Application Name" placeholder="Tours Admin" defaultValue="Tours Admin" />
                 <Input label="Support Email" type="email" placeholder="support@tours.com" defaultValue="support@tours.com" />
                 <Input label="Contact Phone" type="tel" placeholder="+1 234 567 890" />
-                <Input label="Default Language" type="select">
-                  <option value="en">English</option>
-                  <option value="es">Spanish</option>
-                </Input>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Default Language</label>
+                  <Select
+                    options={[{ value: 'en', label: 'English' }, { value: 'es', label: 'Spanish' }]}
+                    value={language}
+                    onChange={setLanguage}
+                    placeholder="Select language"
+                    className="select-compact"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Default Currency
                 </label>
-                <select className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="USD">USD - US Dollar</option>
-                  <option value="EUR">EUR - Euro</option>
-                  <option value="MXN">MXN - Mexican Peso</option>
-                </select>
+                <Select
+                  options={[
+                    { value: 'USD', label: 'USD - US Dollar' },
+                    { value: 'EUR', label: 'EUR - Euro' },
+                    { value: 'MXN', label: 'MXN - Mexican Peso' },
+                  ]}
+                  value={currency}
+                  onChange={setCurrency}
+                  placeholder="Select currency"
+                  className="select-compact"
+                />
               </div>
             </div>
           </Card>

@@ -96,8 +96,7 @@ svg {
 
 input,
 button,
-textarea,
-select {
+textarea {
   font: inherit;
 }
 
@@ -119,8 +118,7 @@ input[type='search'],
 input[type='date'],
 input[type='datetime-local'],
 input[type='time'],
-textarea,
-select {
+textarea {
   width: 100%;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-neutral-300);
@@ -397,6 +395,94 @@ input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
   background: transparent;
   border-radius: 3px;
+}
+
+/* Custom select (dropdown) styling */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23343a40'><path d='M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 0 1 1.08 1.04l-4.25 4.25a.75.75 0 0 1-1.08 0L5.21 8.27a.75.75 0 0 1 .02-1.06z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+  padding-right: calc(var(--space-4) + 24px);
+}
+
+/* Remove IE dropdown arrow */
+select::-ms-expand {
+  display: none;
+}
+
+/* Disabled state */
+select:disabled {
+  background-color: var(--color-neutral-100);
+  color: var(--color-neutral-500);
+}
+
+/* Small adjustments for compact selects */
+.select-compact {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+}
+
+/* Ensure select focus uses primary outline */
+select:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+/* Custom Select component base styles */
+.custom-select .custom-select-button {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-100);
+  width: 100%;
+  font-size: var(--text-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.custom-select .custom-select-button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.custom-select ul {
+  padding: 6px 0;
+  margin: 6px 0 0 0;
+  list-style: none;
+  background: var(--color-neutral-50);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  max-height: 240px;
+  overflow: auto;
+}
+
+.custom-select li {
+  padding: 10px 14px;
+  font-size: var(--text-sm);
+  color: var(--color-neutral-800);
+}
+
+.custom-select li:hover,
+.custom-select li[aria-selected='true'] {
+  background: var(--color-neutral-100);
+}
+
+/* Selected state: visually highlighted rather than showing a checkmark */
+.custom-select li.selected {
+  background: var(--color-neutral-100);
+  font-weight: var(--font-weight-medium);
+}
+
+.custom-select li.highlighted {
+  background: var(--color-neutral-100);
 }
 
 /* Firefox */

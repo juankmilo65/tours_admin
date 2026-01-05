@@ -12,6 +12,7 @@ import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
 import { useTranslation } from '~/lib/i18n/utils';
+import Select from '~/components/ui/Select';
 
 // Loader function - runs on server
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -447,35 +448,17 @@ function ToursClient() {
               >
                 {t('tours.cityRequired')}
               </label>
-              <select
+              <Select
+                options={
+                  [{ value: '', label: t('common.selectCity') }].concat(
+                    translatedCities.map((c: TranslatedCity) => ({ value: c.id, label: c.name }))
+                  )
+                }
                 value={selectedCityId}
-                onChange={(e) => handleCityChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: 'var(--space-3)',
-                  border: '1px solid var(--color-neutral-300)',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: 'var(--text-base)',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-primary-500)';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-neutral-300)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <option value="">{t('common.selectCity')}</option>
-                {translatedCities.map((city: TranslatedCity) => (
-                  <option key={city.id} value={city.id}>
-                    {city.name}
-                  </option>
-                ))}
-              </select>
+                onChange={handleCityChange}
+                placeholder={t('common.selectCity')}
+                id="select-city"
+              />
             </div>
 
             {/* Category Filter */}
@@ -491,36 +474,17 @@ function ToursClient() {
               >
                 {t('tours.category')}
               </label>
-              <select
-                name="category"
+              <Select
+                options={
+                  [{ value: '', label: t('common.allCategories') }].concat(
+                    translatedCategories.map((c) => ({ value: c.id, label: c.name }))
+                  )
+                }
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: 'var(--space-3)',
-                  border: '1px solid var(--color-neutral-300)',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: 'var(--text-base)',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-primary-500)';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-neutral-300)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <option value="">{t('common.allCategories')}</option>
-                {translatedCategories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(v: string) => setSelectedCategory(v)}
+                placeholder={t('common.allCategories')}
+                id="select-category"
+              />
             </div>
 
             {/* Price Range Slider Filter */}

@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { translateCountries, translateCountry, type Country } from '~/store/slices/countriesSlice';
 import { setGlobalLoading, setLanguage, selectLanguage } from '~/store/slices/uiSlice';
+import Select, { Option } from '~/components/ui/Select';
 import { useSubmit, useNavigation, useLocation, useSearchParams } from '@remix-run/react';
 import { useTranslation } from '~/lib/i18n/utils';
 import type { Language } from '~/lib/i18n/types';
@@ -262,55 +263,31 @@ export function Header({
           {/* Language Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>🌐</span>
-            <select
+            <Select
+              options={[{ value: 'es', label: t('common.spanish') }, { value: 'en', label: t('common.english') }]}
               value={currentLanguage}
-              onChange={(e) => handleLanguageChange(e.target.value)}
-              style={{
-                padding: 'var(--space-2) var(--space-3)',
-                fontSize: 'var(--text-sm)',
-                color: 'var(--color-neutral-700)',
-                backgroundColor: 'var(--color-neutral-100)',
-                border: '1px solid var(--color-neutral-200)',
-                borderRadius: 'var(--radius-md)',
-                cursor: 'pointer',
-                outline: 'none',
-                minWidth: '100px',
-              }}
-            >
-              <option value="es">{t('common.spanish')}</option>
-              <option value="en">{t('common.english')}</option>
-            </select>
+              onChange={handleLanguageChange}
+              placeholder={t('common.select')}
+              className=""
+              id="select-language"
+            />
           </div>
 
           {/* Country Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', position: 'relative' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>🌍</span>
-            <select
+            <Select
+              options={
+                translatedCountries.length === 0
+                  ? [{ value: '', label: t('common.loadingCountries') }]
+                  : translatedCountries.map((c): Option => ({ value: c.code, label: c.name }))
+              }
               value={translatedSelectedCountry?.code || ''}
-              onChange={(e) => handleCountryChange(e.target.value)}
+              onChange={handleCountryChange}
               disabled={isChangingCountry}
-              style={{
-                padding: 'var(--space-2) var(--space-3)',
-                fontSize: 'var(--text-sm)',
-                color: 'var(--color-neutral-700)',
-                backgroundColor: isChangingCountry ? 'var(--color-neutral-200)' : 'var(--color-neutral-100)',
-                border: '1px solid var(--color-neutral-200)',
-                borderRadius: 'var(--radius-md)',
-                cursor: isChangingCountry ? 'wait' : 'pointer',
-                outline: 'none',
-                minWidth: '140px',
-                opacity: isChangingCountry ? 0.7 : 1,
-              }}
-            >
-              {translatedCountries.length === 0 && (
-                <option value="">{t('common.loadingCountries')}</option>
-              )}
-              {translatedCountries.map((country) => (
-                <option key={country.id} value={country.code}>
-                  {country.name}
-                </option>
-              ))}
-            </select>
+              placeholder={t('common.selectCountry')}
+              id="select-country"
+            />
             {isChangingCountry && (
               <span style={{ 
                 position: 'absolute', 

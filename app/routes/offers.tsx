@@ -2,9 +2,11 @@
  * Offers Route - Offers and Promotions Management
  */
 
+import { useState } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
+import Select from '~/components/ui/Select';
 import type { Column } from '~/components/ui/Table';
 
 interface Offer {
@@ -110,6 +112,9 @@ export default function Offers() {
     { key: 'createdAt', label: 'Created At' },
   ];
 
+  const [typeFilter, setTypeFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
+
   return (
     <div className="space-y-6">
       <Card
@@ -122,18 +127,25 @@ export default function Offers() {
                 placeholder="Search offers..."
                 className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Types</option>
-                <option value="percentage">Percentage</option>
-                <option value="fixed">Fixed</option>
-                <option value="buy_x_get_y">Buy X Get Y</option>
-              </select>
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Plans</option>
-                <option value="Basic">Basic</option>
-                <option value="Premium">Premium</option>
-                <option value="Top">Top</option>
-              </select>
+              <Select
+                options={[
+                  { value: '', label: 'All Types' },
+                  { value: 'percentage', label: 'Percentage' },
+                  { value: 'fixed', label: 'Fixed' },
+                  { value: 'buy_x_get_y', label: 'Buy X Get Y' },
+                ]}
+                value={typeFilter}
+                onChange={setTypeFilter}
+                placeholder="All Types"
+                className="select-compact"
+              />
+              <Select
+                options={[{ value: '', label: 'All Plans' }, { value: 'Basic', label: 'Basic' }, { value: 'Premium', label: 'Premium' }, { value: 'Top', label: 'Top' }]}
+                value={planFilter}
+                onChange={setPlanFilter}
+                placeholder="All Plans"
+                className="select-compact"
+              />
             </div>
 
             <Table data={mockOffers} columns={columns} />

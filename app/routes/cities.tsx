@@ -2,9 +2,11 @@
  * Cities Route - Cities Management
  */
 
+import { useState } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
+import Select from '~/components/ui/Select';
 import type { Column } from '~/components/ui/Table';
 
 interface City {
@@ -44,6 +46,8 @@ export default function Cities() {
     { key: 'createdAt', label: 'Created At' },
   ];
 
+  const [countryFilter, setCountryFilter] = useState('');
+
   return (
     <div className="space-y-6">
       <Card
@@ -56,12 +60,18 @@ export default function Cities() {
                 placeholder="Search cities..."
                 className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Countries</option>
-                <option value="Spain">Spain</option>
-                <option value="France">France</option>
-                <option value="Italy">Italy</option>
-              </select>
+              <Select
+                options={[
+                  { value: '', label: 'All Countries' },
+                  { value: 'Spain', label: 'Spain' },
+                  { value: 'France', label: 'France' },
+                  { value: 'Italy', label: 'Italy' },
+                ]}
+                value={countryFilter}
+                onChange={setCountryFilter}
+                placeholder="All Countries"
+                className="select-compact"
+              />
             </div>
 
             <Table data={mockCities} columns={columns} />

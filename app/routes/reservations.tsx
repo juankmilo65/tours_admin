@@ -2,9 +2,11 @@
  * Reservations Route - Reservations Management
  */
 
+import { useState } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
+import Select from '~/components/ui/Select';
 import type { Column } from '~/components/ui/Table';
 
 interface Reservation {
@@ -135,6 +137,9 @@ export default function Reservations() {
     { key: 'createdAt', label: 'Created' },
   ];
 
+  const [statusFilter, setStatusFilter] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('');
+
   return (
     <div className="space-y-6">
       <Card
@@ -151,21 +156,33 @@ export default function Reservations() {
                 type="date"
                 className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Status</option>
-                <option value="Confirmed">Confirmed</option>
-                <option value="Pending">Pending</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
-                <option value="Refunded">Refunded</option>
-              </select>
-              <select className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">All Payment Status</option>
-                <option value="Paid">Paid</option>
-                <option value="Pending">Pending</option>
-                <option value="Failed">Failed</option>
-                <option value="Refunded">Refunded</option>
-              </select>
+              <Select
+                options={[
+                  { value: '', label: 'All Status' },
+                  { value: 'Confirmed', label: 'Confirmed' },
+                  { value: 'Pending', label: 'Pending' },
+                  { value: 'Completed', label: 'Completed' },
+                  { value: 'Cancelled', label: 'Cancelled' },
+                  { value: 'Refunded', label: 'Refunded' },
+                ]}
+                value={statusFilter}
+                onChange={setStatusFilter}
+                placeholder="All Status"
+                className="select-compact"
+              />
+              <Select
+                options={[
+                  { value: '', label: 'All Payment Status' },
+                  { value: 'Paid', label: 'Paid' },
+                  { value: 'Pending', label: 'Pending' },
+                  { value: 'Failed', label: 'Failed' },
+                  { value: 'Refunded', label: 'Refunded' },
+                ]}
+                value={paymentFilter}
+                onChange={setPaymentFilter}
+                placeholder="All Payment Status"
+                className="select-compact"
+              />
             </div>
 
             <Table data={mockReservations} columns={columns} />
