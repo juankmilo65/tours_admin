@@ -1,4 +1,4 @@
-import { getCitiesByCountryId } from '../cities';
+import { getCities, getCitiesByCountryId } from '../cities';
 import { getCountries } from '../countries';
 import { ServiceResult } from '../_index';
 
@@ -41,6 +41,20 @@ const getCountriesBusiness = async (data: CitiesPayload): Promise<ServiceResult<
 };
 
 /**
+ * Business logic for getting all cities
+ */
+const getCitiesBusiness = async (data: CitiesPayload): Promise<ServiceResult<unknown>> => {
+  try {
+    const { language } = data;
+    const result = await getCities(language);
+    return result;
+  } catch (error) {
+    console.error('Error in getCitiesBusiness:', error);
+    return { error };
+  }
+};
+
+/**
  * Business logic for getting cities by countryId
  */
 const getCitiesByCountryIdBusiness = async (data: CitiesPayload): Promise<ServiceResult<unknown>> => {
@@ -68,6 +82,7 @@ const citiesBusinessLogic = async (
 ): Promise<ServiceResult<unknown>> => {
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
     getCountriesBusiness: async () => await getCountriesBusiness(data),
+    getCitiesBusiness: async () => await getCitiesBusiness(data),
     getCitiesByCountryIdBusiness: async () => await getCitiesByCountryIdBusiness(data)
   };
 

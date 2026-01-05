@@ -1,6 +1,9 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation, useLoaderData } from '@remix-run/react';
 import { data, type LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
 import { useMemo, useState, useEffect, createContext } from 'react';
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { makeStore, makePersistor } from './store';
 
 import './styles/global.css';
 import { Header } from './components/layout/Header';
@@ -13,8 +16,8 @@ import type { City } from './store/slices/citiesSlice';
 import type { Country } from './store/slices/countriesSlice';
 import { getSession, commitSession } from '~/utilities/sessions';
 import { useAppDispatch } from '~/store/hooks';
-import { fetchCitiesSuccess } from '~/store/slices/citiesSlice';
-import { fetchCountriesSuccess, setSelectedCountryByCode } from '~/store/slices/countriesSlice';
+import { fetchCitiesSuccess } from './store/slices/citiesSlice';
+import { fetchCountriesSuccess, setSelectedCountryByCode } from './store/slices/countriesSlice';
 
 // Context for sharing cities and countries globally
 export const CitiesContext = createContext<{
@@ -22,40 +25,28 @@ export const CitiesContext = createContext<{
   countries: Country[];
 } | null>(null);
 
-// Client component to dispatch cities and countries to Redux
-function CitiesReduxDispatcher({ cities, countries, selectedCountryCode }: { cities: City[], countries: Country[], selectedCountryCode: string }) {
+// Client component to sync loader data with Redux
+function DataSyncDispatcher({ cities, countries, selectedCountryCode }: { cities: City[], countries: Country[], selectedCountryCode: string }) {
   const dispatch = useAppDispatch();
-
+  
   useEffect(() => {
-    // Always update cities, even if empty (important for country changes)
-    dispatch(fetchCitiesSuccess(cities));
-    
+    // Sync countries to Redux
     if (countries.length > 0) {
       dispatch(fetchCountriesSuccess(countries));
     }
     
-    // Always set selected country in Redux
+    // Sync cities to Redux
+    if (cities.length > 0) {
+      dispatch(fetchCitiesSuccess(cities));
+    }
+    
+    // Set selected country
     if (selectedCountryCode) {
       dispatch(setSelectedCountryByCode(selectedCountryCode));
     }
   }, [cities, countries, selectedCountryCode, dispatch]);
 
   return null;
-}
-
-// Wrapper to only render on client
-function ClientOnlyCitiesDispatcher({ cities, countries, selectedCountryCode }: { cities: City[], countries: Country[], selectedCountryCode: string }) {
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  if (!isClient) {
-    return null;
-  }
-
-  return <CitiesReduxDispatcher cities={cities} countries={countries} selectedCountryCode={selectedCountryCode} />;
 }
 
 // Wrapper to only render Sidebar on client
@@ -73,13 +64,23 @@ function ClientOnlySidebar({ isOpen, isCollapsed, onToggle }: { isOpen: boolean;
   return <Sidebar isOpen={isOpen} isCollapsed={isCollapsed} onToggle={onToggle} />;
 }
 
-// Wrapper to only render Header on client
-function ClientOnlyHeader({ title, isSidebarOpen, isSidebarCollapsed, onToggleSidebar, onToggleSidebarCollapse }: {
+// Wrapper to only render Header on client with data from loader
+function ClientOnlyHeader({ 
+  title, 
+  isSidebarOpen, 
+  isSidebarCollapsed, 
+  onToggleSidebar, 
+  onToggleSidebarCollapse,
+  countries,
+  selectedCountryCode
+}: {
   title: string;
   isSidebarOpen: boolean;
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   onToggleSidebarCollapse: () => void;
+  countries: Country[];
+  selectedCountryCode: string;
 }) {
   const [isClient, setIsClient] = useState(false);
 
@@ -98,6 +99,8 @@ function ClientOnlyHeader({ title, isSidebarOpen, isSidebarCollapsed, onToggleSi
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
       onToggleSidebarCollapse={onToggleSidebarCollapse}
+      countries={countries}
+      selectedCountryCode={selectedCountryCode}
     />
   );
 }
@@ -142,7 +145,17 @@ export const links: LinksFunction = () => [
   },
 ];
 
+// Redux store para cliente
+const store = makeStore();
+const persistor = typeof window !== 'undefined' ? makePersistor(store) : null;
+
 export function Layout({ children }: { children: React.ReactNode }) {
+  const [isClient, setIsClient] = useState(false);
+  
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+  
   return (
     <html lang="en">
       <head>
@@ -152,7 +165,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body style={{ backgroundColor: 'var(--color-neutral-50)' }}>
-        {children}
+        <Provider store={store}>
+          {isClient && persistor ? (
+            <PersistGate loading={null} persistor={persistor}>
+              {children}
+            </PersistGate>
+          ) : (
+            children
+          )}
+        </Provider>
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -208,50 +229,48 @@ const actionsLoader = async (action: string, parameters: ActionParameters) => {
 }
 
 interface LoaderData {
-  data: {
-    cities: City[];
-    countries: Country[];
-    selectedCountryId: string;
-    selectedCountryCode: string;
-  };
+  cities: City[];
+  countries: Country[];
+  selectedCountryId: string;
+  selectedCountryCode: string;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Load cities and countries globally for all routes
   const session = await getSession(request.headers.get("Cookie"));
   
-  // Check if countries are already in session (to avoid reloading)
-  const cachedCountries = session.get("cachedCountries") as Country[] | undefined;
+  // Get selected country from session
   const selectedCountryId = session.get("selectedCountryId") as string | undefined;
   const selectedCountryCode = session.get("selectedCountryCode") as string | undefined;
   
-  let countries: Country[] = [];
+  // Get current language from session or default to 'es'
+  const currentLanguage = session.get("language") as string || 'es';
   
-  // Only fetch countries if not cached
-  if (cachedCountries && cachedCountries.length > 0) {
-    countries = cachedCountries;
-  } else {
-    // Fetch countries from API - data comes already formatted
-    const countriesResult = await actionsLoader('getCountries', { language: 'es' });
-    countries = countriesResult.success ? countriesResult.data : [];
-    
-    // Cache countries in session
-    session.set("cachedCountries", countries);
-  }
+  // Fetch countries from API with proper language header
+  // Redux Persist will cache them on client side
+  const countriesResult = await actionsLoader('getCountries', { language: currentLanguage }) as { success: boolean; data: Country[] };
+  const countries = countriesResult.success ? countriesResult.data : [];
   
-  // Determine the country to filter by
-  // Priority: 1. selectedCountryId from session, 2. First country from list (default to Mexico)
+  // Determine country to filter by
+  // Priority: 1. selectedCountryId from session (if valid), 2. Default to Mexico
   let countryId = selectedCountryId;
   let countryCode = selectedCountryCode;
   
-  if (!countryId && countries.length > 0) {
-    // Use first country from the list (default to Mexico if it exists)
-    const mexicoCountry = countries.find(c => c.name.toLowerCase() === 'mexico');
+  // Validate that the countryId from session exists in current countries list
+  const isValidCountry = countryId && countries.some((c: Country) => c.id === countryId);
+  
+  if (!isValidCountry && countries.length > 0) {
+    // Session countryId is invalid or not found, default to Mexico
+    const mexicoCountry = countries.find((c: Country) => 
+      c.code === 'MX' ||
+      c.name_es?.toLowerCase() === 'méxico' || 
+      c.name_en?.toLowerCase() === 'mexico'
+    );
     const defaultCountry = mexicoCountry || countries[0];
     countryId = defaultCountry?.id;
     countryCode = defaultCountry?.code;
     
-    // Save the default selection to session
+    // Save default selection to session
     session.set("selectedCountryId", countryId);
     session.set("selectedCountryCode", countryCode);
   }
@@ -260,23 +279,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   if (countryId) {
     const filters = { countryId };
-    // Fetch cities
-    const citiesResult = await actionsLoader('getCitiesByCountryId', { filters, language: 'es' });
+    // Fetch cities for selected country
+    const citiesResult = await actionsLoader('getCitiesByCountryId', { filters, language: currentLanguage }) as { success: boolean; data: City[] };
     cities = citiesResult.success ? citiesResult.data : [];
   }
   
-  return data(
-  {
+  const loaderResponse = {
     cities,
     countries,
     selectedCountryId: countryId || '',
     selectedCountryCode: countryCode || ''
-  },
-  {
-    headers: {
-      "Set-Cookie": await commitSession(session),
-    },
-  });
+  };
+  
+  return data(
+    loaderResponse,
+    {
+      headers: {
+        "Set-Cookie": await commitSession(session),
+      },
+    }
+  );
 }
 
 export default function App() {
@@ -285,28 +307,18 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [cities, setCities] = useState<City[]>([]);
-  const [countries, setCountriesState] = useState<Country[]>([]);
-  const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
+  const [isClient, setIsClient] = useState(false);
+  
+  // Extract loader data - Los datos están en loaderData.data cuando usamos data() con headers
+  const responseData = (loaderData as any)?.data || loaderData || {};
+  const cities = responseData?.cities || [];
+  const countries = responseData?.countries || [];
+  const selectedCountryCode = responseData?.selectedCountryCode || '';
 
-  // Load cities and countries into state
+  // Check if we're on client
   useEffect(() => {
-    const citiesData = loaderData?.data?.cities || loaderData?.cities || [];
-    const countriesData = loaderData?.data?.countries || loaderData?.countries || [];
-    const countryCode = loaderData?.data?.selectedCountryCode || loaderData?.selectedCountryCode || '';
-
-    if (citiesData.length > 0) {
-      setCities(citiesData);
-    }
-    
-    if (countriesData.length > 0) {
-      setCountriesState(countriesData);
-    }
-    
-    if (countryCode) {
-      setSelectedCountryCode(countryCode);
-    }
-  }, [loaderData]);
+    setIsClient(true);
+  }, []);
 
   // Detectar si es móvil al montar y cuando cambia el tamaño
   useEffect(() => {
@@ -362,9 +374,15 @@ export default function App() {
     return 'Tours Admin';
   }, [location.pathname]);
 
+  // Provide loader data via context (Redux will sync on client)
+  const contextValue = useMemo(() => ({
+    cities,
+    countries
+  }), [cities, countries]);
+
   return (
-    <CitiesContext.Provider value={{ cities, countries }}>
-      <ClientOnlyCitiesDispatcher cities={cities} countries={countries} selectedCountryCode={selectedCountryCode} />
+    <CitiesContext.Provider value={contextValue}>
+      {isClient && <DataSyncDispatcher cities={cities} countries={countries} selectedCountryCode={selectedCountryCode} />}
       <ClientOnlyGlobalLoader />
       <div style={{ minHeight: '100vh' }}>
       <ClientOnlySidebar isOpen={isSidebarOpen} isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
@@ -375,6 +393,8 @@ export default function App() {
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={toggleSidebar} 
           onToggleSidebarCollapse={toggleSidebarCollapse}
+          countries={countries}
+          selectedCountryCode={selectedCountryCode}
         />
         <main 
           style={{

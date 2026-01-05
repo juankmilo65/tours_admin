@@ -6,6 +6,7 @@ interface CategoriesPayload {
   action: string;
   categoryId?: string;
   language?: string;
+  isActive?: boolean;
 }
 
 /**
@@ -15,12 +16,14 @@ const generatePayload = (formData: FormData, token: string = ''): CategoriesPayl
   const action = formData.get('action');
   const categoryId = formData.get('categoryId');
   const language = formData.get('language');
+  const isActive = formData.get('isActive');
 
   return {
     token,
     action: action ? action.toString() : '',
     categoryId: categoryId ? categoryId.toString() : undefined,
     language: language ? language.toString() : 'es',
+    isActive: isActive ? isActive.toString() === 'true' : undefined,
   };
 };
 
@@ -29,7 +32,7 @@ const generatePayload = (formData: FormData, token: string = ''): CategoriesPayl
  */
 const getCategoriesBusiness = async (data: CategoriesPayload): Promise<ServiceResult<unknown>> => {
   try {
-    const result = await getCategories(data.language || 'es');
+    const result = await getCategories(data.language || 'es', data.isActive);
     return result;
   } catch (error) {
     console.error('Error in getCategoriesBusiness:', error);

@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLoaderData, useNavigation, useSearchParams } from '@remix-run/react';
 import { data, type LoaderFunctionArgs } from '@remix-run/node';
-import type { Tour, City } from '~/types/PayloadTourDataProps';
+import type { Tour, TranslatedTour, Language } from '~/types/PayloadTourDataProps';
+import { translateTours } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
-import { selectCities } from '~/store/slices/citiesSlice';
-import { selectCategories, fetchCategoriesSuccess, type Category } from '~/store/slices/categoriesSlice';
+import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
+import { selectCategories, translateCategories, fetchCategoriesSuccess, type Category } from '~/store/slices/categoriesSlice';
+import { selectLanguage, selectCurrency } from '~/store/slices/uiSlice';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
@@ -183,9 +185,21 @@ function ToursClient() {
   const rawLoaderData = useLoaderData<typeof loader>();
   const loaderData = extractLoaderData(rawLoaderData);
   const dispatch = useAppDispatch();
-  const cities = useAppSelector(selectCities);
+  const rawCities = useAppSelector(selectCities);
   const categories = useAppSelector(selectCategories);
+  const currentLanguage = useAppSelector(selectLanguage) as Language;
+  const currentCurrency = useAppSelector(selectCurrency);
   const { t } = useTranslation();
+
+  // Translated cities - computed from rawCities based on language
+  const translatedCities = useMemo(() => {
+    return translateCities(rawCities, currentLanguage);
+  }, [rawCities, currentLanguage]);
+
+  // Translated categories - computed from categories based on language
+  const translatedCategories = useMemo(() => {
+    return translateCategories(categories, currentLanguage);
+  }, [categories, currentLanguage]);
 
   const navigation = useNavigation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -193,7 +207,15 @@ function ToursClient() {
   // State for selected filters (only sent on "Filtrar" click)
   const [selectedCityId, setSelectedCityId] = useState(searchParams.get('cityId') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
-  const [tours, setTours] = useState<Tour[]>(loaderData.tours?.data || []);
+  
+  // Raw tours data (with both languages) - only updated on filter/pagination
+  const [rawTours, setRawTours] = useState<Tour[]>(loaderData.tours?.data || []);
+  
+  // Translated tours - computed from rawTours based on language
+  const translatedTours = useMemo(() => {
+    return translateTours(rawTours, currentLanguage);
+  }, [rawTours, currentLanguage]);
+  
   const [pagination, setPagination] = useState(loaderData.tours?.pagination || {
     page: 1,
     limit: 10,
@@ -240,7 +262,7 @@ function ToursClient() {
   const handleCityChange = (newCityId: string) => {
     setSelectedCityId(newCityId);
     // Clear tours when city changes (before clicking Filter)
-    setTours([]);
+    setRawTours([]);
     setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 });
     setHasCityChanged(true);
     // Reset price range when city changes
@@ -254,7 +276,7 @@ function ToursClient() {
   useEffect(() => {
     const extracted = extractLoaderData(rawLoaderData);
     if (extracted.tours?.data) {
-      setTours(extracted.tours.data);
+      setRawTours(extracted.tours.data);
       // Reset hasCityChanged when we get new data from server
       setHasCityChanged(false);
     }
@@ -426,9 +448,9 @@ function ToursClient() {
                 }}
               >
                 <option value="">{t('common.selectCity')}</option>
-                {cities.map((city: City) => (
+                {translatedCities.map((city: TranslatedCity) => (
                   <option key={city.id} value={city.id}>
-                    {city.name}, {city.country}
+                    {city.name}
                   </option>
                 ))}
               </select>
@@ -471,7 +493,7 @@ function ToursClient() {
                 }}
               >
                 <option value="">{t('common.allCategories')}</option>
-                {categories.map((cat: Category) => (
+                {translatedCategories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name}
                   </option>
@@ -700,7 +722,7 @@ function ToursClient() {
         )}
 
         {/* Tours Grid */}
-        {!isLoading && tours.length > 0 && (
+        {!isLoading && translatedTours.length > 0 && (
           <div
             style={{
               display: 'grid',
@@ -709,7 +731,7 @@ function ToursClient() {
               marginBottom: 'var(--space-6)',
             }}
           >
-            {tours.map((tour: Tour) => (
+            {translatedTours.map((tour: TranslatedTour) => (
               <TourCard
                 key={tour.id}
                 tour={tour}
@@ -722,7 +744,7 @@ function ToursClient() {
         )}
 
         {/* Ready to search state - City selected but user changed it */}
-        {!isLoading && tours.length === 0 && selectedCityId && hasCityChanged && (
+        {!isLoading && translatedTours.length === 0 && selectedCityId && hasCityChanged && (
           <EmptyState
             icon="🔍"
             title={t('tours.readyToSearch')}
@@ -731,7 +753,7 @@ function ToursClient() {
         )}
 
         {/* Empty State - No tours found after search */}
-        {!isLoading && tours.length === 0 && selectedCityId && !hasCityChanged && (
+        {!isLoading && translatedTours.length === 0 && selectedCityId && !hasCityChanged && (
           <EmptyState
             icon="🏛️"
             title={t('tours.noToursFound')}
@@ -740,7 +762,7 @@ function ToursClient() {
         )}
 
         {/* Initial State - No city selected */}
-        {!isLoading && tours.length === 0 && !selectedCityId && (
+        {!isLoading && translatedTours.length === 0 && !selectedCityId && (
           <EmptyState
             icon="🌍"
             title={t('tours.selectCityFirst')}
@@ -749,7 +771,7 @@ function ToursClient() {
         )}
 
         {/* Pagination */}
-        {!isLoading && tours.length > 0 && pagination.totalPages > 1 && (
+        {!isLoading && translatedTours.length > 0 && pagination.totalPages > 1 && (
           <div
             style={{
               display: 'flex',

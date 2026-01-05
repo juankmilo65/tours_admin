@@ -3,7 +3,28 @@ import { createServiceREST } from './_index';
 const BASE_URL = process.env.BACKEND_URL ;
 
 /**
- * Get cities from backend API by countryId
+ * Get all cities from backend API
+ */
+export const getCities = async (language: string = 'es') => {
+  try {
+    const citiesEndpoint = `cities`;
+    const citiesService = createServiceREST(BASE_URL, citiesEndpoint, 'Bearer');
+    
+    const result = await citiesService.get({
+      headers: {
+        'X-Language': language
+      }
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error in getCities service:', error);
+    return { error };
+  }
+};
+
+/**
+ * Get cities from backend API by countryId (legacy - filter on client side instead)
  */
 export const getCitiesByCountryId = async (countryId: string, language: string = 'es') => {
   try {

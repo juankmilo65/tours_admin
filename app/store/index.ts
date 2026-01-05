@@ -4,6 +4,8 @@
  */
 
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
+import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+import storage from './storage';
 import citiesReducer from '~/store/slices/citiesSlice';
 import countriesReducer from '~/store/slices/countriesSlice';
 import categoriesReducer from '~/store/slices/categoriesSlice';
@@ -15,24 +17,40 @@ import reservationsReducer from '~/store/slices/reservationsSlice';
 import newsReducer from '~/store/slices/newsSlice';
 import offersReducer from '~/store/slices/offersSlice'; */
 
+// Redux Persist configuration
+const persistConfig = {
+  key: 'root',
+  version: 1,
+  storage,
+  whitelist: ['country'], // Only persist countries (transversal data)
+};
+
 const rootReducer = combineReducers({
   city: citiesReducer,
   country: countriesReducer,
   category: categoriesReducer,
   ui: uiReducer,
   /* offers: offersReducer, */
-})
+});
+
+const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const makeStore = () => {
-  return configureStore({
-    reducer: rootReducer,
+  const store = configureStore({
+    reducer: persistedReducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-          serializableCheck: false,
-          immutableCheck: false,
+        serializableCheck: {
+          ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+        },
+        immutableCheck: false,
       }),
-  })
-}
+  });
+  
+  return store;
+};
+
+export const makePersistor = (store: AppStore) => persistStore(store);
 
 export type AppStore = ReturnType<typeof makeStore>
 export type RootState = ReturnType<AppStore['getState']>

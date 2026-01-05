@@ -1,13 +1,14 @@
 import { createServiceREST } from './_index';
 
-const BASE_URL = process.env.BACKEND_URL;
+const BASE_URL = process.env.BACKEND_URL || '';
 
 /**
  * Get all categories from backend API
  */
-export const getCategories = async (language: string = 'es') => {
+export const getCategories = async (language: string = 'es', isActive?: boolean) => {
   try {
-    const categoriesEndpoint = 'categories';
+    const params = isActive !== undefined ? `?isActive=${isActive}` : '';
+    const categoriesEndpoint = `categories${params}`;
     const categoriesService = createServiceREST(BASE_URL, categoriesEndpoint, 'Bearer');
     
     const result = await categoriesService.get({

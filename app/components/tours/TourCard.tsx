@@ -3,11 +3,11 @@
  * Displays tour information in a card format
  */
 
-import type { Tour } from '~/types/PayloadTourDataProps';
+import type { TranslatedTour } from '~/types/PayloadTourDataProps';
 import { useTranslation } from '~/lib/i18n/utils';
 
 interface TourCardProps {
-  tour: Tour;
+  tour: TranslatedTour;
   onViewDetails: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
@@ -16,7 +16,7 @@ interface TourCardProps {
 export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProps) {
   const { t } = useTranslation();
   const hasActiveOffer = tour.offers && tour.offers.length > 0 && tour.offers[0]?.isActive;
-  const discount = hasActiveOffer ? parseInt(tour.offers[0]?.discountPercentage || '0') : 0;
+  const discount = hasActiveOffer ? tour.offers[0]?.discountPercentage || 0 : 0;
   const discountedPrice = discount > 0 ? tour.base_price * (1 - discount / 100) : tour.base_price;
 
   const getDifficultyColor = (difficulty: string) => {
@@ -121,7 +121,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
               color: 'var(--color-neutral-600)',
             }}
           >
-            {tour.city?.name || 'Ciudad'}{tour.city?.country ? `, ${tour.city.country}` : ''}
+            {tour.city?.name || 'Ciudad'}
           </span>
         </div>
 

@@ -1,18 +1,53 @@
 /**
  * Categories Slice
- * Manages categories state
+ * Manages categories state with multi-language support
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { Language } from '~/lib/i18n/types';
 
+// Raw category from API with both languages
 export interface Category {
   id: string;
-  name: string;
-  description: string;
-  icon?: string;
+  slug: string;
+  name_es: string;
+  description_es?: string;
+  name_en: string;
+  description_en?: string;
+  imageUrl?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// Translated category for display
+export interface TranslatedCategory {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Translation helper functions
+export function translateCategory(category: Category, lang: Language): TranslatedCategory {
+  return {
+    id: category.id,
+    slug: category.slug,
+    name: lang === 'es' ? category.name_es : category.name_en,
+    description: lang === 'es' ? category.description_es : category.description_en,
+    imageUrl: category.imageUrl,
+    isActive: category.isActive,
+    createdAt: category.createdAt,
+    updatedAt: category.updatedAt,
+  };
+}
+
+export function translateCategories(categories: Category[], lang: Language): TranslatedCategory[] {
+  return categories.map(cat => translateCategory(cat, lang));
 }
 
 interface CategoriesState {

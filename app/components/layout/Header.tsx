@@ -2,12 +2,13 @@
  * Header Component - Top Navigation Bar
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { useAppSelector, useAppDispatch } from '~/store/hooks';
-import { selectCountries, selectSelectedCountry, setSelectedCountryByCode } from '~/store/slices/countriesSlice';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useAppDispatch, useAppSelector } from '~/store/hooks';
+import { translateCountries, translateCountry, type Country } from '~/store/slices/countriesSlice';
 import { setGlobalLoading, setLanguage, selectLanguage } from '~/store/slices/uiSlice';
 import { useSubmit, useNavigation, useLocation, useSearchParams } from '@remix-run/react';
 import { useTranslation } from '~/lib/i18n/utils';
+import type { Language } from '~/lib/i18n/types';
 
 interface HeaderProps {
   title: string;
@@ -15,21 +16,41 @@ interface HeaderProps {
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   onToggleSidebarCollapse: () => void;
+  countries: Country[];
+  selectedCountryCode: string;
 }
 
-export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSidebar, onToggleSidebarCollapse }: HeaderProps) {
+export function Header({ 
+  title, 
+  isSidebarOpen, 
+  isSidebarCollapsed, 
+  onToggleSidebar, 
+  onToggleSidebarCollapse,
+  countries,
+  selectedCountryCode
+}: HeaderProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   
   // i18n hook
-  const { t, language } = useTranslation();
+  const { t } = useTranslation();
   
-  // Redux state for countries
+  // Redux state solo para language
   const dispatch = useAppDispatch();
-  const countries = useAppSelector(selectCountries);
-  const selectedCountry = useAppSelector(selectSelectedCountry);
   const currentLanguage = useAppSelector(selectLanguage);
+  
+  // Translate countries based on current language usando props
+  const translatedCountries = useMemo(() => 
+    translateCountries(countries, currentLanguage as Language),
+    [countries, currentLanguage]
+  );
+  
+  // Find and translate selected country
+  const translatedSelectedCountry = useMemo(() => {
+    const selectedCountry = countries.find(c => c.code === selectedCountryCode);
+    return selectedCountry ? translateCountry(selectedCountry, currentLanguage as Language) : null;
+  }, [countries, selectedCountryCode, currentLanguage]);
   
   // Form submission for country change
   const submit = useSubmit();
@@ -54,7 +75,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
   // Handle country change
   const handleCountryChange = (countryCode: string) => {
     // Don't trigger if same country
-    if (countryCode === selectedCountry?.code) {
+    if (countryCode === selectedCountryCode) {
       return;
     }
     
@@ -70,8 +91,6 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
     
     // Clear all filters from URL
     setSearchParams({});
-    
-    dispatch(setSelectedCountryByCode(countryCode));
     
     // Use submit to the API resource route - send both countryId and countryCode
     const formData = new FormData();
@@ -267,7 +286,7 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', position: 'relative' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>🌍</span>
             <select
-              value={selectedCountry?.code || ''}
+              value={translatedSelectedCountry?.code || ''}
               onChange={(e) => handleCountryChange(e.target.value)}
               disabled={isChangingCountry}
               style={{
@@ -283,10 +302,10 @@ export function Header({ title, isSidebarOpen, isSidebarCollapsed, onToggleSideb
                 opacity: isChangingCountry ? 0.7 : 1,
               }}
             >
-              {countries.length === 0 && (
+              {translatedCountries.length === 0 && (
                 <option value="">{t('common.loadingCountries')}</option>
               )}
-              {countries.map((country) => (
+              {translatedCountries.map((country) => (
                 <option key={country.id} value={country.code}>
                   {country.name}
                 </option>

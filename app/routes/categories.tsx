@@ -2,58 +2,77 @@
  * Categories Route - Categories Management
  */
 
+import { useLoaderData } from '@remix-run/react';
+import type { LoaderFunctionArgs } from '@remix-run/node';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
 import type { Column } from '~/components/ui/Table';
+import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
+import { getSession } from '~/utilities/sessions';
 
 interface Category {
-  id: number;
-  name: string;
+  id: string;
   slug: string;
-  icon: string;
-  color: string;
-  toursCount: number;
-  active: boolean;
+  name_es: string;
+  description_es?: string;
+  name_en: string;
+  description_en?: string;
+  imageUrl?: string;
+  isActive: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
-const mockCategories: readonly Category[] = [
-  { id: 1, name: 'Cultural', slug: 'cultural', icon: '🏛️', color: '#3B82F6', toursCount: 45, active: true, createdAt: '2025-01-01' },
-  { id: 2, name: 'Food', slug: 'food', icon: '🍽️', color: '#EF4444', toursCount: 32, active: true, createdAt: '2025-01-02' },
-  { id: 3, name: 'Adventure', slug: 'adventure', icon: '🏔️', color: '#10B981', toursCount: 28, active: true, createdAt: '2025-01-03' },
-  { id: 4, name: 'Nightlife', slug: 'nightlife', icon: '🌙', color: '#8B5CF6', toursCount: 15, active: false, createdAt: '2025-01-04' },
-];
+interface LoaderData {
+  categories: Category[];
+  language: string;
+}
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const session = await getSession(request.headers.get("Cookie"));
+  const currentLanguage = session.get("language") as string || 'es';
+  
+  const formData = new FormData();
+  formData.append("action", 'getCategoriesBusiness');
+  formData.append("language", currentLanguage);
+  formData.append("isActive", 'true');
+  
+  const categoriesResult = await categoriesBL(formData) as { success: boolean; data: Category[] };
+  const categories = categoriesResult.success ? categoriesResult.data : [];
+  
+  return {
+    categories,
+    language: currentLanguage
+  };
+}
 
 export default function Categories() {
+  const loaderData = useLoaderData<LoaderData>();
+  const { categories, language } = loaderData;
+  
   const columns: Column<Category>[] = [
     {
-      key: 'name',
+      key: 'name_es',
       label: 'Name',
-      render: (value: string, row: Category) => (
+      render: (_value: string, row: Category) => (
         <div className="flex items-center gap-2">
-          <span className="text-xl">{row.icon}</span>
-          <span>{value}</span>
+          <span>{language === 'es' ? row.name_es : row.name_en}</span>
         </div>
       ),
     },
     { key: 'slug', label: 'Slug' },
     {
-      key: 'color',
-      label: 'Color',
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <div
-            className="w-6 h-6 rounded-full border"
-            style={{ backgroundColor: value }}
-          />
-          <span className="text-sm">{value}</span>
-        </div>
+      key: 'description_es',
+      label: 'Description',
+      render: (_value: string | undefined, row: Category) => (
+        <span className="text-sm text-gray-600">
+          {language === 'es' ? row.description_es : row.description_en}
+        </span>
       ),
     },
-    { key: 'toursCount', label: 'Tours Count' },
     {
-      key: 'active',
+      key: 'isActive',
       label: 'Status',
       render: (value: boolean) => (
         <span
@@ -65,7 +84,11 @@ export default function Categories() {
         </span>
       ),
     },
-    { key: 'createdAt', label: 'Created At' },
+    {
+      key: 'createdAt',
+      label: 'Created At',
+      render: (value: string) => new Date(value).toLocaleDateString()
+    },
   ];
 
   return (
@@ -82,14 +105,14 @@ export default function Categories() {
               />
             </div>
 
-            <Table data={mockCategories} columns={columns} />
+            <Table data={categories} columns={columns} />
           </Card>
 
           <Card title="Categories Statistics">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatCard title="Total Categories" value="18" />
-              <StatCard title="Active Categories" value="15" />
-              <StatCard title="Inactive Categories" value="3" />
+              <StatCard title="Total Categories" value={categories.length.toString()} />
+              <StatCard title="Active Categories" value={categories.filter(c => c.isActive).length.toString()} />
+              <StatCard title="Inactive Categories" value={categories.filter(c => !c.isActive).length.toString()} />
             </div>
           </Card>
         </div>

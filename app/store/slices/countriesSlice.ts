@@ -1,11 +1,27 @@
 /**
  * Countries Slice
- * Manages countries state
+ * Manages countries state with multi-language support
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { Language } from '~/lib/i18n/types';
 
+// Raw country from API with both languages
 export interface Country {
+  id: string;
+  code: string;
+  name_es: string;
+  name_en: string;
+  description_es?: string;
+  description_en?: string;
+  flagUrl?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Translated country for display
+export interface TranslatedCountry {
   id: string;
   code: string;
   name: string;
@@ -14,6 +30,24 @@ export interface Country {
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+// Translation helper function
+export function translateCountry(country: Country, lang: Language): TranslatedCountry {
+  return {
+    id: country.id,
+    code: country.code,
+    name: lang === 'es' ? country.name_es : country.name_en,
+    description: lang === 'es' ? country.description_es : country.description_en,
+    flagUrl: country.flagUrl,
+    isActive: country.isActive,
+    createdAt: country.createdAt,
+    updatedAt: country.updatedAt,
+  };
+}
+
+export function translateCountries(countries: Country[], lang: Language): TranslatedCountry[] {
+  return countries.map(country => translateCountry(country, lang));
 }
 
 interface CountriesState {

@@ -1,19 +1,56 @@
 /**
  * Cities Slice
- * Manages cities state
+ * Manages cities state with multi-language support
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { Language } from '~/lib/i18n/types';
 
+// Raw city from API with both languages
 export interface City {
   id: string;
-  name: string;
-  country: string;
-  description: string;
+  slug: string;
+  name_es: string;
+  name_en: string;
+  description_es?: string;
+  description_en?: string;
   imageUrl?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  countryId: string;
+}
+
+// Translated city for display
+export interface TranslatedCity {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  countryId: string;
+}
+
+// Translation helper functions
+export function translateCity(city: City, lang: Language): TranslatedCity {
+  return {
+    id: city.id,
+    slug: city.slug,
+    name: lang === 'es' ? city.name_es : city.name_en,
+    description: lang === 'es' ? city.description_es : city.description_en,
+    imageUrl: city.imageUrl,
+    isActive: city.isActive,
+    createdAt: city.createdAt,
+    updatedAt: city.updatedAt,
+    countryId: city.countryId,
+  };
+}
+
+export function translateCities(cities: City[], lang: Language): TranslatedCity[] {
+  return cities.map(city => translateCity(city, lang));
 }
 
 interface CitiesState {
