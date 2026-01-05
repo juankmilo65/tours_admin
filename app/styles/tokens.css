@@ -180,6 +180,26 @@
   --transition-slow: 300ms ease-in-out;
   --transition-slower: 500ms ease-in-out;
 
+  /* Control sizing tokens (use for inputs, buttons, selects, sliders) */
+  /* Default controls slightly more compact for denser UX */
+  --control-font-size: var(--text-sm);
+  --control-font-size-sm: var(--text-xs);
+  --control-padding-vertical: var(--space-1);
+  --control-padding-horizontal: var(--space-3);
+  --control-padding-sm-vertical: var(--space-0);
+  --control-padding-sm-horizontal: var(--space-2);
+  --control-radius: var(--radius-base);
+
+  /* Range (slider) tokens - smaller thumb/track for compact look */
+  --range-thumb-size: 10px;
+  --range-track-height: 3px;
+  /* Control button widths for filter area (configurable) */
+  --control-btn-primary-width: 220px;
+  --control-btn-secondary-width: 140px;
+  /* Button heights for primary and secondary controls */
+  --control-btn-primary-height: 40px;
+  --control-btn-secondary-height: 36px;
+
   /* Layout */
   --header-height: 64px;
   --sidebar-width: 260px;

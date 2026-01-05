@@ -106,7 +106,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         page: parseInt(page, 10),
         limit: 10,
         total: 0,
-        totalPages: 1,
+        totalPages:1,
       }
     },
   });
@@ -134,7 +134,7 @@ function extractLoaderData(loaderData: unknown) {
     priceRange?: PriceRange | null;
     tours?: { data: Tour[]; pagination: unknown } 
   };
-  // data() may wrap the response in a 'data' property, or it may be direct
+  // data() may wrap up response in a 'data' property, or it may be direct
   return {
     cityId: raw?.data?.cityId ?? raw?.cityId ?? null,
     categories: raw?.data?.categories ?? raw?.categories ?? [],
@@ -421,7 +421,7 @@ function ToursClient() {
         <div
           style={{
             backgroundColor: 'white',
-            padding: 'var(--space-4)',
+            padding: 'var(--space-3)',
             borderRadius: 'var(--radius-lg)',
             border: '1px solid var(--color-neutral-200)',
             marginBottom: 'var(--space-6)',
@@ -430,9 +430,9 @@ function ToursClient() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: 'var(--space-4)',
-              alignItems: 'end',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: 'var(--space-3)',
+              alignItems: 'center',
             }}
           >
             {/* City Filter - Required */}
@@ -440,10 +440,10 @@ function ToursClient() {
               <label
                 style={{
                   display: 'block',
-                  fontSize: 'var(--text-sm)',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--font-weight-medium)',
                   color: 'var(--color-neutral-700)',
-                  marginBottom: 'var(--space-2)',
+                  marginBottom: 'var(--space-1)',
                 }}
               >
                 {t('tours.cityRequired')}
@@ -466,10 +466,10 @@ function ToursClient() {
               <label
                 style={{
                   display: 'block',
-                  fontSize: 'var(--text-sm)',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--font-weight-medium)',
                   color: 'var(--color-neutral-700)',
-                  marginBottom: 'var(--space-2)',
+                  marginBottom: 'var(--space-1)',
                 }}
               >
                 {t('tours.category')}
@@ -492,27 +492,26 @@ function ToursClient() {
               <label
                 style={{
                   display: 'block',
-                  fontSize: 'var(--text-sm)',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--font-weight-medium)',
                   color: isPriceFilterEnabled ? 'var(--color-neutral-700)' : 'var(--color-neutral-400)',
-                  marginBottom: 'var(--space-2)',
+                  marginBottom: 'var(--space-1)',
                 }}
               >
                 {t('tours.priceRange')} ({priceRange?.currency || 'MXN'})
                 {!isPriceFilterEnabled && (
-                  <span style={{ fontWeight: 'normal', marginLeft: 'var(--space-2)', fontSize: 'var(--text-xs)' }}>
+                  <span style={{ fontWeight: 'normal', marginLeft: 'var(--space-1)', fontSize: '10px' }}>
                     ({t('tours.selectCityForPrice')})
                   </span>
                 )}
-              </label>
-              
+              </label>              
               {/* Price display label */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  marginBottom: 'var(--space-2)',
-                  fontSize: 'var(--text-sm)',
+                  marginBottom: 'var(--space-1)',
+                  fontSize: 'var(--text-xs)',
                   color: isPriceFilterEnabled ? 'var(--color-neutral-900)' : 'var(--color-neutral-400)',
                   fontWeight: 'var(--font-weight-medium)',
                 }}
@@ -521,16 +520,16 @@ function ToursClient() {
                 <span>${selectedMaxPrice.toLocaleString()}</span>
               </div>
 
-              {/* Dual Range Slider Container */}
-              <div style={{ position: 'relative', height: '40px', opacity: isPriceFilterEnabled ? 1 : 0.5 }}>
+              {/* Dual Range Slider Container - Smaller */}
+              <div style={{ position: 'relative', height: '28px', opacity: isPriceFilterEnabled ? 1 : 0.5 }}>
                 {/* Track background */}
                 <div
                   style={{
                     position: 'absolute',
-                    top: '50%',
-                    left: 0,
-                    right: 0,
-                    height: '6px',
+                        top: '50%',
+                        left: 0,
+                        right: 0,
+                        height: '6px',
                     backgroundColor: 'var(--color-neutral-200)',
                     borderRadius: '3px',
                     transform: 'translateY(-50%)',
@@ -617,7 +616,7 @@ function ToursClient() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     marginTop: 'var(--space-1)',
-                    fontSize: 'var(--text-xs)',
+                    fontSize: '10px',
                     color: 'var(--color-neutral-500)',
                   }}
                 >
@@ -627,21 +626,24 @@ function ToursClient() {
               )}
             </div>
 
-            {/* Filter Button */}
-            <div>
+            {/* Filter Button (primary) - Smaller */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <button
                 onClick={handleFilter}
                 disabled={isLoading}
                 style={{
-                  width: '100%',
-                  padding: 'var(--space-3) var(--space-4)',
+                    width: 'auto',
+                    minWidth: '80px',
+                    height: '32px',
+                    padding: '0 var(--space-3)',
                   backgroundColor: 'var(--color-primary-500)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: 'var(--radius-md)',
+                  borderRadius: 'var(--radius-sm)',
                   fontWeight: 'var(--font-weight-medium)',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
                   transition: 'background-color 0.2s ease',
+                  fontSize: '13px',
                 }}
                 onMouseOver={(e) => {
                   if (!isLoading) {
@@ -656,20 +658,23 @@ function ToursClient() {
               </button>
             </div>
 
-            {/* Clear Filters Button */}
-            <div>
+            {/* Clear Filters Button (secondary) - Smaller */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <button
                 onClick={handleClearFilters}
                 style={{
-                  width: '100%',
-                  padding: 'var(--space-3) var(--space-4)',
+                  width: 'auto',
+                  minWidth: '80px',
+                  height: '32px',
+                  padding: '0 var(--space-3)',
                   backgroundColor: 'var(--color-neutral-100)',
                   color: 'var(--color-neutral-700)',
                   border: 'none',
-                  borderRadius: 'var(--radius-md)',
+                  borderRadius: 'var(--radius-sm)',
                   fontWeight: 'var(--font-weight-medium)',
                   cursor: 'pointer',
                   transition: 'background-color 0.2s ease',
+                  fontSize: '13px',
                 }}
                 onMouseOver={(e) => {
                   e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';

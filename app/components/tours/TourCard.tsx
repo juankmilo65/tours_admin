@@ -174,7 +174,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
             <span>{tour.duration}h</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>👥</span>
+            <span>👥</span>me 
             <span>{tour.maxCapacity}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
