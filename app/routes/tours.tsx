@@ -7,7 +7,7 @@ import { TourCard } from '~/components/tours/TourCard';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
 import { selectCategories, translateCategories, fetchCategoriesSuccess, type Category } from '~/store/slices/categoriesSlice';
-import { selectLanguage, selectCurrency, setGlobalLoading } from '~/store/slices/uiSlice';
+import { selectLanguage, selectCurrency, setGlobalLoading, openModal } from '~/store/slices/uiSlice';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
@@ -307,7 +307,13 @@ function ToursClient() {
   // Handle filter button click - update URL with all selected filters
   const handleFilter = () => {
     if (!selectedCityId) {
-      alert(t('validation.selectCity'));
+      dispatch(openModal({
+        id: 'validation-select-city',
+        type: 'confirm',
+        title: t('validation.selectCityTitle') || t('common.notice'),
+        isOpen: true,
+        data: { message: t('validation.selectCity'), icon: 'alert' },
+      }));
       return;
     }
 

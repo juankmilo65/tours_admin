@@ -10,6 +10,7 @@ import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
 import { GlobalLoader } from './components/ui/GlobalLoader';
+import { ModalRoot } from './components/ui/Modal';
 import citiesBL from './server/businessLogic/citiesBusinessLogic';
 import countriesBL from './server/businessLogic/countriesBusinessLogic';
 import type { City } from './store/slices/citiesSlice';
@@ -133,6 +134,18 @@ function ClientOnlyGlobalLoader() {
   }
 
   return <GlobalLoader />;
+}
+
+// Wrapper to only render Modal on client
+function ClientOnlyModal() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) return null;
+  return <ModalRoot />;
 }
 
 export const links: LinksFunction = () => [
@@ -384,6 +397,7 @@ export default function App() {
     <CitiesContext.Provider value={contextValue}>
       {isClient && <DataSyncDispatcher cities={cities} countries={countries} selectedCountryCode={selectedCountryCode} />}
       <ClientOnlyGlobalLoader />
+      <ClientOnlyModal />
       <div style={{ minHeight: '100vh' }}>
       <ClientOnlySidebar isOpen={isSidebarOpen} isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
       <div style={{ marginLeft: isMobile ? 0 : (isSidebarCollapsed ? '80px' : '280px'), transition: 'margin-left var(--transition-base)' }}>

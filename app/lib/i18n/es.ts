@@ -25,6 +25,8 @@ export const es: Translation = {
     yes: 'Sí',
     no: 'No',
     loading: 'Cargando...',
+    ok: 'OK',
+    notice: 'Aviso',
     error: 'Error',
     success: 'Éxito',
     warning: 'Advertencia',
@@ -327,6 +329,7 @@ export const es: Translation = {
     datePast: 'La fecha debe ser en el pasado',
     confirmed: 'Los valores no coinciden',
     selectCity: 'Por favor selecciona una ciudad',
+    selectCityTitle: 'Ciudad requerida',
   },
   pagination: {
     previous: 'Anterior',

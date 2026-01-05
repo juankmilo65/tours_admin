@@ -118,5 +118,6 @@ export const selectToken = (state: RootState) => state.ui.token;
 export const selectLanguage = (state: RootState) => state.ui.language;
 export const selectCurrency = (state: RootState) => state.ui.currency;
 export const selectSidebarCollapsed = (state: RootState) => state.ui.sidebarCollapsed;
+export const selectModals = (state: RootState) => state.ui.modals;
 
 export default uiSlice.reducer;

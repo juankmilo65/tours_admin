@@ -25,6 +25,8 @@ export const en: Translation = {
     yes: 'Yes',
     no: 'No',
     loading: 'Loading...',
+    ok: 'OK',
+    notice: 'Notice',
     error: 'Error',
     success: 'Success',
     warning: 'Warning',
@@ -327,6 +329,7 @@ export const en: Translation = {
     datePast: 'Date must be in the past',
     confirmed: 'Values do not match',
     selectCity: 'Please select a city',
+    selectCityTitle: 'City required',
   },
   pagination: {
     previous: 'Previous',
