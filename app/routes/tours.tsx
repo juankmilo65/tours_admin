@@ -504,7 +504,7 @@ function ToursClient() {
                     ({t('tours.selectCityForPrice')})
                   </span>
                 )}
-              </label>              
+              </label>
               {/* Price display label */}
               <div
                 style={{
