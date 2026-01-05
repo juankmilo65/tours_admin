@@ -265,70 +265,79 @@ export function translateTour(tour: Tour, lang: Language): TranslatedTour {
   const getTranslated = (es: string, en: string): string => {
     return lang === 'es' ? (es || en) : (en || es);
   };
+  // Sanitize nested properties to avoid runtime errors when fields are missing
+  const category = tour.category || ({} as Category);
+  const city = tour.city || ({} as City);
+  const offers = tour.offers || [];
+  const activities = tour.activities || [];
+  const amenities = tour.amenities || [];
+  const requirements = tour.requirements || [];
+  const included = tour.included || [];
+  const termsConditions = tour.termsConditions || { id: '', terms_conditions_es: '', terms_conditions_en: '' };
 
   return {
     id: tour.id,
     slug: tour.slug,
-    title: getTranslated(tour.title_es, tour.title_en),
-    description: getTranslated(tour.description_es, tour.description_en),
-    shortDescription: getTranslated(tour.shortDescription_es, tour.shortDescription_en),
-    duration: tour.duration,
-    maxCapacity: tour.maxCapacity,
-    basePrice: tour.basePrice,
-    currency: tour.currency,
-    imageUrl: tour.imageUrl,
-    images: tour.images,
-    difficulty: tour.difficulty,
-    language: tour.language,
-    isActive: tour.isActive,
+    title: getTranslated(tour.title_es || '', tour.title_en || ''),
+    description: getTranslated(tour.description_es || '', tour.description_en || ''),
+    shortDescription: getTranslated(tour.shortDescription_es || '', tour.shortDescription_en || ''),
+    duration: tour.duration || 0,
+    maxCapacity: tour.maxCapacity || 0,
+    basePrice: tour.basePrice || '',
+    currency: tour.currency || 'MXN',
+    imageUrl: tour.imageUrl || '',
+    images: tour.images || [],
+    difficulty: tour.difficulty || '',
+    language: tour.language || [],
+    isActive: typeof tour.isActive === 'boolean' ? tour.isActive : false,
     category: {
-      id: tour.category.id,
-      name: getTranslated(tour.category.name_es, tour.category.name_en),
-      description: tour.category.description_es || tour.category.description_en 
-        ? getTranslated(tour.category.description_es || '', tour.category.description_en || '')
+      id: category.id || '',
+      name: getTranslated((category as any).name_es || '', (category as any).name_en || ''),
+      description: (category as any).description_es || (category as any).description_en
+        ? getTranslated((category as any).description_es || '', (category as any).description_en || '')
         : undefined,
     },
     city: {
-      id: tour.city.id,
-      name: getTranslated(tour.city.name_es, tour.city.name_en),
-      description: tour.city.description_es || tour.city.description_en
-        ? getTranslated(tour.city.description_es || '', tour.city.description_en || '')
+      id: city.id || '',
+      name: getTranslated((city as any).name_es || '', (city as any).name_en || ''),
+      description: (city as any).description_es || (city as any).description_en
+        ? getTranslated((city as any).description_es || '', (city as any).description_en || '')
         : undefined,
     },
-    offers: (tour.offers || []).map(offer => ({
-      id: offer.id,
-      title: getTranslated(offer.title_es, offer.title_en),
-      description: getTranslated(offer.description_es, offer.description_en),
-      discountPercentage: offer.discountPercentage,
-      isActive: offer.isActive,
+    offers: offers.map(offer => ({
+      id: offer.id || '',
+      title: getTranslated((offer as any).title_es || '', (offer as any).title_en || ''),
+      description: getTranslated((offer as any).description_es || '', (offer as any).description_en || ''),
+      discountPercentage: (offer as any).discountPercentage || 0,
+      isActive: typeof (offer as any).isActive === 'boolean' ? (offer as any).isActive : false,
     })),
-    activities: (tour.activities || []).map(activity => ({
-      id: activity.id,
-      activity: getTranslated(activity.activity_es, activity.activity_en),
-      hora: activity.hora,
-      sortOrder: activity.sortOrder,
-      category: activity.category,
+    activities: activities.map(activity => ({
+      id: activity.id || '',
+      activity: getTranslated((activity as any).activity_es || '', (activity as any).activity_en || ''),
+      hora: activity.hora || '',
+      sortOrder: activity.sortOrder || 0,
+      category: activity.category || '',
     })),
-    amenities: (tour.amenities || []).map(amenity => ({
-      id: amenity.id,
-      item: getTranslated(amenity.item_es, amenity.item_en),
-      include: amenity.include,
-      sortOrder: amenity.sortOrder,
-      category: amenity.category,
+    amenities: amenities.map(amenity => ({
+      id: amenity.id || '',
+      item: getTranslated((amenity as any).item_es || '', (amenity as any).item_en || ''),
+      include: typeof (amenity as any).include === 'boolean' ? (amenity as any).include : false,
+      sortOrder: amenity.sortOrder || 0,
+      category: amenity.category || '',
     })),
-    requirements: (tour.requirements || []).map(req => ({
-      id: req.id,
-      requirement: getTranslated(req.requirement_es, req.requirement_en),
-      sortOrder: req.sortOrder,
-      category: req.category,
+    requirements: requirements.map(req => ({
+      id: req.id || '',
+      requirement: getTranslated((req as any).requirement_es || '', (req as any).requirement_en || ''),
+      sortOrder: req.sortOrder || 0,
+      category: req.category || '',
     })),
-    included: tour.included,
+    included,
     termsConditions: {
-      id: tour.termsConditions.id,
-      terms_conditions: getTranslated(tour.termsConditions.terms_conditions_es, tour.termsConditions.terms_conditions_en),
+      id: termsConditions.id || '',
+      terms_conditions: getTranslated(termsConditions.terms_conditions_es || '', termsConditions.terms_conditions_en || ''),
     },
-    base_price: tour.base_price,
-    convertedCurrency: tour.convertedCurrency,
+    base_price: tour.base_price || 0,
+    convertedCurrency: tour.convertedCurrency || '',
   };
 }
 

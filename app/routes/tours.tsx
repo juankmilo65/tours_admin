@@ -7,7 +7,7 @@ import { TourCard } from '~/components/tours/TourCard';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
 import { selectCategories, translateCategories, fetchCategoriesSuccess, type Category } from '~/store/slices/categoriesSlice';
-import { selectLanguage, selectCurrency } from '~/store/slices/uiSlice';
+import { selectLanguage, selectCurrency, setGlobalLoading } from '~/store/slices/uiSlice';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
@@ -236,6 +236,22 @@ function ToursClient() {
 
   // Check if price filter should be enabled (has tours and at least city filter is applied)
   const isPriceFilterEnabled = priceRange !== null && priceRange.count > 0 && selectedCityId !== '';
+
+  // Activate global loading on component mount, deactivate when data is ready
+  useEffect(() => {
+    // Activate loading on mount
+    dispatch(setGlobalLoading({ isLoading: true, message: 'Cargando datos...' }));
+
+    // Deactivate loading when categories and cities are loaded
+    if (categories.length > 0 && rawCities.length > 0) {
+      dispatch(setGlobalLoading({ isLoading: false }));
+    }
+
+    // Cleanup: deactivate loading on unmount
+    return () => {
+      dispatch(setGlobalLoading({ isLoading: false }));
+    };
+  }, [categories, rawCities, dispatch]);
 
   // Dispatch categories to Redux when loaded from server
   useEffect(() => {

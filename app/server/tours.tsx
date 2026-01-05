@@ -1,7 +1,7 @@
 import { createServiceREST } from './_index';
 import { ServicePayload } from '../types/PayloadTourDataProps';
 
-const BASE_URL = process.env.BACKEND_URL;
+const BASE_URL = process.env.BACKEND_URL || '';
 
 /**
  * Get tours from backend API with filters
@@ -31,7 +31,7 @@ export const getTours = async (payload: ServicePayload) => {
     if (minPrice) params.minPrice = minPrice;
     if (maxPrice) params.maxPrice = maxPrice;
     
-    const toursEndpoint = 'tours';
+    const toursEndpoint = 'tours/cards';
     const toursService = createServiceREST(BASE_URL, toursEndpoint, 'Bearer');
     
     const result = await toursService.get({
