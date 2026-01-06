@@ -5,6 +5,9 @@
 
 import type { TranslatedTour } from '~/types/PayloadTourDataProps';
 import { useTranslation } from '~/lib/i18n/utils';
+import { useNavigate } from '@remix-run/react';
+import { useAppDispatch } from '~/store/hooks';
+import { setGlobalLoading } from '~/store/slices/uiSlice';
 
 interface TourCardProps {
   tour: TranslatedTour;
@@ -15,6 +18,8 @@ interface TourCardProps {
 
 export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const hasActiveOffer = tour.offers && tour.offers.length > 0 && tour.offers[0]?.isActive;
   const discount = hasActiveOffer ? tour.offers[0]?.discountPercentage || 0 : 0;
   const discountedPrice = discount > 0 ? tour.base_price * (1 - discount / 100) : tour.base_price;
@@ -262,7 +267,10 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onEdit(tour.id);
+              // Activate global loading before navigating
+              dispatch(setGlobalLoading({ isLoading: true, message: 'Cargando tour para edición...' }));
+              // Navigate to edit page
+              navigate(`/tours/${tour.id}/edit`);
             }}
             style={{
               padding: 'var(--space-2) var(--space-3)',

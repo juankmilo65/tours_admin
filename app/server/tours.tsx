@@ -23,7 +23,7 @@ export const getTours = async (payload: ServicePayload) => {
     const params: Record<string, string | number> = {
       page,
       limit: 10,
-      city: cityId, // Backend expects 'city' not 'cityId'
+      cityId: cityId, // Backend expects 'cityId'
     };
     
     if (category) params.category = category;

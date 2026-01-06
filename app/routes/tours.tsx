@@ -106,7 +106,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         page: parseInt(page, 10),
         limit: 10,
         total: 0,
-        totalPages:1,
+        totalPages: 1,
       }
     },
   });
@@ -217,12 +217,14 @@ function ToursClient() {
     return translateTours(rawTours, currentLanguage);
   }, [rawTours, currentLanguage]);
   
-  const [pagination, setPagination] = useState(loaderData.tours?.pagination || {
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
-  });
+  const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number }>(
+    (loaderData.tours?.pagination as { page: number; limit: number; total: number; totalPages: number }) || {
+      page: 1,
+      limit: 10,
+      total: 0,
+      totalPages: 1,
+    }
+  );
   // Track if user changed city (to show "ready to search" state)
   const [hasCityChanged, setHasCityChanged] = useState(false);
 
@@ -280,7 +282,7 @@ function ToursClient() {
     setSelectedCityId(newCityId);
     // Clear tours when city changes (before clicking Filter)
     setRawTours([]);
-    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 });
+    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as { page: number; limit: number; total: number; totalPages: number });
     setHasCityChanged(true);
     // Reset price range when city changes
     if (priceRange) {
@@ -374,17 +376,14 @@ function ToursClient() {
 
   // Handle tour actions
   const handleViewDetails = (id: string) => {
-    console.log('View tour:', id);
     // TODO: Navigate to tour details page
   };
 
   const handleEdit = (id: string) => {
-    console.log('Edit tour:', id);
     // TODO: Navigate to edit tour page
   };
 
   const handleDelete = (id: string) => {
-    console.log('Delete tour:', id);
     // TODO: Implement delete action
   };
 
