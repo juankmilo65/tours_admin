@@ -108,7 +108,27 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<ReturnTyp
 
   const result = await toursBL(formData);
 
-  if (result.success === true) {
+  // Type guard for tours result
+  const isToursResult = (
+    toursResult: unknown
+  ): toursResult is {
+    success: boolean;
+    data: Tour[] | null;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    } | null;
+  } =>
+    typeof toursResult === 'object' &&
+    toursResult !== null &&
+    'success' in toursResult &&
+    typeof (toursResult as { success?: boolean }).success === 'boolean' &&
+    'data' in toursResult &&
+    'pagination' in toursResult;
+
+  if (isToursResult(result) && result.success === true) {
     return data({
       cityId: cityId,
       categories,
