@@ -90,6 +90,7 @@
     },
     {
       "files": [
+        "app/routes/tours.tsx",
         "app/components/tours/TourEditForm.tsx",
         "app/components/ui/Select.tsx",
         "app/components/ui/Table.tsx",
@@ -99,6 +100,7 @@
         "app/types/PayloadTourDataProps.ts",
         "app/server/businessLogic/priceRangeBusinessLogic.tsx",
         "app/server/businessLogic/toursBusinessLogic.tsx",
+        "app/server/_index.tsx"
       ],
       "rules": {
         "@typescript-eslint/no-explicit-any": "warn",
