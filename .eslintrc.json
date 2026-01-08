@@ -90,7 +90,6 @@
     },
     {
       "files": [
-        "app/routes/tours.tsx",
         "app/components/tours/TourEditForm.tsx",
         "app/components/ui/Select.tsx",
         "app/components/ui/Table.tsx",
