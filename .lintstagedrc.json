@@ -1,4 +1,4 @@
 {
-  "app/**/*.{ts,tsx,js,jsx}": ["eslint --fix", "eslint --max-warnings 0"],
+  "*.{ts,tsx,js,jsx}": ["eslint --fix", "eslint --max-warnings 0"],
   "*.{ts,tsx,js,jsx,json,md,css,html}": ["prettier --write"]
 }
