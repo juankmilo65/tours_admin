@@ -100,7 +100,6 @@
         "app/types/PayloadTourDataProps.ts",
         "app/server/businessLogic/priceRangeBusinessLogic.tsx",
         "app/server/businessLogic/toursBusinessLogic.tsx",
-        "app/server/_index.tsx"
       ],
       "rules": {
         "@typescript-eslint/no-explicit-any": "warn",
