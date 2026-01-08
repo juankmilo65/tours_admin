@@ -96,11 +96,7 @@
         "app/components/ui/Table.tsx",
         "app/components/tours/TourCard.tsx",
         "app/store/storage.ts",
-        "app/lib/i18n/utils.ts",
-        "app/types/PayloadTourDataProps.ts",
-        "app/server/businessLogic/priceRangeBusinessLogic.tsx",
-        "app/server/businessLogic/toursBusinessLogic.tsx",
-        "app/server/_index.tsx"
+        "app/lib/i18n/utils.ts"
       ],
       "rules": {
         "@typescript-eslint/no-explicit-any": "warn",
