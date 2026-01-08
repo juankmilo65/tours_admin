@@ -215,7 +215,7 @@ if (input !== null && input !== undefined && input !== '') {
 
 ## Project Status
 
-Current ESLint errors in the project: 2,284
+Current ESLint errors in the project: **1,223** (as of latest pre-commit test)
 
 These errors need to be fixed to pass pre-commit validation. Run:
 

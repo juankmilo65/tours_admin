@@ -3,7 +3,8 @@
  * Manages categories state with multi-language support
  */
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { Language } from '~/lib/i18n/types';
 
 // Raw category from API with both languages
@@ -47,7 +48,7 @@ export function translateCategory(category: Category, lang: Language): Translate
 }
 
 export function translateCategories(categories: Category[], lang: Language): TranslatedCategory[] {
-  return categories.map(cat => translateCategory(cat, lang));
+  return categories.map((cat) => translateCategory(cat, lang));
 }
 
 interface CategoriesState {
@@ -115,9 +116,13 @@ export const {
 } = categoriesSlice.actions;
 
 // Selectors
-export const selectCategories = (state: { category: CategoriesState }) => state.category.categories;
-export const selectSelectedCategory = (state: { category: CategoriesState }) => state.category.selectedCategory;
-export const selectCategoriesLoading = (state: { category: CategoriesState }) => state.category.isLoading;
-export const selectCategoriesError = (state: { category: CategoriesState }) => state.category.error;
+export const selectCategories = (state: { category: CategoriesState }): Category[] =>
+  state.category.categories;
+export const selectSelectedCategory = (state: { category: CategoriesState }): Category | null =>
+  state.category.selectedCategory;
+export const selectCategoriesLoading = (state: { category: CategoriesState }): boolean =>
+  state.category.isLoading;
+export const selectCategoriesError = (state: { category: CategoriesState }): string | null =>
+  state.category.error;
 
 export default categoriesSlice.reducer;

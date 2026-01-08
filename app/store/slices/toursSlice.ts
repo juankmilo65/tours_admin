@@ -3,7 +3,8 @@
  * Manages tours state - UI state only, data fetching is handled by Remix loaders
  */
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { Tour, Pagination, TourFilters } from '~/types/PayloadTourDataProps';
 
 interface ToursState {

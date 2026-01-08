@@ -6,28 +6,30 @@
 import { type ActionFunctionArgs, redirect } from '@remix-run/node';
 import { getSession, commitSession } from '~/utilities/sessions';
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({
+  request,
+}: ActionFunctionArgs): Promise<ReturnType<typeof redirect>> {
   const formData = await request.formData();
   const countryId = formData.get('countryId') as string;
   const countryCode = formData.get('countryCode') as string;
-  const returnTo = formData.get('returnTo') as string || '/';
-  
-  if (!countryId || !countryCode) {
+  const returnTo = (formData.get('returnTo') as string) ?? '/';
+
+  if (countryId === null || countryCode === null) {
     return redirect(returnTo);
   }
-  
-  const session = await getSession(request.headers.get("Cookie"));
-  
+
+  const session = await getSession(request.headers.get('Cookie'));
+
   // Clear cached countries to force reload with new country filter
-  session.unset("cachedCountries");
-  
+  session.unset('cachedCountries');
+
   // Set the new country id and code
-  session.set("selectedCountryId", countryId);
-  session.set("selectedCountryCode", countryCode);
-  
+  session.set('selectedCountryId', countryId);
+  session.set('selectedCountryCode', countryCode);
+
   return redirect(returnTo, {
     headers: {
-      "Set-Cookie": await commitSession(session),
+      'Set-Cookie': await commitSession(session),
     },
   });
 }

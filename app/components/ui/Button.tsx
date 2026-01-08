@@ -2,7 +2,7 @@
  * Button Component - Reusable UI Component
  */
 
-import type { ButtonHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, JSX } from 'react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -18,7 +18,7 @@ export function Button({
   disabled,
   className = '',
   ...props
-}: ButtonProps) {
+}: ButtonProps): JSX.Element {
   const baseStyles = [
     'font-medium',
     'rounded-lg',
@@ -45,7 +45,7 @@ export function Button({
   return (
     <button
       className={`${baseStyles.join(' ')} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
-      disabled={disabled || loading}
+      disabled={(disabled ?? false) || loading}
       {...props}
     >
       {loading ? 'Loading...' : children}

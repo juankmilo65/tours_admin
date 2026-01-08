@@ -3,7 +3,8 @@
  * Manages UI state (modals, notifications, global loading, auth token, etc.)
  */
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from '~/store';
 
 export interface Notification {
@@ -81,7 +82,7 @@ const uiSlice = createSlice({
     // Global transversal actions
     setGlobalLoading: (state, action: PayloadAction<{ isLoading: boolean; message?: string }>) => {
       state.isGlobalLoading = action.payload.isLoading;
-      state.globalLoadingMessage = action.payload.message || '';
+      state.globalLoadingMessage = action.payload.message ?? '';
     },
     setToken: (state, action: PayloadAction<string | null>) => {
       state.token = action.payload;
@@ -112,12 +113,13 @@ export const {
 } = uiSlice.actions;
 
 // Selectors
-export const selectIsGlobalLoading = (state: RootState) => state.ui.isGlobalLoading;
-export const selectGlobalLoadingMessage = (state: RootState) => state.ui.globalLoadingMessage;
-export const selectToken = (state: RootState) => state.ui.token;
-export const selectLanguage = (state: RootState) => state.ui.language;
-export const selectCurrency = (state: RootState) => state.ui.currency;
-export const selectSidebarCollapsed = (state: RootState) => state.ui.sidebarCollapsed;
-export const selectModals = (state: RootState) => state.ui.modals;
+export const selectIsGlobalLoading = (state: RootState): boolean => state.ui.isGlobalLoading;
+export const selectGlobalLoadingMessage = (state: RootState): string =>
+  state.ui.globalLoadingMessage;
+export const selectToken = (state: RootState): string | null => state.ui.token;
+export const selectLanguage = (state: RootState): string => state.ui.language;
+export const selectCurrency = (state: RootState): string => state.ui.currency;
+export const selectSidebarCollapsed = (state: RootState): boolean => state.ui.sidebarCollapsed;
+export const selectModals = (state: RootState): Modal[] => state.ui.modals;
 
 export default uiSlice.reducer;

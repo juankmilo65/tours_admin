@@ -3,7 +3,8 @@
  * Manages user authentication state
  */
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 
 interface User {
   id: string;
@@ -57,7 +58,6 @@ const authSlice = createSlice({
     },
   },
 });
-
 
 export const { loginStart, loginSuccess, loginFailure, logout, clearError } = authSlice.actions;
 export default authSlice.reducer;

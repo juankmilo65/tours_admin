@@ -3,6 +3,7 @@
  * Displays tour information in a card format
  */
 
+import React from 'react';
 import type { TranslatedTour } from '~/types/PayloadTourDataProps';
 import { useTranslation } from '~/lib/i18n/utils';
 import { useNavigate } from '@remix-run/react';
@@ -11,17 +12,26 @@ import { setGlobalLoading } from '~/store/slices/uiSlice';
 
 interface TourCardProps {
   tour: TranslatedTour;
-  onViewDetails: (id: string) => void;
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
+  onViewDetails?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
-export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProps) {
+export function TourCard({
+  tour,
+  onViewDetails,
+  // ...existing code...
+  onDelete,
+}: TourCardProps): React.JSX.Element {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const hasActiveOffer = tour.offers && tour.offers.length > 0 && tour.offers[0]?.isActive;
-  const discount = hasActiveOffer ? tour.offers[0]?.discountPercentage || 0 : 0;
+  const hasActiveOffer =
+    tour.offers !== undefined &&
+    tour.offers !== null &&
+    tour.offers.length > 0 &&
+    tour.offers[0]?.isActive === true;
+  const discount = hasActiveOffer ? (tour.offers[0]?.discountPercentage ?? 0) : 0;
   const discountedPrice = discount > 0 ? tour.base_price * (1 - discount / 100) : tour.base_price;
 
   const getDifficultyColor = (difficulty: string) => {
@@ -69,9 +79,9 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
             height: '100%',
             objectFit: 'cover',
           }}
-          onClick={() => onViewDetails(tour.id)}
+          onClick={() => onViewDetails?.()}
         />
-        {hasActiveOffer && (
+        {hasActiveOffer && tour.offers !== undefined && tour.offers !== null && (
           <div
             style={{
               position: 'absolute',
@@ -117,7 +127,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
               fontWeight: 'var(--font-weight-medium)',
             }}
           >
-            {tour.category?.name || 'Sin categoría'}
+            {tour.category?.name ?? 'Sin categoría'}
           </span>
           <span style={{ color: 'var(--color-neutral-300)' }}>•</span>
           <span
@@ -126,7 +136,7 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
               color: 'var(--color-neutral-600)',
             }}
           >
-            {tour.city?.name || 'Ciudad'}
+            {tour.city?.name ?? 'Ciudad'}
           </span>
         </div>
 
@@ -179,12 +189,12 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
             <span>{tour.duration}h</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>👥</span>me 
+            <span>👥</span>me
             <span>{tour.maxCapacity}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span>🗣️</span>
-            <span>{tour.language?.[0] || 'ES'}</span>
+            <span>{tour.language?.[0] ?? 'ES'}</span>
           </div>
         </div>
 
@@ -242,33 +252,37 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          <button
-            onClick={() => onViewDetails(tour.id)}
-            style={{
-              flex: 1,
-              padding: 'var(--space-2) var(--space-4)',
-              backgroundColor: 'var(--color-primary-500)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              fontWeight: 'var(--font-weight-medium)',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-primary-600)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-primary-500)';
-            }}
-          >
-            {t('tours.viewDetails')}
-          </button>
+          {onViewDetails && (
+            <button
+              onClick={() => onViewDetails?.()}
+              style={{
+                flex: 1,
+                padding: 'var(--space-2) var(--space-4)',
+                backgroundColor: 'var(--color-primary-500)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 'var(--font-weight-medium)',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s ease',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-primary-600)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-primary-500)';
+              }}
+            >
+              {t('tours.viewDetails')}
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
               // Activate global loading before navigating
-              dispatch(setGlobalLoading({ isLoading: true, message: 'Cargando tour para edición...' }));
+              dispatch(
+                setGlobalLoading({ isLoading: true, message: 'Cargando tour para edición...' })
+              );
               // Navigate to edit page
               navigate(`/tours/${tour.id}/edit`);
             }}
@@ -292,33 +306,35 @@ export function TourCard({ tour, onViewDetails, onEdit, onDelete }: TourCardProp
           >
             ✏️
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (window.confirm(t('common.confirm'))) {
-                onDelete(tour.id);
-              }
-            }}
-            style={{
-              padding: 'var(--space-2) var(--space-3)',
-              backgroundColor: 'var(--color-error-50)',
-              color: 'var(--color-error-600)',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              fontWeight: 'var(--font-weight-medium)',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-error-100)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
-            }}
-            title={t('common.delete')}
-          >
-            🗑️
-          </button>
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(t('common.confirm'))) {
+                  onDelete?.();
+                }
+              }}
+              style={{
+                padding: 'var(--space-2) var(--space-3)',
+                backgroundColor: 'var(--color-error-50)',
+                color: 'var(--color-error-600)',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 'var(--font-weight-medium)',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s ease',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-error-100)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
+              }}
+              title={t('common.delete')}
+            >
+              🗑️
+            </button>
+          )}
         </div>
       </div>
     </div>

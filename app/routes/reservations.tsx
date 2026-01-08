@@ -2,6 +2,7 @@
  * Reservations Route - Reservations Management
  */
 
+import type { JSX } from 'react';
 import { useState } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
@@ -78,7 +79,7 @@ const mockReservations: readonly Reservation[] = [
   },
 ];
 
-export default function Reservations() {
+export default function Reservations(): JSX.Element {
   const columns: Column<Reservation>[] = [
     { key: 'customerName', label: 'Customer' },
     { key: 'customerEmail', label: 'Email' },
@@ -105,7 +106,7 @@ export default function Reservations() {
         return (
           <span
             className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-              statusColors[value] || 'bg-gray-100 text-gray-800'
+              statusColors[value] ?? 'bg-gray-100 text-gray-800'
             }`}
           >
             {value}
@@ -126,7 +127,7 @@ export default function Reservations() {
         return (
           <span
             className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-              paymentColors[value] || 'bg-gray-100 text-gray-800'
+              paymentColors[value] ?? 'bg-gray-100 text-gray-800'
             }`}
           >
             {value}
@@ -146,95 +147,99 @@ export default function Reservations() {
         title="All Reservations"
         actions={<Button variant="primary">Create Reservation</Button>}
       >
-            <div className="mb-4 flex gap-4 flex-wrap">
-              <input
-                type="search"
-                placeholder="Search reservations..."
-                className="flex-1 min-w-[200px] px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <input
-                type="date"
-                className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Select
-                options={[
-                  { value: '', label: 'All Status' },
-                  { value: 'Confirmed', label: 'Confirmed' },
-                  { value: 'Pending', label: 'Pending' },
-                  { value: 'Completed', label: 'Completed' },
-                  { value: 'Cancelled', label: 'Cancelled' },
-                  { value: 'Refunded', label: 'Refunded' },
-                ]}
-                value={statusFilter}
-                onChange={setStatusFilter}
-                placeholder="All Status"
-                className="select-compact"
-              />
-              <Select
-                options={[
-                  { value: '', label: 'All Payment Status' },
-                  { value: 'Paid', label: 'Paid' },
-                  { value: 'Pending', label: 'Pending' },
-                  { value: 'Failed', label: 'Failed' },
-                  { value: 'Refunded', label: 'Refunded' },
-                ]}
-                value={paymentFilter}
-                onChange={setPaymentFilter}
-                placeholder="All Payment Status"
-                className="select-compact"
-              />
-            </div>
-
-            <Table data={mockReservations} columns={columns} />
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card title="Reservations Statistics">
-              <div className="grid grid-cols-2 gap-4">
-                <StatCard title="Total" value="127" />
-                <StatCard title="Today" value="12" />
-                <StatCard title="This Week" value="45" />
-                <StatCard title="This Month" value="127" />
-              </div>
-            </Card>
-
-            <Card title="Revenue Overview">
-              <div className="grid grid-cols-2 gap-4">
-                <StatCard title="Total Revenue" value="$45,230" />
-                <StatCard title="Pending Revenue" value="$8,500" />
-                <StatCard title="Avg. Order" value="$356" />
-                <StatCard title="Conversion" value="12.5%" />
-              </div>
-            </Card>
-          </div>
-
-          <Card title="Upcoming Reservations">
-            <div className="space-y-4">
-              {[
-                { tour: 'Historical City Center Tour', time: 'Tomorrow 10:00', customers: 4 },
-                { tour: 'Food Market Experience', time: 'Tomorrow 14:00', customers: 6 },
-                { tour: 'Museum Private Tour', time: 'Jan 15 09:00', customers: 2 },
-              ].map((item, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium text-gray-900">{item.tour}</p>
-                    <p className="text-sm text-gray-500">{item.time}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{item.customers} guests</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+        <div className="mb-4 flex gap-4 flex-wrap">
+          <input
+            type="search"
+            placeholder="Search reservations..."
+            className="flex-1 min-w-[200px] px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            type="date"
+            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <Select
+            options={[
+              { value: '', label: 'All Status' },
+              { value: 'Confirmed', label: 'Confirmed' },
+              { value: 'Pending', label: 'Pending' },
+              { value: 'Completed', label: 'Completed' },
+              { value: 'Cancelled', label: 'Cancelled' },
+              { value: 'Refunded', label: 'Refunded' },
+            ]}
+            value={statusFilter}
+            onChange={(v: string) => {
+              setStatusFilter(v);
+            }}
+            placeholder="All Status"
+            className="select-compact"
+          />
+          <Select
+            options={[
+              { value: '', label: 'All Payment Status' },
+              { value: 'Paid', label: 'Paid' },
+              { value: 'Pending', label: 'Pending' },
+              { value: 'Failed', label: 'Failed' },
+              { value: 'Refunded', label: 'Refunded' },
+            ]}
+            value={paymentFilter}
+            onChange={(v: string) => {
+              setPaymentFilter(v);
+            }}
+            placeholder="All Payment Status"
+            className="select-compact"
+          />
         </div>
+
+        <Table data={mockReservations} columns={columns} />
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card title="Reservations Statistics">
+          <div className="grid grid-cols-2 gap-4">
+            <StatCard title="Total" value="127" />
+            <StatCard title="Today" value="12" />
+            <StatCard title="This Week" value="45" />
+            <StatCard title="This Month" value="127" />
+          </div>
+        </Card>
+
+        <Card title="Revenue Overview">
+          <div className="grid grid-cols-2 gap-4">
+            <StatCard title="Total Revenue" value="$45,230" />
+            <StatCard title="Pending Revenue" value="$8,500" />
+            <StatCard title="Avg. Order" value="$356" />
+            <StatCard title="Conversion" value="12.5%" />
+          </div>
+        </Card>
+      </div>
+
+      <Card title="Upcoming Reservations">
+        <div className="space-y-4">
+          {[
+            { tour: 'Historical City Center Tour', time: 'Tomorrow 10:00', customers: 4 },
+            { tour: 'Food Market Experience', time: 'Tomorrow 14:00', customers: 6 },
+            { tour: 'Museum Private Tour', time: 'Jan 15 09:00', customers: 2 },
+          ].map((item, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+            >
+              <div>
+                <p className="font-medium text-gray-900">{item.tour}</p>
+                <p className="text-sm text-gray-500">{item.time}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">{item.customers} guests</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
   );
 }
 
-function StatCard({ title, value }: { title: string; value: string | number }) {
+function StatCard({ title, value }: { title: string; value: string | number }): JSX.Element {
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
       <p className="text-sm text-gray-500">{title}</p>

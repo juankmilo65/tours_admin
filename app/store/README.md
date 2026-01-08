@@ -1,6 +1,7 @@
 # Redux Store Architecture
 
 ## Overview
+
 Centralized state management using Redux Toolkit for the Tours Admin application.
 
 ## Structure
@@ -19,28 +20,34 @@ store/
 ## Key Features
 
 ### 1. **Redux Toolkit**
+
 - Modern Redux with simplified setup
 - Built-in Immer for immutable state updates
 - Automatic action type generation
 
 ### 2. **Persistence**
+
 - Redux-persist for automatic state persistence
 - SSR-safe storage that works on both client and server
 - Configurable whitelist/blacklist for what to persist
 
 ### 3. **TypeScript Support**
+
 - Fully typed store, actions, and selectors
 - Type-safe hooks: `useAppDispatch` and `useAppSelector`
 
 ## Usage
 
 ### Store Setup
+
 The store is configured in `entry.client.tsx` with:
+
 - Redux Provider wrapper
 - PersistGate for hydration
 - SSR-safe configuration
 
 ### Creating Slices
+
 ```typescript
 // slices/exampleSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
@@ -72,6 +79,7 @@ export const persistExample = {
 ```
 
 ### Using in Components
+
 ```typescript
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, fetchCitiesSuccess } from '~/store/slices/citiesSlice';
@@ -86,6 +94,7 @@ function MyComponent() {
 ```
 
 ### Store Configuration
+
 ```typescript
 // store/index.ts
 const rootReducer = combineReducers({
@@ -93,14 +102,15 @@ const rootReducer = combineReducers({
   // other reducers...
 });
 
-export const makeStore = () => configureStore({
-  reducer: rootReducer,
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: false, // Required for redux-persist
-      immutableCheck: false,
-    }),
-});
+export const makeStore = () =>
+  configureStore({
+    reducer: rootReducer,
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({
+        serializableCheck: false, // Required for redux-persist
+        immutableCheck: false,
+      }),
+  });
 ```
 
 ## Best Practices

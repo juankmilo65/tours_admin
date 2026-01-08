@@ -1,6 +1,22 @@
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation, useLoaderData } from '@remix-run/react';
+import {
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useLocation,
+  useLoaderData,
+} from '@remix-run/react';
 import { data, type LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
-import { useMemo, useState, useEffect, createContext } from 'react';
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  createContext,
+  type ReactNode,
+} from 'react';
+import React from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { makeStore, makePersistor } from './store';
@@ -27,22 +43,34 @@ export const CitiesContext = createContext<{
 } | null>(null);
 
 // Client component to sync loader data with Redux
-function DataSyncDispatcher({ cities, countries, selectedCountryCode }: { cities: City[], countries: Country[], selectedCountryCode: string }) {
+function DataSyncDispatcher({
+  cities,
+  countries,
+  selectedCountryCode,
+}: {
+  cities: City[];
+  countries: Country[];
+  selectedCountryCode: string;
+}) {
   const dispatch = useAppDispatch();
-  
+
   useEffect(() => {
     // Sync countries to Redux
     if (countries.length > 0) {
       dispatch(fetchCountriesSuccess(countries));
     }
-    
+
     // Sync cities to Redux
     if (cities.length > 0) {
       dispatch(fetchCitiesSuccess(cities));
     }
-    
+
     // Set selected country
-    if (selectedCountryCode) {
+    if (
+      selectedCountryCode !== null &&
+      selectedCountryCode !== undefined &&
+      selectedCountryCode !== ''
+    ) {
       dispatch(setSelectedCountryByCode(selectedCountryCode));
     }
   }, [cities, countries, selectedCountryCode, dispatch]);
@@ -51,11 +79,23 @@ function DataSyncDispatcher({ cities, countries, selectedCountryCode }: { cities
 }
 
 // Wrapper to only render Sidebar on client
-function ClientOnlySidebar({ isOpen, isCollapsed, onToggle }: { isOpen: boolean; isCollapsed: boolean; onToggle: () => void }) {
+function ClientOnlySidebar({
+  isOpen,
+  isCollapsed,
+  onToggle,
+}: {
+  isOpen: boolean;
+  isCollapsed: boolean;
+  onToggle: () => void;
+}): ReactNode {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    // Defer setState to avoid cascading renders
+    const timeoutId = window.setTimeout(() => {
+      setIsClient(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   if (!isClient) {
@@ -66,14 +106,14 @@ function ClientOnlySidebar({ isOpen, isCollapsed, onToggle }: { isOpen: boolean;
 }
 
 // Wrapper to only render Header on client with data from loader
-function ClientOnlyHeader({ 
-  title, 
-  isSidebarOpen, 
-  isSidebarCollapsed, 
-  onToggleSidebar, 
+function ClientOnlyHeader({
+  title,
+  isSidebarOpen,
+  isSidebarCollapsed,
+  onToggleSidebar,
   onToggleSidebarCollapse,
   countries,
-  selectedCountryCode
+  selectedCountryCode,
 }: {
   title: string;
   isSidebarOpen: boolean;
@@ -82,15 +122,21 @@ function ClientOnlyHeader({
   onToggleSidebarCollapse: () => void;
   countries: Country[];
   selectedCountryCode: string;
-}) {
+}): ReactNode {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    // Defer setState to avoid cascading renders
+    const timeoutId = window.setTimeout(() => {
+      setIsClient(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   if (!isClient) {
-    return <div style={{ height: 'var(--header-height)', backgroundColor: 'var(--color-white)' }} />;
+    return (
+      <div style={{ height: 'var(--header-height)', backgroundColor: 'var(--color-white)' }} />
+    );
   }
 
   return (
@@ -107,11 +153,15 @@ function ClientOnlyHeader({
 }
 
 // Wrapper to only render Footer on client
-function ClientOnlyFooter() {
+function ClientOnlyFooter(): ReactNode {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    // Defer setState to avoid cascading renders
+    const timeoutId = window.setTimeout(() => {
+      setIsClient(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   if (!isClient) {
@@ -122,11 +172,15 @@ function ClientOnlyFooter() {
 }
 
 // Wrapper to only render GlobalLoader on client
-function ClientOnlyGlobalLoader() {
+function ClientOnlyGlobalLoader(): ReactNode {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    // Defer setState to avoid cascading renders
+    const timeoutId = window.setTimeout(() => {
+      setIsClient(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   if (!isClient) {
@@ -137,11 +191,15 @@ function ClientOnlyGlobalLoader() {
 }
 
 // Wrapper to only render Modal on client
-function ClientOnlyModal() {
+function ClientOnlyModal(): ReactNode {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    // Defer setState to avoid cascading renders
+    const timeoutId = window.setTimeout(() => {
+      setIsClient(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   if (!isClient) return null;
@@ -162,13 +220,17 @@ export const links: LinksFunction = () => [
 const store = makeStore();
 const persistor = typeof window !== 'undefined' ? makePersistor(store) : null;
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export function Layout({ children }: { children: ReactNode }): ReactNode {
   const [isClient, setIsClient] = useState(false);
-  
+
   useEffect(() => {
-    setIsClient(true);
+    // Defer setState to avoid cascading renders
+    const timeoutId = window.setTimeout(() => {
+      setIsClient(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
-  
+
   return (
     <html lang="en">
       <head>
@@ -199,47 +261,44 @@ interface GetCitiesParameters {
   language?: string;
 }
 
-const getCitiesByCountryId = async (parameters: GetCitiesParameters) => {
+const getCitiesByCountryId = (parameters: GetCitiesParameters) => {
   const formData = new FormData();
   const { filters } = parameters;
 
-  formData.append("action", 'getCitiesByCountryIdBusiness');
-  formData.append("filters", JSON.stringify(filters));
-  formData.append("language", parameters.language || 'es');
+  formData.append('action', 'getCitiesByCountryIdBusiness');
+  formData.append('filters', JSON.stringify(filters));
+  formData.append('language', parameters.language ?? 'es');
 
-  const citiesByCountry = await citiesBL(formData);
-  
-  return citiesByCountry;
-}
+  return citiesBL(formData);
+};
 
 interface GetCountriesParameters {
   language?: string;
 }
 
-const getCountries = async (parameters: GetCountriesParameters) => {
+const getCountries = (parameters: GetCountriesParameters) => {
   const formData = new FormData();
 
-  formData.append("action", 'getCountriesBusiness');
-  formData.append("language", parameters.language || 'es');
+  formData.append('action', 'getCountriesBusiness');
+  formData.append('language', parameters.language ?? 'es');
 
-  const countries = await countriesBL(formData);
-  
-  return countries;
-}
+  return countriesBL(formData);
+};
 
 type ActionParameters = GetCitiesParameters | GetCountriesParameters;
 
-const actionsLoader = async (action: string, parameters: ActionParameters) => {
+const actionsLoader = (action: string, parameters: ActionParameters) => {
   const ACTIONS = {
-    getCitiesByCountryId: async () => await getCitiesByCountryId(parameters as GetCitiesParameters),
-    getCountries: async () => await getCountries(parameters as GetCountriesParameters)
+    getCitiesByCountryId: () => getCitiesByCountryId(parameters as GetCitiesParameters),
+
+    getCountries: () => getCountries(parameters as GetCountriesParameters),
   };
 
   if (action && action in ACTIONS) {
     return ACTIONS[action as keyof typeof ACTIONS]();
   }
   throw new Error('Invalid action');
-}
+};
 
 interface LoaderData {
   cities: City[];
@@ -248,89 +307,107 @@ interface LoaderData {
   selectedCountryCode: string;
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs): Promise<{
+  data: LoaderData;
+}> {
   // Load cities and countries globally for all routes
-  const session = await getSession(request.headers.get("Cookie"));
-  
+  const session = await getSession(request.headers.get('Cookie'));
+
   // Get selected country from session
-  const selectedCountryId = session.get("selectedCountryId") as string | undefined;
-  const selectedCountryCode = session.get("selectedCountryCode") as string | undefined;
-  
+  const selectedCountryId = session.get('selectedCountryId') as string | undefined;
+  const selectedCountryCode = session.get('selectedCountryCode') as string | undefined;
+
   // Get current language from session or default to 'es'
-  const currentLanguage = session.get("language") as string || 'es';
-  
+  const currentLanguage = (session.get('language') as string) ?? 'es';
+
   // Fetch countries from API with proper language header
   // Redux Persist will cache them on client side
-  const countriesResult = await actionsLoader('getCountries', { language: currentLanguage }) as { success: boolean; data: Country[] };
+  const countriesResult = (await actionsLoader('getCountries', {
+    language: currentLanguage,
+  })) as {
+    success: boolean;
+    data: Country[];
+  };
   const countries = countriesResult.success ? countriesResult.data : [];
-  
+
   // Determine country to filter by
   // Priority: 1. selectedCountryId from session (if valid), 2. Default to Mexico
   let countryId = selectedCountryId;
   let countryCode = selectedCountryCode;
-  
+
   // Validate that the countryId from session exists in current countries list
-  const isValidCountry = countryId && countries.some((c: Country) => c.id === countryId);
-  
+  const isValidCountry =
+    countryId !== null &&
+    countryId !== undefined &&
+    countries.some((c: Country) => c.id === countryId);
+
   if (!isValidCountry && countries.length > 0) {
     // Session countryId is invalid or not found, default to Mexico
-    const mexicoCountry = countries.find((c: Country) => 
-      c.code === 'MX' ||
-      c.name_es?.toLowerCase() === 'méxico' || 
-      c.name_en?.toLowerCase() === 'mexico'
+    const mexicoCountry = countries.find(
+      (c: Country) =>
+        c.code === 'MX' ||
+        c.name_es?.toLowerCase() === 'méxico' ||
+        c.name_en?.toLowerCase() === 'mexico'
     );
-    const defaultCountry = mexicoCountry || countries[0];
+    const defaultCountry = mexicoCountry ?? countries[0];
     countryId = defaultCountry?.id;
     countryCode = defaultCountry?.code;
-    
+
     // Save default selection to session
-    session.set("selectedCountryId", countryId);
-    session.set("selectedCountryCode", countryCode);
+    session.set('selectedCountryId', countryId);
+    session.set('selectedCountryCode', countryCode);
   }
-  
+
   let cities: City[] = [];
-  
-  if (countryId) {
+
+  if (countryId !== null && countryId !== undefined && countryId !== '') {
     const filters = { countryId };
     // Fetch cities for selected country
-    const citiesResult = await actionsLoader('getCitiesByCountryId', { filters, language: currentLanguage }) as { success: boolean; data: City[] };
+    const citiesResult = (await actionsLoader('getCitiesByCountryId', {
+      filters,
+      language: currentLanguage,
+    })) as { success: boolean; data: City[] };
     cities = citiesResult.success ? citiesResult.data : [];
   }
-  
+
   const loaderResponse = {
     cities,
     countries,
-    selectedCountryId: countryId || '',
-    selectedCountryCode: countryCode || ''
+    selectedCountryId: countryId ?? '',
+    selectedCountryCode: countryCode ?? '',
   };
-  
-  return data(
-    loaderResponse,
-    {
-      headers: {
-        "Set-Cookie": await commitSession(session),
-      },
-    }
-  );
+
+  return data(loaderResponse, {
+    headers: {
+      'Set-Cookie': await commitSession(session),
+    },
+  });
 }
 
-export default function App() {
+export default function App(): React.JSX.Element {
   const location = useLocation();
   const loaderData = useLoaderData<LoaderData>();
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [isClient, setIsClient] = useState(false);
-  
+
   // Extract loader data - Los datos están en loaderData.data cuando usamos data() con headers
-  const responseData = (loaderData as any)?.data || loaderData || {};
-  const cities = responseData?.cities || [];
-  const countries = responseData?.countries || [];
-  const selectedCountryCode = responseData?.selectedCountryCode || '';
+  const typedLoader = loaderData as unknown as { data?: LoaderData };
+  const hasData = typedLoader.data !== undefined;
+  const dataOrLoader = hasData
+    ? (typedLoader as { data: LoaderData }).data
+    : (loaderData as LoaderData);
+  const cities = useMemo(() => dataOrLoader?.cities ?? [], [dataOrLoader]);
+  const countries = useMemo(() => dataOrLoader?.countries ?? [], [dataOrLoader]);
+  const selectedCountryCode = dataOrLoader?.selectedCountryCode ?? '';
 
   // Check if we're on client
-  useEffect(() => {
-    setIsClient(true);
+  useLayoutEffect(() => {
+    // Defer setState to avoid cascading renders
+    window.setTimeout(() => {
+      setIsClient(true);
+    }, 0);
   }, []);
 
   // Detectar si es móvil al montar y cuando cambia el tamaño
@@ -339,7 +416,7 @@ export default function App() {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
     }
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -369,60 +446,89 @@ export default function App() {
       '/users': 'Users & Roles',
       '/settings': 'Settings',
     };
-    
+
     // Check exact path match first
-    if (pathMap[location.pathname]) {
-      return pathMap[location.pathname]!;
+    const exactMatch = pathMap[location.pathname];
+    if (exactMatch !== undefined && exactMatch !== null && exactMatch !== '') {
+      return exactMatch;
     }
-    
+
     // Check for partial matches (e.g., /tours/123)
-    const matchedPath = Object.keys(pathMap).find(path => 
+    const matchedPath = Object.keys(pathMap).find((path) =>
       location.pathname.startsWith(`${path}/`)
     );
-    
-    if (matchedPath && pathMap[matchedPath]) {
-      return pathMap[matchedPath]!;
+
+    if (
+      matchedPath !== undefined &&
+      matchedPath !== null &&
+      matchedPath !== '' &&
+      pathMap[matchedPath] !== undefined &&
+      pathMap[matchedPath] !== null &&
+      pathMap[matchedPath] !== ''
+    ) {
+      const matched = pathMap[matchedPath];
+      if (matched !== undefined && matched !== null && matched !== '') {
+        return matched;
+      }
     }
-    
+
     return 'Tours Admin';
   }, [location.pathname]);
 
   // Provide loader data via context (Redux will sync on client)
-  const contextValue = useMemo(() => ({
-    cities,
-    countries
-  }), [cities, countries]);
+  const contextValue = useMemo(
+    () => ({
+      cities,
+      countries,
+    }),
+    [cities, countries]
+  );
 
   return (
     <CitiesContext.Provider value={contextValue}>
-      {isClient && <DataSyncDispatcher cities={cities} countries={countries} selectedCountryCode={selectedCountryCode} />}
-      <ClientOnlyGlobalLoader />
-      <ClientOnlyModal />
-      <div style={{ minHeight: '100vh' }}>
-      <ClientOnlySidebar isOpen={isSidebarOpen} isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
-      <div style={{ marginLeft: isMobile ? 0 : (isSidebarCollapsed ? '80px' : '280px'), transition: 'margin-left var(--transition-base)' }}>
-        <ClientOnlyHeader 
-          title={pageTitle} 
-          isSidebarOpen={isSidebarOpen} 
-          isSidebarCollapsed={isSidebarCollapsed}
-          onToggleSidebar={toggleSidebar} 
-          onToggleSidebarCollapse={toggleSidebarCollapse}
+      {isClient && (
+        <DataSyncDispatcher
+          cities={cities}
           countries={countries}
           selectedCountryCode={selectedCountryCode}
         />
-        <main 
+      )}
+      <ClientOnlyGlobalLoader />
+      <ClientOnlyModal />
+      <div style={{ minHeight: '100vh' }}>
+        <ClientOnlySidebar
+          isOpen={isSidebarOpen}
+          isCollapsed={isSidebarCollapsed}
+          onToggle={toggleSidebar}
+        />
+        <div
           style={{
-            paddingTop: 'var(--header-height)',
-            paddingBottom: '80px',
-            paddingLeft: 'var(--space-6)',
-            paddingRight: 'var(--space-6)',
+            marginLeft: isMobile ? 0 : isSidebarCollapsed ? '80px' : '280px',
+            transition: 'margin-left var(--transition-base)',
           }}
         >
-          <Outlet />
-        </main>
-        <ClientOnlyFooter />
+          <ClientOnlyHeader
+            title={pageTitle}
+            isSidebarOpen={isSidebarOpen}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebar={toggleSidebar}
+            onToggleSidebarCollapse={toggleSidebarCollapse}
+            countries={countries}
+            selectedCountryCode={selectedCountryCode}
+          />
+          <main
+            style={{
+              paddingTop: 'var(--header-height)',
+              paddingBottom: '80px',
+              paddingLeft: 'var(--space-6)',
+              paddingRight: 'var(--space-6)',
+            }}
+          >
+            <Outlet />
+          </main>
+          <ClientOnlyFooter />
+        </div>
       </div>
-    </div>
     </CitiesContext.Provider>
   );
 }

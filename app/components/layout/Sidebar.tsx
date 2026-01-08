@@ -2,6 +2,7 @@
  * Sidebar Component - Navigation Menu
  */
 
+import type { JSX } from 'react';
 import { Link, useLocation, useNavigation } from '@remix-run/react';
 import { useState, useEffect } from 'react';
 import { useAppDispatch } from '~/store/hooks';
@@ -31,7 +32,7 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
-export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
+export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.Element {
   const location = useLocation();
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
@@ -51,7 +52,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
     function checkMobile() {
       setIsMobile(window.innerWidth < 1024);
     }
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -63,7 +64,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
     if (targetPath !== currentPath) {
       dispatch(setGlobalLoading({ isLoading: true }));
     }
-    
+
     if (isMobile) {
       onToggle();
     }
@@ -88,9 +89,9 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
         ></div>
       )}
 
-      <aside 
+      <aside
         style={{
-          width: isMobile ? '280px' : (isCollapsed ? '80px' : '280px'),
+          width: isMobile ? '280px' : isCollapsed ? '80px' : '280px',
           backgroundColor: 'var(--color-primary-light-50)',
           color: 'var(--color-neutral-800)',
           height: '100vh',
@@ -105,7 +106,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
         }}
       >
         {isMobile && (
-          <div 
+          <div
             style={{
               padding: 'var(--space-4)',
               borderBottom: '1px solid var(--color-neutral-200)',
@@ -142,7 +143,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
         )}
 
         {/* Logo/Title Section */}
-        <div 
+        <div
           style={{
             padding: isCollapsed ? 'var(--space-3)' : 'var(--space-4)',
             borderBottom: '1px solid var(--color-neutral-200)',
@@ -163,7 +164,14 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
           />
         </div>
 
-        <nav style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+        <nav
+          style={{
+            padding: 'var(--space-4)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-1)',
+          }}
+        >
           {navItems.map((item) => {
             const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
             const label = t(item.labelKey);
@@ -182,7 +190,9 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps) {
                   transition: 'all var(--transition-base)',
                   color: isActive ? 'var(--color-primary-700)' : 'var(--color-neutral-600)',
                   backgroundColor: isActive ? 'var(--color-primary-50)' : 'transparent',
-                  fontWeight: isActive ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
+                  fontWeight: isActive
+                    ? 'var(--font-weight-semibold)'
+                    : 'var(--font-weight-normal)',
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
                 }}
                 onMouseOver={(e) => {

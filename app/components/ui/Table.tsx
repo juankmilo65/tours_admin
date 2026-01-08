@@ -1,3 +1,5 @@
+import React from 'react';
+
 /**
  * Table Component - Reusable UI Component
  */
@@ -5,20 +7,20 @@
 export interface Column<T> {
   key: keyof T;
   label: string;
-  render?: (value: any, row: T) => React.ReactNode;
+  render?: (value: unknown, row: T) => React.ReactNode;
 }
 
 interface TableProps<T> {
   data: readonly T[];
   columns: Column<T>[];
-  onRowClick?: (row: T) => void;
+  onRowClick?: (row: unknown) => void;
 }
 
-export function Table<T extends Record<string, any>>({
+export function Table<T extends Record<string, unknown>>({
   data,
   columns,
   onRowClick,
-}: TableProps<T>) {
+}: TableProps<T>): React.ReactNode {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -38,7 +40,9 @@ export function Table<T extends Record<string, any>>({
           {data.map((row, index) => (
             <tr
               key={index}
-              onClick={() => onRowClick?.(row)}
+              onClick={() => {
+                void onRowClick?.(row);
+              }}
               className={`
                 cursor-pointer
                 ${onRowClick ? 'hover:bg-gray-50' : ''}

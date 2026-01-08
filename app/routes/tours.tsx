@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { JSX } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useLoaderData, useNavigation, useSearchParams } from '@remix-run/react';
 import { data, type LoaderFunctionArgs } from '@remix-run/node';
 import type { Tour, TranslatedTour, Language } from '~/types/PayloadTourDataProps';
@@ -6,8 +7,13 @@ import { translateTours } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
-import { selectCategories, translateCategories, fetchCategoriesSuccess, type Category } from '~/store/slices/categoriesSlice';
-import { selectLanguage, selectCurrency, setGlobalLoading, openModal } from '~/store/slices/uiSlice';
+import {
+  selectCategories,
+  translateCategories,
+  fetchCategoriesSuccess,
+  type Category,
+} from '~/store/slices/categoriesSlice';
+import { selectLanguage, setGlobalLoading, openModal } from '~/store/slices/uiSlice';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
@@ -15,35 +21,53 @@ import { useTranslation } from '~/lib/i18n/utils';
 import Select from '~/components/ui/Select';
 
 // Loader function - runs on server
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs): Promise<ReturnType<typeof data>> {
   const url = new URL(request.url);
-  const cityId = url.searchParams.get('cityId');
-  const page = url.searchParams.get('page') || '1';
-  const category = url.searchParams.get('category') || '';
-  const minPrice = url.searchParams.get('minPrice') || '';
-  const maxPrice = url.searchParams.get('maxPrice') || '';
+  const cityId = url.searchParams.get('cityId') ?? null;
+  const page = url.searchParams.get('page') ?? '1';
+  const category = url.searchParams.get('category') ?? '';
+  const minPrice = url.searchParams.get('minPrice') ?? '';
+  const maxPrice = url.searchParams.get('maxPrice') ?? '';
 
   // Fetch categories
   const categoriesFormData = new FormData();
   categoriesFormData.append('action', 'getCategoriesBusiness');
   categoriesFormData.append('language', 'es');
   const categoriesResult = await categoriesBL(categoriesFormData);
-  const categories = categoriesResult.success ? categoriesResult.data : [];
+  // Type guard for categoriesResult
+  const isCategoriesResult = (
+    result: unknown
+  ): result is { success: boolean; data: Category[] | null } =>
+    typeof result === 'object' &&
+    result !== null &&
+    'success' in result &&
+    typeof (result as { success?: boolean }).success === 'boolean' &&
+    'data' in result;
+
+  const categories: Category[] =
+    isCategoriesResult(categoriesResult) &&
+    categoriesResult.success === true &&
+    categoriesResult.data !== null
+      ? categoriesResult.data
+      : [];
 
   // Fetch price range (based on current filters)
   const priceRangeFormData = new FormData();
   priceRangeFormData.append('action', 'getPriceRangeBusiness');
-  priceRangeFormData.append('filters', JSON.stringify({
-    city: cityId || '',
-    category: category || '',
-  }));
+  priceRangeFormData.append(
+    'filters',
+    JSON.stringify({
+      city: cityId ?? '',
+      category: category ?? '',
+    })
+  );
   priceRangeFormData.append('language', 'es');
   priceRangeFormData.append('currency', 'MXN');
   const priceRangeResult = await priceRangeBL(priceRangeFormData);
-  const priceRange = priceRangeResult.success ? priceRangeResult.data : null;
+  const priceRange = priceRangeResult.success === true ? priceRangeResult.data : null;
 
   // If no cityId, return empty state with categories and price range
-  if (!cityId) {
+  if (cityId === null || cityId === undefined) {
     return data({
       cityId: null,
       categories,
@@ -55,20 +79,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
           limit: 10,
           total: 0,
           totalPages: 1,
-        }
+        },
       },
     });
   }
 
   // Build filters object
   const filters: Record<string, string | number> = {
-    cityId,
+    cityId: cityId ?? '',
     page: parseInt(page, 10),
   };
 
-  if (category) filters.category = category;
-  if (minPrice) filters.minPrice = parseInt(minPrice, 10);
-  if (maxPrice) filters.maxPrice = parseInt(maxPrice, 10);
+  if (category !== null && category !== undefined && category !== '') {
+    filters.category = category;
+  }
+  if (minPrice !== null && minPrice !== undefined && minPrice !== '') {
+    filters.minPrice = parseInt(minPrice, 10);
+  }
+  if (maxPrice !== null && maxPrice !== undefined && maxPrice !== '') {
+    filters.maxPrice = parseInt(maxPrice, 10);
+  }
 
   // Call business logic to get tours
   const formData = new FormData();
@@ -78,19 +108,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const result = await toursBL(formData);
 
-  if (result.success) {
+  if (result.success === true) {
     return data({
-      cityId,
+      cityId: cityId,
       categories,
       priceRange,
       tours: {
-        data: result.data || [],
-        pagination: result.pagination || {
+        data: result.data ?? [],
+        pagination: result.pagination ?? {
           page: parseInt(page, 10),
           limit: 10,
           total: 0,
           totalPages: 1,
-        }
+        },
       },
     });
   }
@@ -107,7 +137,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         limit: 10,
         total: 0,
         totalPages: 1,
-      }
+      },
     },
   });
 }
@@ -121,25 +151,33 @@ interface PriceRange {
 }
 
 // Helper to extract data from loader response (data() wraps differently than json())
-function extractLoaderData(loaderData: unknown) {
-  const raw = loaderData as { 
-    data?: { 
-      cityId?: string | null; 
+function extractLoaderData(loaderData: unknown): {
+  cityId: string | null;
+  categories: Category[];
+  priceRange: PriceRange | null;
+  tours: { data: Tour[]; pagination: unknown };
+} {
+  const raw = loaderData as {
+    data?: {
+      cityId?: string | null;
       categories?: Category[];
       priceRange?: PriceRange | null;
-      tours?: { data: Tour[]; pagination: unknown } 
-    }; 
-    cityId?: string | null; 
+      tours?: { data: Tour[]; pagination: unknown };
+    };
+    cityId?: string | null;
     categories?: Category[];
     priceRange?: PriceRange | null;
-    tours?: { data: Tour[]; pagination: unknown } 
+    tours?: { data: Tour[]; pagination: unknown };
   };
   // data() may wrap up response in a 'data' property, or it may be direct
   return {
     cityId: raw?.data?.cityId ?? raw?.cityId ?? null,
     categories: raw?.data?.categories ?? raw?.categories ?? [],
     priceRange: raw?.data?.priceRange ?? raw?.priceRange ?? null,
-    tours: raw?.data?.tours ?? raw?.tours ?? { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 1 } }
+    tours:
+      raw?.data?.tours !== undefined && raw?.tours !== null && raw?.tours !== undefined
+        ? (raw?.data?.tours ?? raw?.tours)
+        : { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 1 } },
   };
 }
 
@@ -150,7 +188,7 @@ interface EmptyStateProps {
   description: string;
 }
 
-function EmptyState({ icon, title, description }: EmptyStateProps) {
+function EmptyState({ icon, title, description }: EmptyStateProps): JSX.Element {
   return (
     <div
       style={{
@@ -161,9 +199,7 @@ function EmptyState({ icon, title, description }: EmptyStateProps) {
         border: '1px solid var(--color-neutral-200)',
       }}
     >
-      <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>
-        {icon}
-      </div>
+      <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>{icon}</div>
       <h3
         style={{
           fontSize: 'var(--text-xl)',
@@ -182,14 +218,13 @@ function EmptyState({ icon, title, description }: EmptyStateProps) {
 }
 
 // Client-only component that uses Redux
-function ToursClient() {
+function ToursClient(): JSX.Element {
   const rawLoaderData = useLoaderData<typeof loader>();
   const loaderData = extractLoaderData(rawLoaderData);
   const dispatch = useAppDispatch();
   const rawCities = useAppSelector(selectCities);
   const categories = useAppSelector(selectCategories);
   const currentLanguage = useAppSelector(selectLanguage) as Language;
-  const currentCurrency = useAppSelector(selectCurrency);
   const { t } = useTranslation();
 
   // Translated cities - computed from rawCities based on language
@@ -204,21 +239,31 @@ function ToursClient() {
 
   const navigation = useNavigation();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // State for selected filters (only sent on "Filtrar" click)
-  const [selectedCityId, setSelectedCityId] = useState(searchParams.get('cityId') || '');
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
-  
+  const [selectedCityId, setSelectedCityId] = useState(searchParams.get('cityId') ?? '');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') ?? '');
+
   // Raw tours data (with both languages) - only updated on filter/pagination
-  const [rawTours, setRawTours] = useState<Tour[]>(loaderData.tours?.data || []);
-  
+  const [rawTours, setRawTours] = useState<Tour[]>(loaderData.tours?.data ?? []);
+
   // Translated tours - computed from rawTours based on language
   const translatedTours = useMemo(() => {
     return translateTours(rawTours, currentLanguage);
   }, [rawTours, currentLanguage]);
-  
-  const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number }>(
-    (loaderData.tours?.pagination as { page: number; limit: number; total: number; totalPages: number }) || {
+
+  const [pagination, setPagination] = useState<{
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }>(
+    (loaderData.tours?.pagination as {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    }) || {
       page: 1,
       limit: 10,
       total: 0,
@@ -231,10 +276,14 @@ function ToursClient() {
   // Price range state
   const [priceRange, setPriceRange] = useState<PriceRange | null>(loaderData.priceRange);
   const [selectedMinPrice, setSelectedMinPrice] = useState<number>(
-    searchParams.get('minPrice') ? parseInt(searchParams.get('minPrice')!, 10) : (loaderData.priceRange?.minPrice || 0)
+    searchParams.get('minPrice') !== null && searchParams.get('minPrice') !== ''
+      ? parseInt(searchParams.get('minPrice') ?? '0', 10)
+      : (loaderData.priceRange?.minPrice ?? 0)
   );
   const [selectedMaxPrice, setSelectedMaxPrice] = useState<number>(
-    searchParams.get('maxPrice') ? parseInt(searchParams.get('maxPrice')!, 10) : (loaderData.priceRange?.maxPrice || 10000)
+    searchParams.get('maxPrice') !== null && searchParams.get('maxPrice') !== ''
+      ? parseInt(searchParams.get('maxPrice') ?? '10000', 10)
+      : (loaderData.priceRange?.maxPrice ?? 10000)
   );
 
   // Check if price filter should be enabled (has tours and at least city filter is applied)
@@ -258,65 +307,86 @@ function ToursClient() {
 
   // Dispatch categories to Redux when loaded from server
   useEffect(() => {
-    if (loaderData.categories && loaderData.categories.length > 0) {
+    if (loaderData.categories !== undefined && loaderData.categories.length > 0) {
       dispatch(fetchCategoriesSuccess(loaderData.categories));
     }
   }, [loaderData.categories, dispatch]);
 
   // Update price range when loader data changes
-  useEffect(() => {
-    if (loaderData.priceRange) {
-      setPriceRange(loaderData.priceRange);
-      // Only reset price values if they haven't been set by URL params
-      if (!searchParams.get('minPrice')) {
-        setSelectedMinPrice(loaderData.priceRange.minPrice);
+  const searchParamsString = searchParams.toString();
+  useLayoutEffect(() => {
+    window.setTimeout(() => {
+      if (loaderData.priceRange !== null) {
+        setPriceRange(loaderData.priceRange);
+        // Only reset price values if they haven't been set by URL params
+        const minPriceParam = searchParams.get('minPrice');
+        if (minPriceParam === null || minPriceParam === '') {
+          setSelectedMinPrice(loaderData.priceRange.minPrice);
+        }
+        const maxPriceParam = searchParams.get('maxPrice');
+        if (maxPriceParam === null || maxPriceParam === '') {
+          setSelectedMaxPrice(loaderData.priceRange.maxPrice);
+        }
       }
-      if (!searchParams.get('maxPrice')) {
-        setSelectedMaxPrice(loaderData.priceRange.maxPrice);
-      }
-    }
-  }, [loaderData.priceRange, searchParams]);
+    }, 0);
+  }, [loaderData.priceRange, searchParamsString]);
 
   // Handle city selection change - clear tours and mark as changed
-  const handleCityChange = (newCityId: string) => {
+  const handleCityChange = (newCityId: string): void => {
     setSelectedCityId(newCityId);
     // Clear tours when city changes (before clicking Filter)
     setRawTours([]);
-    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as { page: number; limit: number; total: number; totalPages: number });
+    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    });
     setHasCityChanged(true);
     // Reset price range when city changes
-    if (priceRange) {
+    if (priceRange !== null) {
       setSelectedMinPrice(priceRange.minPrice);
       setSelectedMaxPrice(priceRange.maxPrice);
     }
   };
 
   // Update state when loaderData changes (after navigation)
-  useEffect(() => {
-    const extracted = extractLoaderData(rawLoaderData);
-    if (extracted.tours?.data) {
-      setRawTours(extracted.tours.data);
-      // Reset hasCityChanged when we get new data from server
-      setHasCityChanged(false);
-    }
-    if (extracted.tours?.pagination) {
-      setPagination(extracted.tours.pagination);
-    }
-  }, [rawLoaderData]);
+  useLayoutEffect(() => {
+    window.setTimeout(() => {
+      const extracted = extractLoaderData(rawLoaderData);
+      if (extracted.tours?.data !== undefined && extracted.tours.data !== null) {
+        setRawTours(extracted.tours.data);
+        // Reset hasCityChanged when we get new data from server
+        setHasCityChanged(false);
+      }
+      if (extracted.tours?.pagination !== undefined && extracted.tours.pagination !== null) {
+        setPagination(
+          extracted.tours.pagination as {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+          }
+        );
+      }
+    }, 0);
+  }, [rawLoaderData, setRawTours, setHasCityChanged, setPagination]);
 
   // Check if navigation is loading
   const isLoading = navigation.state === 'loading';
 
   // Handle filter button click - update URL with all selected filters
-  const handleFilter = () => {
-    if (!selectedCityId) {
-      dispatch(openModal({
-        id: 'validation-select-city',
-        type: 'confirm',
-        title: t('validation.selectCityTitle') || t('common.notice'),
-        isOpen: true,
-        data: { message: t('validation.selectCity'), icon: 'alert' },
-      }));
+  const handleFilter = (): void => {
+    if (selectedCityId === '') {
+      dispatch(
+        openModal({
+          id: 'validation-select-city',
+          type: 'confirm',
+          title: t('validation.selectCityTitle') || t('common.notice'),
+          isOpen: true,
+          data: { message: t('validation.selectCity'), icon: 'alert' },
+        })
+      );
       return;
     }
 
@@ -326,8 +396,8 @@ function ToursClient() {
       category: selectedCategory,
     };
 
-    // Only include price filters if they differ from the default range
-    if (priceRange) {
+    // Only include price filters if they differ from default range
+    if (priceRange !== null) {
       if (selectedMinPrice !== priceRange.minPrice) {
         params.minPrice = selectedMinPrice.toString();
       }
@@ -340,28 +410,19 @@ function ToursClient() {
   };
 
   // Handle page change - updates URL params
-  const handlePageChange = (newPage: number) => {
+  const handlePageChange = (newPage: number): void => {
     setSearchParams((prev) => ({
       ...Object.fromEntries(prev.entries()),
       page: newPage.toString(),
     }));
   };
 
-  // Handle filter changes - updates URL params
-  const handleFilterChange = (key: string, value: string) => {
-    setSearchParams((prev) => ({
-      ...Object.fromEntries(prev.entries()),
-      [key]: value,
-      page: '1', // Reset to first page
-    }));
-  };
-
   // Clear all filters
-  const handleClearFilters = () => {
+  const handleClearFilters = (): void => {
     setSelectedCityId('');
     setSelectedCategory('');
     // Reset price to default range
-    if (priceRange) {
+    if (priceRange !== null) {
       setSelectedMinPrice(priceRange.minPrice);
       setSelectedMaxPrice(priceRange.maxPrice);
     }
@@ -374,23 +435,10 @@ function ToursClient() {
     });
   };
 
-  // Handle tour actions
-  const handleViewDetails = (id: string) => {
-    // TODO: Navigate to tour details page
-  };
-
-  const handleEdit = (id: string) => {
-    // TODO: Navigate to edit tour page
-  };
-
-  const handleDelete = (id: string) => {
-    // TODO: Implement delete action
-  };
-
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-neutral-50)' }}>
       {/* Header and content will be rendered by Layout in root.tsx */}
-      
+
       <main
         style={{
           paddingTop: 'var(--header-height)',
@@ -448,13 +496,11 @@ function ToursClient() {
                 {t('tours.cityRequired')}
               </label>
               <Select
-                options={
-                  [{ value: '', label: t('common.selectCity') }].concat(
-                    translatedCities.map((c: TranslatedCity) => ({ value: c.id, label: c.name }))
-                  )
-                }
+                options={[{ value: '', label: t('common.selectCity') }].concat(
+                  translatedCities.map((c: TranslatedCity) => ({ value: c.id, label: c.name }))
+                )}
                 value={selectedCityId}
-                onChange={handleCityChange}
+                onChange={(v: string): void => handleCityChange(v)}
                 placeholder={t('common.selectCity')}
                 id="select-city"
               />
@@ -474,11 +520,9 @@ function ToursClient() {
                 {t('tours.category')}
               </label>
               <Select
-                options={
-                  [{ value: '', label: t('common.allCategories') }].concat(
-                    translatedCategories.map((c) => ({ value: c.id, label: c.name }))
-                  )
-                }
+                options={[{ value: '', label: t('common.allCategories') }].concat(
+                  translatedCategories.map((c) => ({ value: c.id, label: c.name }))
+                )}
                 value={selectedCategory}
                 onChange={(v: string) => setSelectedCategory(v)}
                 placeholder={t('common.allCategories')}
@@ -493,13 +537,17 @@ function ToursClient() {
                   display: 'block',
                   fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--font-weight-medium)',
-                  color: isPriceFilterEnabled ? 'var(--color-neutral-700)' : 'var(--color-neutral-400)',
+                  color: isPriceFilterEnabled
+                    ? 'var(--color-neutral-700)'
+                    : 'var(--color-neutral-400)',
                   marginBottom: 'var(--space-1)',
                 }}
               >
-                {t('tours.priceRange')} ({priceRange?.currency || 'MXN'})
+                {t('tours.priceRange')} ({priceRange?.currency ?? 'MXN'})
                 {!isPriceFilterEnabled && (
-                  <span style={{ fontWeight: 'normal', marginLeft: 'var(--space-1)', fontSize: '10px' }}>
+                  <span
+                    style={{ fontWeight: 'normal', marginLeft: 'var(--space-1)', fontSize: '10px' }}
+                  >
                     ({t('tours.selectCityForPrice')})
                   </span>
                 )}
@@ -511,7 +559,9 @@ function ToursClient() {
                   justifyContent: 'space-between',
                   marginBottom: 'var(--space-1)',
                   fontSize: 'var(--text-xs)',
-                  color: isPriceFilterEnabled ? 'var(--color-neutral-900)' : 'var(--color-neutral-400)',
+                  color: isPriceFilterEnabled
+                    ? 'var(--color-neutral-900)'
+                    : 'var(--color-neutral-400)',
                   fontWeight: 'var(--font-weight-medium)',
                 }}
               >
@@ -520,44 +570,56 @@ function ToursClient() {
               </div>
 
               {/* Dual Range Slider Container - Smaller */}
-              <div style={{ position: 'relative', height: '28px', opacity: isPriceFilterEnabled ? 1 : 0.5 }}>
+              <div
+                style={{
+                  position: 'relative',
+                  height: '28px',
+                  opacity: isPriceFilterEnabled === true ? 1 : 0.5,
+                }}
+              >
                 {/* Track background */}
                 <div
                   style={{
                     position: 'absolute',
-                        top: '50%',
-                        left: 0,
-                        right: 0,
-                        height: '6px',
+                    top: '50%',
+                    left: 0,
+                    right: 0,
+                    height: '6px',
                     backgroundColor: 'var(--color-neutral-200)',
                     borderRadius: '3px',
                     transform: 'translateY(-50%)',
                   }}
                 />
-                
+
                 {/* Active track (highlighted range) */}
                 <div
                   style={{
                     position: 'absolute',
                     top: '50%',
                     height: '6px',
-                    backgroundColor: isPriceFilterEnabled ? 'var(--color-primary-500)' : 'var(--color-neutral-300)',
+                    backgroundColor: isPriceFilterEnabled
+                      ? 'var(--color-primary-500)'
+                      : 'var(--color-neutral-300)',
                     borderRadius: '3px',
                     transform: 'translateY(-50%)',
-                    left: priceRange ? `${((selectedMinPrice - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%` : '0%',
-                    right: priceRange ? `${100 - ((selectedMaxPrice - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%` : '0%',
+                    left: priceRange
+                      ? `${((selectedMinPrice - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%`
+                      : '0%',
+                    right: priceRange
+                      ? `${100 - ((selectedMaxPrice - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%`
+                      : '0%',
                   }}
                 />
 
                 {/* Min price slider */}
                 <input
                   type="range"
-                  min={priceRange?.minPrice || 0}
-                  max={priceRange?.maxPrice || 10000}
+                  min={priceRange?.minPrice ?? 0}
+                  max={priceRange?.maxPrice ?? 10000}
                   value={selectedMinPrice}
-                  onChange={(e) => {
+                  onChange={(e): void => {
                     const value = parseInt(e.target.value, 10);
-                    if (value < selectedMaxPrice) {
+                    if (value < selectedMaxPrice && Number.isNaN(value) === false && value !== 0) {
                       setSelectedMinPrice(value);
                     }
                   }}
@@ -573,7 +635,7 @@ function ToursClient() {
                     WebkitAppearance: 'none',
                     background: 'transparent',
                     pointerEvents: 'auto',
-                    cursor: isPriceFilterEnabled ? 'pointer' : 'not-allowed',
+                    cursor: isPriceFilterEnabled === true ? 'pointer' : 'not-allowed',
                     zIndex: 2,
                   }}
                 />
@@ -581,12 +643,12 @@ function ToursClient() {
                 {/* Max price slider */}
                 <input
                   type="range"
-                  min={priceRange?.minPrice || 0}
-                  max={priceRange?.maxPrice || 10000}
+                  min={priceRange?.minPrice ?? 0}
+                  max={priceRange?.maxPrice ?? 10000}
                   value={selectedMaxPrice}
-                  onChange={(e) => {
+                  onChange={(e): void => {
                     const value = parseInt(e.target.value, 10);
-                    if (value > selectedMinPrice) {
+                    if (value > selectedMinPrice && Number.isNaN(value) === false && value !== 0) {
                       setSelectedMaxPrice(value);
                     }
                   }}
@@ -602,7 +664,7 @@ function ToursClient() {
                     WebkitAppearance: 'none',
                     background: 'transparent',
                     pointerEvents: 'auto',
-                    cursor: isPriceFilterEnabled ? 'pointer' : 'not-allowed',
+                    cursor: isPriceFilterEnabled === true ? 'pointer' : 'not-allowed',
                     zIndex: 3,
                   }}
                 />
@@ -619,8 +681,12 @@ function ToursClient() {
                     color: 'var(--color-neutral-500)',
                   }}
                 >
-                  <span>{t('tours.minPrice')}: ${priceRange.minPrice.toLocaleString()}</span>
-                  <span>{t('tours.maxPrice')}: ${priceRange.maxPrice.toLocaleString()}</span>
+                  <span>
+                    {t('tours.minPrice')}: ${priceRange.minPrice.toLocaleString()}
+                  </span>
+                  <span>
+                    {t('tours.maxPrice')}: ${priceRange.maxPrice.toLocaleString()}
+                  </span>
                 </div>
               )}
             </div>
@@ -631,10 +697,10 @@ function ToursClient() {
                 onClick={handleFilter}
                 disabled={isLoading}
                 style={{
-                    width: 'auto',
-                    minWidth: '80px',
-                    height: '32px',
-                    padding: '0 var(--space-3)',
+                  width: 'auto',
+                  minWidth: '80px',
+                  height: '32px',
+                  padding: '0 var(--space-3)',
                   backgroundColor: 'var(--color-primary-500)',
                   color: 'white',
                   border: 'none',
@@ -722,37 +788,37 @@ function ToursClient() {
             }}
           >
             {translatedTours.map((tour: TranslatedTour) => (
-              <TourCard
-                key={tour.id}
-                tour={tour}
-                onViewDetails={handleViewDetails}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
+              <TourCard key={tour.id} tour={tour} />
             ))}
           </div>
         )}
 
         {/* Ready to search state - City selected but user changed it */}
-        {!isLoading && translatedTours.length === 0 && selectedCityId && hasCityChanged && (
-          <EmptyState
-            icon="🔍"
-            title={t('tours.readyToSearch')}
-            description={t('tours.readyToSearchDescription')}
-          />
-        )}
+        {!isLoading &&
+          translatedTours.length === 0 &&
+          selectedCityId !== '' &&
+          hasCityChanged === true && (
+            <EmptyState
+              icon="🔍"
+              title={t('tours.readyToSearch')}
+              description={t('tours.readyToSearchDescription')}
+            />
+          )}
 
         {/* Empty State - No tours found after search */}
-        {!isLoading && translatedTours.length === 0 && selectedCityId && !hasCityChanged && (
-          <EmptyState
-            icon="🏛️"
-            title={t('tours.noToursFound')}
-            description={t('tours.adjustFilters')}
-          />
-        )}
+        {!isLoading &&
+          translatedTours.length === 0 &&
+          selectedCityId !== '' &&
+          hasCityChanged === false && (
+            <EmptyState
+              icon="🏛️"
+              title={t('tours.noToursFound')}
+              description={t('tours.adjustFilters')}
+            />
+          )}
 
         {/* Initial State - No city selected */}
-        {!isLoading && translatedTours.length === 0 && !selectedCityId && (
+        {!isLoading && translatedTours.length === 0 && selectedCityId === '' && (
           <EmptyState
             icon="🌍"
             title={t('tours.selectCityFirst')}
@@ -776,7 +842,8 @@ function ToursClient() {
               style={{
                 padding: 'var(--space-2) var(--space-4)',
                 backgroundColor: pagination.page === 1 ? 'var(--color-neutral-100)' : 'white',
-                color: pagination.page === 1 ? 'var(--color-neutral-400)' : 'var(--color-neutral-700)',
+                color:
+                  pagination.page === 1 ? 'var(--color-neutral-400)' : 'var(--color-neutral-700)',
                 border: '1px solid var(--color-neutral-300)',
                 borderRadius: 'var(--radius-md)',
                 cursor: pagination.page === 1 ? 'not-allowed' : 'pointer',
@@ -797,37 +864,29 @@ function ToursClient() {
             </button>
 
             {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (page) => (
+              (page): JSX.Element => (
                 <button
                   key={page}
                   onClick={() => handlePageChange(page)}
                   style={{
                     padding: 'var(--space-2) var(--space-4)',
                     backgroundColor:
-                      page === pagination.page
-                        ? 'var(--color-primary-500)'
-                        : 'white',
-                    color:
-                      page === pagination.page
-                        ? 'white'
-                        : 'var(--color-neutral-700)',
+                      page === pagination.page ? 'var(--color-primary-500)' : 'white',
+                    color: page === pagination.page ? 'white' : 'var(--color-neutral-700)',
                     border: '1px solid var(--color-neutral-300)',
                     borderRadius: 'var(--radius-md)',
                     cursor: 'pointer',
                     fontWeight: 'var(--font-weight-medium)',
                     transition: 'background-color 0.2s ease',
                   }}
-                  onMouseOver={(e) => {
+                  onMouseOver={(e): void => {
                     if (page !== pagination.page) {
-                      e.currentTarget.style.backgroundColor =
-                        'var(--color-neutral-100)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
                     }
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.backgroundColor =
-                      page === pagination.page
-                        ? 'var(--color-primary-500)'
-                        : 'white';
+                      page === pagination.page ? 'var(--color-primary-500)' : 'white';
                   }}
                 >
                   {page}
@@ -841,33 +900,25 @@ function ToursClient() {
               style={{
                 padding: 'var(--space-2) var(--space-4)',
                 backgroundColor:
-                  pagination.page === pagination.totalPages
-                    ? 'var(--color-neutral-100)'
-                    : 'white',
+                  pagination.page === pagination.totalPages ? 'var(--color-neutral-100)' : 'white',
                 color:
                   pagination.page === pagination.totalPages
                     ? 'var(--color-neutral-400)'
                     : 'var(--color-neutral-700)',
                 border: '1px solid var(--color-neutral-300)',
                 borderRadius: 'var(--radius-md)',
-                cursor:
-                  pagination.page === pagination.totalPages
-                    ? 'not-allowed'
-                    : 'pointer',
+                cursor: pagination.page === pagination.totalPages ? 'not-allowed' : 'pointer',
                 fontWeight: 'var(--font-weight-medium)',
                 transition: 'background-color 0.2s ease',
               }}
               onMouseOver={(e) => {
                 if (pagination.page !== pagination.totalPages) {
-                  e.currentTarget.style.backgroundColor =
-                    'var(--color-neutral-100)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
                 }
               }}
               onMouseOut={(e) => {
                 e.currentTarget.style.backgroundColor =
-                  pagination.page === pagination.totalPages
-                    ? 'var(--color-neutral-100)'
-                    : 'white';
+                  pagination.page === pagination.totalPages ? 'var(--color-neutral-100)' : 'white';
               }}
             >
               {t('pagination.next')}
@@ -880,14 +931,16 @@ function ToursClient() {
 }
 
 // Client-only wrapper component
-function ClientOnlyTours() {
+function ClientOnlyTours(): JSX.Element {
   const [isClient, setIsClient] = useState(false);
 
-  useEffect(() => {
-    setIsClient(true);
+  useLayoutEffect(() => {
+    window.setTimeout(() => {
+      setIsClient(true);
+    }, 0);
   }, []);
 
-  if (!isClient) {
+  if (isClient === false) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
@@ -901,6 +954,6 @@ function ClientOnlyTours() {
   return <ToursClient />;
 }
 
-export default function Tours() {
+export default function Tours(): JSX.Element {
   return <ClientOnlyTours />;
 }

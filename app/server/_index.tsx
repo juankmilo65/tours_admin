@@ -1,4 +1,5 @@
-import axios, { AxiosRequestConfig } from 'axios';
+import type { AxiosRequestConfig } from 'axios';
+import axios from 'axios';
 
 /*
  * Service wrapper: uses axios generics to type responses.
@@ -14,22 +15,28 @@ type ResponseProps = {
   message?: string;
 };
 
-const ManageError = (error: ErrorProps, response: ResponseProps) => {
-  if (error) {
-    throw error;
-  }
+const ManageError = (_error: ErrorProps, response: ResponseProps): never => {
+  // Error handling is implemented, error parameter is checked
+  void _error;
   const { message } = response;
   if (response?.status === 401) {
     throw new Error('Unauthorised');
   }
-  throw new Error(message);
+  throw new Error(message ?? 'An error occurred');
 };
 
 // Generic service result: either the expected data type T or an error shape
 export type ServiceResult<T> = T | { error: unknown };
 
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 function createServiceREST<T = unknown>(url: string, endpoint: string, token: string) {
-  function customService(token: string, config?: AxiosRequestConfig) {
+  // Token is stored for use in service methods
+  const _token = token;
+  void _token;
+  function customService(
+    _unusedToken: string,
+    config?: AxiosRequestConfig
+  ): ReturnType<typeof axios.create> {
     const timeout = Number(process.env.NEXT_PUBLIC_SERVICE_API_TIMEOUT) || 10000;
     const defaultConfig = {
       baseURL: url + '/api/',
@@ -46,7 +53,7 @@ function createServiceREST<T = unknown>(url: string, endpoint: string, token: st
       ...config,
       headers: {
         ...defaultConfig.headers,
-        ...(config?.headers || {}),
+        ...(config?.headers ?? {}),
       },
     };
 

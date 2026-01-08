@@ -2,6 +2,7 @@
  * Offers Route - Offers and Promotions Management
  */
 
+import type { JSX } from 'react';
 import { useState } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
@@ -68,7 +69,7 @@ const mockOffers: readonly Offer[] = [
   },
 ];
 
-export default function Offers() {
+export default function Offers(): JSX.Element {
   const columns: Column<Offer>[] = [
     { key: 'name', label: 'Offer Name' },
     {
@@ -78,16 +79,21 @@ export default function Offers() {
         const typeLabels: Record<string, string> = {
           percentage: 'Percentage',
           fixed: 'Fixed',
-          'buy_x_get_y': 'Buy X Get Y',
+          buy_x_get_y: 'Buy X Get Y',
         };
-        return typeLabels[value] || value;
+        return typeLabels[value] ?? value;
       },
     },
     {
       key: 'discountValue',
       label: 'Discount',
       render: (value: number, row: Offer) => {
-        if (row.type === 'percentage') {
+        if (
+          row.type === 'percentage' &&
+          value !== undefined &&
+          value !== null &&
+          Number.isNaN(value) === false
+        ) {
           return `${value}%`;
         }
         return `$${value}`;
@@ -117,61 +123,67 @@ export default function Offers() {
 
   return (
     <div className="space-y-6">
-      <Card
-        title="All Offers"
-        actions={<Button variant="primary">Create New Offer</Button>}
-      >
-            <div className="mb-4 flex gap-4">
-              <input
-                type="search"
-                placeholder="Search offers..."
-                className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Select
-                options={[
-                  { value: '', label: 'All Types' },
-                  { value: 'percentage', label: 'Percentage' },
-                  { value: 'fixed', label: 'Fixed' },
-                  { value: 'buy_x_get_y', label: 'Buy X Get Y' },
-                ]}
-                value={typeFilter}
-                onChange={setTypeFilter}
-                placeholder="All Types"
-                className="select-compact"
-              />
-              <Select
-                options={[{ value: '', label: 'All Plans' }, { value: 'Basic', label: 'Basic' }, { value: 'Premium', label: 'Premium' }, { value: 'Top', label: 'Top' }]}
-                value={planFilter}
-                onChange={setPlanFilter}
-                placeholder="All Plans"
-                className="select-compact"
-              />
-            </div>
-
-            <Table data={mockOffers} columns={columns} />
-          </Card>
-
-          <Card title="Offers Statistics">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <StatCard title="Total Offers" value="24" />
-              <StatCard title="Active Offers" value="18" />
-              <StatCard title="Inactive Offers" value="6" />
-              <StatCard title="Expired This Month" value="3" />
-            </div>
-          </Card>
-
-          <Card title="Subscription Plans Overview">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <PlanCard title="Basic" tours="50" price="$49/month" />
-              <PlanCard title="Premium" tours="150" price="$99/month" />
-              <PlanCard title="Top" tours="Unlimited" price="$199/month" />
-            </div>
-          </Card>
+      <Card title="All Offers" actions={<Button variant="primary">Create New Offer</Button>}>
+        <div className="mb-4 flex gap-4">
+          <input
+            type="search"
+            placeholder="Search offers..."
+            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <Select
+            options={[
+              { value: '', label: 'All Types' },
+              { value: 'percentage', label: 'Percentage' },
+              { value: 'fixed', label: 'Fixed' },
+              { value: 'buy_x_get_y', label: 'Buy X Get Y' },
+            ]}
+            value={typeFilter}
+            onChange={(v: string) => {
+              setTypeFilter(v);
+            }}
+            placeholder="All Types"
+            className="select-compact"
+          />
+          <Select
+            options={[
+              { value: '', label: 'All Plans' },
+              { value: 'Basic', label: 'Basic' },
+              { value: 'Premium', label: 'Premium' },
+              { value: 'Top', label: 'Top' },
+            ]}
+            value={planFilter}
+            onChange={(v: string) => {
+              setPlanFilter(v);
+            }}
+            placeholder="All Plans"
+            className="select-compact"
+          />
         </div>
+
+        <Table data={mockOffers} columns={columns} />
+      </Card>
+
+      <Card title="Offers Statistics">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <StatCard title="Total Offers" value="24" />
+          <StatCard title="Active Offers" value="18" />
+          <StatCard title="Inactive Offers" value="6" />
+          <StatCard title="Expired This Month" value="3" />
+        </div>
+      </Card>
+
+      <Card title="Subscription Plans Overview">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <PlanCard title="Basic" tours="50" price="$49/month" />
+          <PlanCard title="Premium" tours="150" price="$99/month" />
+          <PlanCard title="Top" tours="Unlimited" price="$199/month" />
+        </div>
+      </Card>
+    </div>
   );
 }
 
-function StatCard({ title, value }: { title: string; value: string | number }) {
+function StatCard({ title, value }: { title: string; value: string | number }): JSX.Element {
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
       <p className="text-sm text-gray-500">{title}</p>
@@ -180,7 +192,15 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
   );
 }
 
-function PlanCard({ title, tours, price }: { title: string; tours: string; price: string }) {
+function PlanCard({
+  title,
+  tours,
+  price,
+}: {
+  title: string;
+  tours: string;
+  price: string;
+}): JSX.Element {
   return (
     <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg">
       <h3 className="text-xl font-bold mb-2">{title} Plan</h3>

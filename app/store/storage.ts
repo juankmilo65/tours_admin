@@ -11,9 +11,11 @@ const createNoopStorage = () => {
     getItem(_key: string) {
       return Promise.resolve(null);
     },
-    setItem(_key: string, value: any) {
+
+    setItem(_key: string, value: unknown) {
       return Promise.resolve(value);
     },
+
     removeItem(_key: string) {
       return Promise.resolve();
     },
@@ -21,9 +23,6 @@ const createNoopStorage = () => {
 };
 
 // Use localStorage if available (browser), otherwise use noop storage (SSR)
-const storage =
-  typeof window !== 'undefined'
-    ? createWebStorage('local')
-    : createNoopStorage();
+const storage = typeof window !== 'undefined' ? createWebStorage('local') : createNoopStorage();
 
 export default storage;

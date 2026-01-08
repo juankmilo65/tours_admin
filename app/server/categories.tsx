@@ -1,20 +1,20 @@
 import { createServiceREST } from './_index';
 
-const BASE_URL = process.env.BACKEND_URL || '';
+const BASE_URL = process.env.BACKEND_URL ?? '';
 
 /**
  * Get all categories from backend API
  */
-export const getCategories = async (language: string = 'es', isActive?: boolean) => {
+export const getCategories = async (language = 'es', isActive?: boolean): Promise<unknown> => {
   try {
     const params = isActive !== undefined ? `?isActive=${isActive}` : '';
     const categoriesEndpoint = `categories${params}`;
     const categoriesService = createServiceREST(BASE_URL, categoriesEndpoint, 'Bearer');
-    
+
     const result = await categoriesService.get({
       headers: {
-        'X-Language': language
-      }
+        'X-Language': language,
+      },
     });
 
     return result;
@@ -27,15 +27,15 @@ export const getCategories = async (language: string = 'es', isActive?: boolean)
 /**
  * Get category by ID from backend API
  */
-export const getCategoryById = async (id: string, language: string = 'es') => {
+export const getCategoryById = async (id: string, language = 'es'): Promise<unknown> => {
   try {
     const categoryEndpoint = `categories/${id}`;
     const categoryService = createServiceREST(BASE_URL, categoryEndpoint, 'Bearer');
-    
+
     const result = await categoryService.get({
       headers: {
-        'X-Language': language
-      }
+        'X-Language': language,
+      },
     });
 
     return result;

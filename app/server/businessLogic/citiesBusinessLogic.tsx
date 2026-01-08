@@ -1,6 +1,6 @@
 import { getCities, getCitiesByCountryId } from '../cities';
 import { getCountries } from '../countries';
-import { ServiceResult } from '../_index';
+import type { ServiceResult } from '../_index';
 
 interface CitiesPayload {
   token?: string;
@@ -14,16 +14,17 @@ interface CitiesPayload {
 /**
  * Generate payload from FormData
  */
-const generatePayload = (formData: FormData, token: string = ''): CitiesPayload => {
+const generatePayload = (formData: FormData, token = ''): CitiesPayload => {
   const action = formData.get('action');
   const filters = formData.get('filters');
   const language = formData.get('language');
 
   return {
     token,
-    action: action ? action.toString() : '',
-    language: language ? language.toString() : 'es',
-    filters: filters ? JSON.parse(filters.toString()) : '',
+    action: action !== null ? action.toString() : '',
+    language: language !== null ? language.toString() : 'es',
+    filters:
+      filters !== null ? (JSON.parse(filters.toString()) as { countryId: string }) : undefined,
   };
 };
 
@@ -32,7 +33,7 @@ const generatePayload = (formData: FormData, token: string = ''): CitiesPayload 
  */
 const getCountriesBusiness = async (data: CitiesPayload): Promise<ServiceResult<unknown>> => {
   try {
-    const result = await getCountries(data.language || 'es');
+    const result = await getCountries(data.language ?? 'es');
     return result;
   } catch (error) {
     console.error('Error in getCountriesBusiness:', error);
@@ -57,11 +58,13 @@ const getCitiesBusiness = async (data: CitiesPayload): Promise<ServiceResult<unk
 /**
  * Business logic for getting cities by countryId
  */
-const getCitiesByCountryIdBusiness = async (data: CitiesPayload): Promise<ServiceResult<unknown>> => {
+const getCitiesByCountryIdBusiness = async (
+  data: CitiesPayload
+): Promise<ServiceResult<unknown>> => {
   try {
     const { filters, language } = data;
-    const { countryId } = filters || {};
-    if (!countryId) {
+    const { countryId } = filters ?? {};
+    if (countryId === undefined || countryId === '') {
       return { error: 'Country ID is required' };
     }
     const result = await getCitiesByCountryId(countryId, language);
@@ -76,33 +79,33 @@ const getCitiesByCountryIdBusiness = async (data: CitiesPayload): Promise<Servic
 /**
  * Main business logic router
  */
-const citiesBusinessLogic = async (
+const citiesBusinessLogic = (
   action: string,
   data: CitiesPayload
 ): Promise<ServiceResult<unknown>> => {
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
-    getCountriesBusiness: async () => await getCountriesBusiness(data),
-    getCitiesBusiness: async () => await getCitiesBusiness(data),
-    getCitiesByCountryIdBusiness: async () => await getCitiesByCountryIdBusiness(data)
+    getCountriesBusiness: () => getCountriesBusiness(data),
+    getCitiesBusiness: () => getCitiesBusiness(data),
+    getCitiesByCountryIdBusiness: () => getCitiesByCountryIdBusiness(data),
   };
 
   const handler = ACTIONS[action];
   if (!handler) {
-    return { 
+    return {
       error: {
         status: 400,
-        message: 'Invalid action'
-      }
+        message: 'Invalid action',
+      },
     };
   }
-  
+
   return handler();
 };
 
 /**
  * Main export function
  */
-const cities = async (formData: FormData, token: string = ''): Promise<ServiceResult<unknown>> => {
+const cities = async (formData: FormData, token = ''): Promise<ServiceResult<unknown>> => {
   try {
     const payload = generatePayload(formData, token);
     const { action } = payload;

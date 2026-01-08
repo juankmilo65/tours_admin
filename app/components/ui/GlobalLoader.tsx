@@ -4,11 +4,12 @@
  * (country change, navigation, API calls outside current view)
  */
 
+import type { JSX } from 'react';
 import { useAppSelector } from '~/store/hooks';
 import { selectIsGlobalLoading, selectGlobalLoadingMessage } from '~/store/slices/uiSlice';
 import { useTranslation } from '~/lib/i18n/utils';
 
-export function GlobalLoader() {
+export function GlobalLoader(): JSX.Element | null {
   const isLoading = useAppSelector(selectIsGlobalLoading);
   const message = useAppSelector(selectGlobalLoadingMessage);
   const { t } = useTranslation();
@@ -44,9 +45,9 @@ export function GlobalLoader() {
           marginBottom: 'var(--space-4)',
         }}
       />
-      
+
       {/* Loading message */}
-      {message && (
+      {message !== undefined && (
         <p
           style={{
             fontSize: 'var(--text-lg)',
@@ -59,9 +60,9 @@ export function GlobalLoader() {
           {message}
         </p>
       )}
-      
+
       {/* Default message if none provided */}
-      {!message && (
+      {message === undefined && (
         <p
           style={{
             fontSize: 'var(--text-base)',

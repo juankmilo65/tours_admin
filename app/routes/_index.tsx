@@ -2,9 +2,10 @@
  * Home Route - Tours Admin Dashboard
  */
 
+import type { JSX } from 'react';
 import { Link } from '@remix-run/react';
 
-export default function Index() {
+export default function Index(): JSX.Element {
   return (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
       <h1 style={{ fontSize: '3rem', marginBottom: '1rem' }}>Welcome to Tours Admin</h1>
@@ -90,7 +91,7 @@ function LinkCard({
   description: string;
   to: string;
   icon: string;
-}) {
+}): JSX.Element {
   return (
     <Link
       to={to}

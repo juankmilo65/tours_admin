@@ -1,32 +1,50 @@
+import type { JSX } from 'react';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectModals, closeModal } from '~/store/slices/uiSlice';
 import { useTranslation } from '~/lib/i18n/utils';
 
-export function ModalRoot() {
+interface ModalData {
+  message?: string;
+  icon?: string;
+}
+
+export function ModalRoot(): JSX.Element | null {
   const modals = useAppSelector(selectModals);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  if (!modals || modals.length === 0) return null;
+  if (modals.length === 0) {
+    return null;
+  }
 
-  // Render the last opened modal (stack behavior)
+  // Render last opened modal (stack behavior)
   const modal = modals[modals.length - 1];
-  if (!modal || !modal.isOpen) return null;
+  if (modal === undefined) {
+    return null;
+  }
+  if (!modal.isOpen) {
+    return null;
+  }
 
-  const { id, type, title, data } = modal as any;
-  const message = data?.message || '';
-  const iconType = data?.icon || type || 'info';
+  const { id, title, data } = modal;
+  const modalData = data as ModalData | undefined;
+  const message = modalData?.message ?? '';
+  const iconType = modalData?.icon ?? 'info';
 
   const iconMap: Record<string, string> = {
+    create: '✨',
+    edit: '✏️',
+    delete: '🗑️',
+    confirm: '❓',
+    info: 'ℹ️',
     success: '✅',
     error: '⛔',
     alert: '⚠️',
-    info: 'ℹ️',
   };
 
-  const icon = iconMap[iconType] || iconMap.info;
+  const icon = iconMap[iconType] ?? iconMap.info;
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     dispatch(closeModal(id));
   };
 
@@ -56,13 +74,16 @@ export function ModalRoot() {
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <div style={{ fontSize: 34 }}>{icon}</div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ margin: 0, fontSize: '1.125rem' }}>{title || t('common.notice')}</h3>
-            {message && <p style={{ marginTop: 8, color: 'var(--color-neutral-700)' }}>{message}</p>}
+            <h3 style={{ margin: 0, fontSize: '1.125rem' }}>{title ?? t('common.notice')}</h3>
+            {message !== '' && (
+              <p style={{ marginTop: 8, color: 'var(--color-neutral-700)' }}>{message}</p>
+            )}
           </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
           <button
+            type="button"
             onClick={handleClose}
             style={{
               padding: '8px 16px',

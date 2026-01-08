@@ -3,7 +3,8 @@
  * Manages countries state with multi-language support
  */
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { Language } from '~/lib/i18n/types';
 
 // Raw country from API with both languages
@@ -47,7 +48,7 @@ export function translateCountry(country: Country, lang: Language): TranslatedCo
 }
 
 export function translateCountries(countries: Country[], lang: Language): TranslatedCountry[] {
-  return countries.map(country => translateCountry(country, lang));
+  return countries.map((country) => translateCountry(country, lang));
 }
 
 interface CountriesState {
@@ -99,7 +100,7 @@ const countriesSlice = createSlice({
     },
     setSelectedCountryByCode: (state, action: PayloadAction<string>) => {
       const country = state.countries.find((c) => c.code === action.payload);
-      state.selectedCountry = country || null;
+      state.selectedCountry = country ?? null;
     },
     clearCountriesError: (state) => {
       state.error = null;
@@ -120,9 +121,13 @@ export const {
 } = countriesSlice.actions;
 
 // Selectors
-export const selectCountries = (state: { country: CountriesState }) => state.country.countries;
-export const selectCountriesLoading = (state: { country: CountriesState }) => state.country.isLoading;
-export const selectCountriesError = (state: { country: CountriesState }) => state.country.error;
-export const selectSelectedCountry = (state: { country: CountriesState }) => state.country.selectedCountry;
+export const selectCountries = (state: { country: CountriesState }): Country[] =>
+  state.country.countries;
+export const selectCountriesLoading = (state: { country: CountriesState }): boolean =>
+  state.country.isLoading;
+export const selectCountriesError = (state: { country: CountriesState }): string | null =>
+  state.country.error;
+export const selectSelectedCountry = (state: { country: CountriesState }): Country | null =>
+  state.country.selectedCountry;
 
 export default countriesSlice.reducer;

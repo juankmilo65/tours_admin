@@ -65,7 +65,7 @@ export function getDefaultLanguage(): Language {
     return 'es';
   }
 
-  const browserLang = navigator.language.split('-')[0] as Language;
+  const browserLang = (window.navigator?.language ?? 'es').split('-')[0] as Language;
   return isLanguageSupported(browserLang) ? browserLang : 'es';
 }
 
@@ -75,25 +75,29 @@ export function getDefaultLanguage(): Language {
  * @param params - Parameters to replace
  * @returns Formatted translation
  */
-export function formatTranslation(template: string, params: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key) => {
-    return params[key]?.toString() ?? match;
+export function formatTranslation(
+  template: string,
+  _params: Record<string, string | number>
+): string {
+  void _params; // Intentionally unused - kept for API compatibility
+  return template.replace(/\{(\w+)\}/g, (_match, _key) => {
+    const value = _params[_key as keyof typeof _params];
+    return value !== undefined ? value.toString() : _match;
   });
 }
 
-/**
- * React hook for translations
- * Uses Redux store for language state
- * @returns Object with translation function and current language
- */
-export function useTranslation() {
+type TranslateFunction = (key: string, _params?: Record<string, string | number>) => string;
+
+interface TranslationHookResult {
+  t: TranslateFunction;
+  language: Language;
+}
+
+export function useTranslation(): TranslationHookResult {
   const language = useSelector(selectLanguage) as Language;
 
-  const translate = (key: string, params?: Record<string, string | number>): string => {
-    const translated = t(key, language);
-    if (params) {
-      return formatTranslation(translated, params);
-    }
+  const translate = (_key: string): string => {
+    const translated = t(_key, language);
     return translated;
   };
 

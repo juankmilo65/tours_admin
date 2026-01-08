@@ -2,11 +2,13 @@
  * Header Component - Top Navigation Bar
  */
 
+import type { JSX } from 'react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { translateCountries, translateCountry, type Country } from '~/store/slices/countriesSlice';
 import { setGlobalLoading, setLanguage, selectLanguage } from '~/store/slices/uiSlice';
-import Select, { Option } from '~/components/ui/Select';
+import type { Option } from '~/components/ui/Select';
+import Select from '~/components/ui/Select';
 import { useSubmit, useNavigation, useLocation, useSearchParams } from '@remix-run/react';
 import { useTranslation } from '~/lib/i18n/utils';
 import type { Language } from '~/lib/i18n/types';
@@ -21,44 +23,44 @@ interface HeaderProps {
   selectedCountryCode: string;
 }
 
-export function Header({ 
-  title, 
-  isSidebarOpen, 
-  isSidebarCollapsed, 
-  onToggleSidebar, 
+export function Header({
+  title,
+  isSidebarOpen,
+  isSidebarCollapsed,
+  onToggleSidebar,
   onToggleSidebarCollapse,
   countries,
-  selectedCountryCode
-}: HeaderProps) {
+  selectedCountryCode,
+}: HeaderProps): JSX.Element {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
-  
+
   // i18n hook
   const { t } = useTranslation();
-  
+
   // Redux state solo para language
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector(selectLanguage);
-  
+
   // Translate countries based on current language usando props
-  const translatedCountries = useMemo(() => 
-    translateCountries(countries, currentLanguage as Language),
+  const translatedCountries = useMemo(
+    () => translateCountries(countries, currentLanguage as Language),
     [countries, currentLanguage]
   );
-  
+
   // Find and translate selected country
   const translatedSelectedCountry = useMemo(() => {
-    const selectedCountry = countries.find(c => c.code === selectedCountryCode);
+    const selectedCountry = countries.find((c) => c.code === selectedCountryCode);
     return selectedCountry ? translateCountry(selectedCountry, currentLanguage as Language) : null;
   }, [countries, selectedCountryCode, currentLanguage]);
-  
+
   // Form submission for country change
   const submit = useSubmit();
   const navigation = useNavigation();
   const location = useLocation();
   const [, setSearchParams] = useSearchParams();
-  
+
   const isChangingCountry = navigation.state === 'submitting' || navigation.state === 'loading';
 
   // Handle language change
@@ -79,26 +81,26 @@ export function Header({
     if (countryCode === selectedCountryCode) {
       return;
     }
-    
+
     // Find the country to get its id
-    const country = countries.find(c => c.code === countryCode);
+    const country = countries.find((c) => c.code === countryCode);
     if (!country) {
       console.error('Country not found:', countryCode);
       return;
     }
-    
+
     // Show global loading
     dispatch(setGlobalLoading({ isLoading: true }));
-    
+
     // Clear all filters from URL
     setSearchParams({});
-    
+
     // Use submit to the API resource route - send both countryId and countryCode
     const formData = new FormData();
     formData.append('countryId', country.id);
     formData.append('countryCode', countryCode);
     formData.append('returnTo', location.pathname);
-    
+
     submit(formData, { method: 'post', action: '/api/changeCountry' });
   };
 
@@ -107,7 +109,7 @@ export function Header({
     function checkMobile() {
       setIsMobile(window.innerWidth < 1024);
     }
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -126,20 +128,20 @@ export function Header({
   }, []);
 
   return (
-    <header 
+    <header
       style={{
         height: 'var(--header-height)',
         backgroundColor: 'var(--color-neutral-50)',
         borderBottom: '1px solid var(--color-neutral-200)',
         position: 'fixed',
         top: 0,
-        left: isMobile ? 0 : (isSidebarCollapsed ? '80px' : '280px'),
+        left: isMobile ? 0 : isSidebarCollapsed ? '80px' : '280px',
         right: 0,
         zIndex: 'var(--z-fixed)',
         transition: 'left var(--transition-base)',
       }}
     >
-      <div 
+      <div
         style={{
           height: '100%',
           padding: '0 var(--space-6)',
@@ -248,7 +250,7 @@ export function Header({
               />
             </button>
           )}
-          <h2 
+          <h2
             style={{
               fontSize: 'var(--text-xl)',
               fontWeight: 'var(--font-weight-semibold)',
@@ -262,9 +264,14 @@ export function Header({
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           {/* Language Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>🌐</span>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>
+              🌐
+            </span>
             <Select
-              options={[{ value: 'es', label: t('common.spanish') }, { value: 'en', label: t('common.english') }]}
+              options={[
+                { value: 'es', label: t('common.spanish') },
+                { value: 'en', label: t('common.english') },
+              ]}
               value={currentLanguage}
               onChange={handleLanguageChange}
               placeholder={t('common.select')}
@@ -274,28 +281,39 @@ export function Header({
           </div>
 
           {/* Country Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', position: 'relative' }}>
-            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>🌍</span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              position: 'relative',
+            }}
+          >
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-500)' }}>
+              🌍
+            </span>
             <Select
               options={
                 translatedCountries.length === 0
                   ? [{ value: '', label: t('common.loadingCountries') }]
                   : translatedCountries.map((c): Option => ({ value: c.code, label: c.name }))
               }
-              value={translatedSelectedCountry?.code || ''}
+              value={translatedSelectedCountry?.code ?? ''}
               onChange={handleCountryChange}
               disabled={isChangingCountry}
               placeholder={t('common.selectCountry')}
               id="select-country"
             />
             {isChangingCountry && (
-              <span style={{ 
-                position: 'absolute', 
-                right: '8px', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                fontSize: 'var(--text-xs)',
-              }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: 'var(--text-xs)',
+                }}
+              >
                 ⏳
               </span>
             )}
@@ -345,7 +363,7 @@ export function Header({
               }}
             >
               <div style={{ textAlign: 'right' }}>
-                <p 
+                <p
                   style={{
                     fontSize: 'var(--text-sm)',
                     fontWeight: 'var(--font-weight-medium)',
@@ -355,7 +373,7 @@ export function Header({
                 >
                   Admin User
                 </p>
-                <p 
+                <p
                   style={{
                     fontSize: 'var(--text-xs)',
                     color: 'var(--color-neutral-500)',
@@ -365,7 +383,7 @@ export function Header({
                   admin@tours.com
                 </p>
               </div>
-              <div 
+              <div
                 style={{
                   width: '40px',
                   height: '40px',
@@ -451,7 +469,7 @@ export function Header({
                   <span>⚙️</span>
                   <span>{t('header.settings')}</span>
                 </button>
-                <div 
+                <div
                   style={{
                     height: '1px',
                     backgroundColor: 'var(--color-neutral-200)',

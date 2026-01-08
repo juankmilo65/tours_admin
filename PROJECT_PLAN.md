@@ -1,9 +1,11 @@
 # Tours Admin Dashboard - Implementation Plan
 
 ## Project Overview
+
 Modern admin dashboard for managing tours, reservations, users, and payments. Built with Remix, TypeScript, Supabase, and Auth0.
 
 ## Tech Stack
+
 - **Frontend**: Remix + React + TypeScript + CSS Variables/Design Tokens
 - **Backend**: Node.js + TypeScript (API modular)
 - **Database**: Supabase (PostgreSQL)
@@ -15,6 +17,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 ## Implementation Phases
 
 ### Phase 1: Project Setup & Configuration
+
 - [x] Create project plan
 - [ ] Initialize Remix project with TypeScript
 - [ ] Configure ESLint, Prettier, and TypeScript strict mode
@@ -23,6 +26,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Create folder structure
 
 ### Phase 2: Database & Backend
+
 - [ ] Set up Supabase project
 - [ ] Design database schema
 - [ ] Create migration files for all tables
@@ -32,6 +36,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Set up Supabase client and utilities
 
 ### Phase 3: Authentication
+
 - [ ] Configure Auth0 application
 - [ ] Set up Auth0 integration with Remix
 - [ ] Implement authentication flow (login/logout)
@@ -40,6 +45,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Create auth utilities and hooks
 
 ### Phase 4: Core UI Components
+
 - [ ] Create layout components (Sidebar, Header, Main)
 - [ ] Build reusable UI components (Buttons, Cards, Modals, Tables)
 - [ ] Implement design tokens system
@@ -48,6 +54,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Implement responsive design patterns
 
 ### Phase 5: Dashboard & Analytics
+
 - [ ] Create dashboard main page
 - [ ] Implement KPI cards component
 - [ ] Build charts and graphs components
@@ -57,6 +64,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Create analytics data fetching
 
 ### Phase 6: Tours Management
+
 - [ ] Create tours list page with filters
 - [ ] Build tour creation/edit form
 - [ ] Implement image upload for tours
@@ -66,6 +74,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Add tour i18n support
 
 ### Phase 7: Cities & Categories Management
+
 - [ ] Create cities CRUD interface
 - [ ] Build categories CRUD interface
 - [ ] Implement SEO metadata management
@@ -73,6 +82,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Create association management
 
 ### Phase 8: News & Content Management
+
 - [ ] Create news CRUD interface
 - [ ] Implement draft/published states
 - [ ] Add scheduling functionality
@@ -80,6 +90,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Add content i18n support
 
 ### Phase 9: Offers & Promotions
+
 - [ ] Create offers CRUD interface
 - [ ] Implement dynamic landing pages
 - [ ] Add offer scheduling
@@ -87,6 +98,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Build promotion ranking system
 
 ### Phase 10: Reservations & Payments
+
 - [ ] Create reservations list with filters
 - [ ] Build reservation detail view
 - [ ] Implement payment status management
@@ -96,6 +108,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Integrate Mercado Pago
 
 ### Phase 11: Users & Roles Management
+
 - [ ] Create users list page
 - [ ] Build role assignment interface
 - [ ] Implement activity history view
@@ -103,6 +116,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Create audit logs
 
 ### Phase 12: Application Configuration
+
 - [ ] Build settings page
 - [ ] Implement color and typography configuration
 - [ ] Create payment settings
@@ -110,6 +124,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Build integration settings (Auth0, Mercado Pago, analytics)
 
 ### Phase 13: Testing & Optimization
+
 - [ ] Write unit tests for critical components
 - [ ] Implement integration tests
 - [ ] Perform accessibility testing
@@ -118,6 +133,7 @@ Modern admin dashboard for managing tours, reservations, users, and payments. Bu
 - [ ] Security audit
 
 ### Phase 14: Documentation & Deployment
+
 - [ ] Create API documentation
 - [ ] Write deployment guide
 - [ ] Set up CI/CD pipeline

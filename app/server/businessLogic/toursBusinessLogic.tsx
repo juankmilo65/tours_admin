@@ -1,20 +1,23 @@
 import { getTours } from '../tours';
-import { ToursPayload } from '../../types/PayloadTourDataProps';
-import { ServiceResult } from '../_index';
+import type { ToursPayload } from '../../types/PayloadTourDataProps';
+import type { ServiceResult } from '../_index';
 
 /**
  * Generate payload from FormData
  */
-const generatePayload = (formData: FormData, token: string = ''): ToursPayload => {
+const generatePayload = (formData: FormData, token = ''): ToursPayload => {
   const action = formData.get('action');
   const filters = formData.get('filters');
   const language = formData.get('language');
 
   return {
     token,
-    action: action ? action.toString() : '',
-    language: language ? language.toString() : 'es',
-    filters: filters ? JSON.parse(filters.toString()) : undefined,
+    action: action !== null && action !== undefined ? action.toString() : '',
+    language: language !== null && language !== undefined ? language.toString() : 'es',
+    filters:
+      filters !== null && filters !== undefined
+        ? (JSON.parse(filters.toString()) as ToursPayload['filters'])
+        : undefined,
   };
 };
 
@@ -25,63 +28,63 @@ const getToursBusiness = async (data: ToursPayload): Promise<ServiceResult<unkno
   try {
     const { filters = {}, token, language = 'es' } = data;
     const { cityId, page = 1, category, difficulty, minPrice, maxPrice } = filters;
-    
+
     const payload = {
       cityId,
-      page,
+      page: typeof page === 'string' ? Number.parseInt(page, 10) : page,
       category,
       difficulty,
-      minPrice,
-      maxPrice,
+      minPrice: typeof minPrice === 'string' ? Number.parseFloat(minPrice) : minPrice,
+      maxPrice: typeof maxPrice === 'string' ? Number.parseFloat(maxPrice) : maxPrice,
       token,
       language,
-      currency: 'MXN'
+      currency: 'MXN',
     };
 
     const result = await getTours(payload);
-    
+
     return result;
   } catch (error) {
     console.error('Error in getToursBusiness:', error);
-    return { error };
+    return Promise.resolve({ error });
   }
 };
 
 /**
  * Main business logic router
  */
-const toursBusinessLogic = async (
+const toursBusinessLogic = (
   action: string,
   data: ToursPayload
 ): Promise<ServiceResult<unknown>> => {
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
-    getToursBusiness: async () => await getToursBusiness(data)
+    getToursBusiness: () => getToursBusiness(data),
   };
 
   const handler = ACTIONS[action];
-  if (!handler) {
-    return { 
+  if (handler === undefined) {
+    return Promise.resolve({
       error: {
         status: 400,
-        message: 'Invalid action'
-      }
-    };
+        message: 'Invalid action',
+      },
+    });
   }
-  
+
   return handler();
 };
 
 /**
  * Main export function
  */
-const tours = async (formData: FormData, token: string = ''): Promise<ServiceResult<unknown>> => {
+const tours = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> => {
   try {
     const payload = generatePayload(formData, token);
     const { action } = payload;
-    return await toursBusinessLogic(action, payload);
+    return toursBusinessLogic(action, payload);
   } catch (error) {
     console.error('Error in tours business logic:', error);
-    return { error };
+    return Promise.resolve({ error });
   }
 };
 

@@ -16,6 +16,7 @@ A modern, responsive admin dashboard for managing tours, reservations, users, an
 ## ✨ Features
 
 ### Core Modules
+
 - 🔐 **Authentication**: Secure login with Auth0, role-based access control
 - 📊 **Dashboard**: Real-time KPIs, analytics, and visualizations
 - 🏛️ **Tours Management**: Full CRUD for tours with images, pricing, and availability
@@ -28,6 +29,7 @@ A modern, responsive admin dashboard for managing tours, reservations, users, an
 - ⚙️ **Settings**: Configure app settings, colors, and integrations
 
 ### Key Features
+
 - 🌍 **Multi-language**: Full i18n support (English & Spanish)
 - 📱 **Responsive**: Optimized for desktop and tablet
 - ♿ **Accessible**: WCAG 2.1 AA compliant
@@ -46,22 +48,26 @@ A modern, responsive admin dashboard for managing tours, reservations, users, an
 ## 🛠️ Installation
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/juankmilo65/tours_admin.git
 cd tours_admin
 ```
 
 2. **Install dependencies**
+
 ```bash
 pnpm install
 ```
 
 3. **Set up environment variables**
+
 ```bash
 cp .env.example .env
 ```
 
 Edit `.env` with your credentials:
+
 ```env
 # Supabase
 SUPABASE_URL=your_supabase_project_url
@@ -83,6 +89,7 @@ NODE_ENV=development
 ```
 
 4. **Set up Supabase database**
+
 ```bash
 # Apply database migrations
 npx supabase db push
@@ -91,12 +98,14 @@ npx supabase db push
 ```
 
 5. **Configure Auth0**
+
 - Create a new application in Auth0 dashboard
 - Set callback URLs: `http://localhost:3000/auth/callback`
 - Enable Google and email/password authentication
 - Configure role mapping (admin/staff)
 
 6. **Start development server**
+
 ```bash
 pnpm run dev
 ```

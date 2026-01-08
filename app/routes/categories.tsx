@@ -2,6 +2,7 @@
  * Categories Route - Categories Management
  */
 
+import type { JSX } from 'react';
 import { useLoaderData } from '@remix-run/react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { Card } from '~/components/ui/Card';
@@ -29,28 +30,28 @@ interface LoaderData {
   language: string;
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const session = await getSession(request.headers.get("Cookie"));
-  const currentLanguage = session.get("language") as string || 'es';
-  
+export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderData> {
+  const session = await getSession(request.headers.get('Cookie'));
+  const currentLanguage = (session.get('language') as string) ?? 'es';
+
   const formData = new FormData();
-  formData.append("action", 'getCategoriesBusiness');
-  formData.append("language", currentLanguage);
-  formData.append("isActive", 'true');
-  
-  const categoriesResult = await categoriesBL(formData) as { success: boolean; data: Category[] };
+  formData.append('action', 'getCategoriesBusiness');
+  formData.append('language', currentLanguage);
+  formData.append('isActive', 'true');
+
+  const categoriesResult = (await categoriesBL(formData)) as { success: boolean; data: Category[] };
   const categories = categoriesResult.success ? categoriesResult.data : [];
-  
+
   return {
     categories,
-    language: currentLanguage
+    language: currentLanguage,
   };
 }
 
-export default function Categories() {
+export default function Categories(): JSX.Element {
   const loaderData = useLoaderData<LoaderData>();
   const { categories, language } = loaderData;
-  
+
   const columns: Column<Category>[] = [
     {
       key: 'name_es',
@@ -87,39 +88,42 @@ export default function Categories() {
     {
       key: 'createdAt',
       label: 'Created At',
-      render: (value: string) => new Date(value).toLocaleDateString()
+      render: (value: string) => new Date(value).toLocaleDateString(),
     },
   ];
 
   return (
     <div className="space-y-6">
-      <Card
-        title="All Categories"
-        actions={<Button variant="primary">Add New Category</Button>}
-      >
-            <div className="mb-4 flex gap-4">
-              <input
-                type="search"
-                placeholder="Search categories..."
-                className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <Table data={categories} columns={columns} />
-          </Card>
-
-          <Card title="Categories Statistics">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatCard title="Total Categories" value={categories.length.toString()} />
-              <StatCard title="Active Categories" value={categories.filter(c => c.isActive).length.toString()} />
-              <StatCard title="Inactive Categories" value={categories.filter(c => !c.isActive).length.toString()} />
-            </div>
-          </Card>
+      <Card title="All Categories" actions={<Button variant="primary">Add New Category</Button>}>
+        <div className="mb-4 flex gap-4">
+          <input
+            type="search"
+            placeholder="Search categories..."
+            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
+
+        <Table data={categories} columns={columns} />
+      </Card>
+
+      <Card title="Categories Statistics">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StatCard title="Total Categories" value={categories.length.toString()} />
+          <StatCard
+            title="Active Categories"
+            value={categories.filter((c) => c.isActive).length.toString()}
+          />
+          <StatCard
+            title="Inactive Categories"
+            value={categories.filter((c) => !c.isActive).length.toString()}
+          />
+        </div>
+      </Card>
+    </div>
   );
 }
 
-function StatCard({ title, value }: { title: string; value: string | number }) {
+function StatCard({ title, value }: { title: string; value: string | number }): JSX.Element {
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
       <p className="text-sm text-gray-500">{title}</p>

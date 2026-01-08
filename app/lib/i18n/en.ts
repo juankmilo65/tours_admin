@@ -168,7 +168,7 @@ export const en: Translation = {
     selectCityFirst: 'Select a city',
     selectCityDescription: 'Choose a city to see available tours.',
     readyToSearch: 'Ready to search!',
-    readyToSearchDescription: 'Click \'Filter\' to search for available tours and configure them.',
+    readyToSearchDescription: "Click 'Filter' to search for available tours and configure them.",
     selectCityForPrice: 'Select a city first',
     viewDetails: 'View Details',
     book: 'Book',

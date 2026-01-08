@@ -3,7 +3,8 @@
  * Manages cities state with multi-language support
  */
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { Language } from '~/lib/i18n/types';
 
 // Raw city from API with both languages
@@ -50,7 +51,7 @@ export function translateCity(city: City, lang: Language): TranslatedCity {
 }
 
 export function translateCities(cities: City[], lang: Language): TranslatedCity[] {
-  return cities.map(city => translateCity(city, lang));
+  return cities.map((city) => translateCity(city, lang));
 }
 
 interface CitiesState {
@@ -118,9 +119,10 @@ export const {
 } = citiesSlice.actions;
 
 // Selectors
-export const selectCities = (state: { city: CitiesState }) => state.city.cities;
-export const selectCitiesLoading = (state: { city: CitiesState }) => state.city.isLoading;
-export const selectCitiesError = (state: { city: CitiesState }) => state.city.error;
-export const selectSelectedCity = (state: { city: CitiesState }) => state.city.selectedCity;
+export const selectCities = (state: { city: CitiesState }): City[] => state.city.cities;
+export const selectCitiesLoading = (state: { city: CitiesState }): boolean => state.city.isLoading;
+export const selectCitiesError = (state: { city: CitiesState }): string | null => state.city.error;
+export const selectSelectedCity = (state: { city: CitiesState }): City | null =>
+  state.city.selectedCity;
 
 export default citiesSlice.reducer;

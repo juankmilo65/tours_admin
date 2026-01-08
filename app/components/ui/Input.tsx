@@ -2,26 +2,22 @@
  * Input Component - Reusable UI Component
  */
 
-import type { InputHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, JSX } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
 }
 
-export function Input({ label, error, className = '', ...props }: InputProps) {
+export function Input({ label, error, className = '', ...props }: InputProps): JSX.Element {
   return (
     <div className="flex flex-col gap-1">
-      {label && (
-        <label className="text-sm font-medium text-gray-700">
-          {label}
-        </label>
-      )}
+      {label !== undefined && <label className="text-sm font-medium text-gray-700">{label}</label>}
       <input
         className={`
           px-4 py-2
           border rounded-lg
-          ${error ? 'border-red-500' : 'border-gray-300'}
+          ${error !== undefined ? 'border-red-500' : 'border-gray-300'}
           focus:outline-none
           focus:ring-2
           focus:ring-blue-500
@@ -31,7 +27,7 @@ export function Input({ label, error, className = '', ...props }: InputProps) {
         `}
         {...props}
       />
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error !== undefined && <p className="text-sm text-red-500">{error}</p>}
     </div>
   );
 }

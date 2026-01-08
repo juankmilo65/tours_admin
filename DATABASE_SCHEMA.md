@@ -1,11 +1,13 @@
 # Database Schema - Tours Admin Dashboard
 
 ## Overview
+
 PostgreSQL database schema for the Tours Admin Dashboard, designed for Supabase.
 
 ## Tables
 
 ### 1. Users
+
 ```sql
 users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,6 +26,7 @@ users (
 ```
 
 ### 2. Cities
+
 ```sql
 cities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -41,6 +44,7 @@ cities (
 ```
 
 ### 3. Categories
+
 ```sql
 categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -56,6 +60,7 @@ categories (
 ```
 
 ### 4. Tours
+
 ```sql
 tours (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -81,6 +86,7 @@ tours (
 ```
 
 ### 5. Tour Availability
+
 ```sql
 tour_availability (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -95,6 +101,7 @@ tour_availability (
 ```
 
 ### 6. News
+
 ```sql
 news (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -114,6 +121,7 @@ news (
 ```
 
 ### 7. Offers
+
 ```sql
 offers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -137,6 +145,7 @@ offers (
 ```
 
 ### 8. Reservations
+
 ```sql
 reservations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -163,6 +172,7 @@ reservations (
 ```
 
 ### 9. Payments
+
 ```sql
 payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -180,6 +190,7 @@ payments (
 ```
 
 ### 10. Audit Logs
+
 ```sql
 audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -195,6 +206,7 @@ audit_logs (
 ```
 
 ### 11. Settings
+
 ```sql
 settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -206,6 +218,7 @@ settings (
 ```
 
 ### 12. Analytics Events
+
 ```sql
 analytics_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -385,3 +398,4 @@ CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories
 
 CREATE TRIGGER update_tours_updated_at BEFORE UPDATE ON tours
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+```

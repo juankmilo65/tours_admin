@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 
 export interface Option {
@@ -17,7 +18,15 @@ interface SelectProps {
   id?: string;
 }
 
-export default function Select({ options, value, onChange, placeholder, disabled, className, id }: SelectProps) {
+export default function Select({
+  options,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  className,
+  id,
+}: SelectProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -36,23 +45,25 @@ export default function Select({ options, value, onChange, placeholder, disabled
     return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
-  useEffect(() => {
-    if (!open) setHighlightedIndex(-1);
+  useLayoutEffect(() => {
+    window.setTimeout(() => {
+      if (!open) setHighlightedIndex(-1);
+    }, 0);
   }, [open]);
 
-  const toggle = () => {
-    if (disabled) return;
+  const toggle = (): void => {
+    if (disabled === true) return;
     setOpen((v) => !v);
   };
 
   const handleSelect = (opt: Option) => {
-    if (opt.disabled) return;
+    if (opt.disabled === true) return;
     onChange(opt.value);
     setOpen(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (disabled) return;
+    if (disabled === true) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       setOpen((v) => !v);
@@ -73,13 +84,20 @@ export default function Select({ options, value, onChange, placeholder, disabled
 
   useEffect(() => {
     if (open && highlightedIndex >= 0) {
-      const el = rootRef.current?.querySelectorAll('[data-select-item]')[highlightedIndex] as HTMLElement | undefined;
+      const el = rootRef.current?.querySelectorAll('[data-select-item]')[highlightedIndex] as
+        | HTMLElement
+        | undefined;
       el?.scrollIntoView({ block: 'nearest' });
     }
   }, [highlightedIndex, open]);
 
   return (
-    <div ref={rootRef} className={`custom-select ${className || ''}`} id={id} style={{ position: 'relative' }}>
+    <div
+      ref={rootRef}
+      className={`custom-select ${className ?? ''}`}
+      id={id}
+      style={{ position: 'relative' }}
+    >
       <button
         type="button"
         aria-haspopup="listbox"
@@ -96,8 +114,14 @@ export default function Select({ options, value, onChange, placeholder, disabled
           gap: '8px',
         }}
       >
-        <span style={{ color: selected ? 'var(--color-neutral-900)' : 'var(--color-neutral-500)', flex: '1 1 auto', textAlign: 'left' }}>
-          {selected ? selected.label : (placeholder || t('common.select'))}
+        <span
+          style={{
+            color: selected ? 'var(--color-neutral-900)' : 'var(--color-neutral-500)',
+            flex: '1 1 auto',
+            textAlign: 'left',
+          }}
+        >
+          {selected ? selected.label : (placeholder ?? t('common.select'))}
         </span>
         <span style={{ color: 'var(--color-neutral-500)', marginLeft: '8px' }}>▾</span>
       </button>
@@ -137,8 +161,9 @@ export default function Select({ options, value, onChange, placeholder, disabled
                 className={`select-item${isHighlighted ? ' highlighted' : ''}${isSelected ? ' selected' : ''}`}
                 style={{
                   padding: '8px 12px',
-                  cursor: opt.disabled ? 'not-allowed' : 'pointer',
-                  color: opt.disabled ? 'var(--color-neutral-400)' : 'var(--color-neutral-900)',
+                  cursor: opt.disabled === true ? 'not-allowed' : 'pointer',
+                  color:
+                    opt.disabled === true ? 'var(--color-neutral-400)' : 'var(--color-neutral-900)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,

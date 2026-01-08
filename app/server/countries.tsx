@@ -1,19 +1,19 @@
 import { createServiceREST } from './_index';
 
-const BASE_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+const BASE_URL = process.env.BACKEND_URL ?? 'http://localhost:3000';
 
 /**
  * Get all countries from backend API
  */
-export const getCountries = async (language: string = 'es') => {
+export const getCountries = async (language = 'es'): Promise<unknown> => {
   try {
     const countriesEndpoint = 'countries';
     const countriesService = createServiceREST(BASE_URL, countriesEndpoint, 'Bearer');
-    
+
     const result = await countriesService.get({
       headers: {
-        'X-Language': language
-      }
+        'X-Language': language,
+      },
     });
 
     return result;
@@ -26,15 +26,15 @@ export const getCountries = async (language: string = 'es') => {
 /**
  * Get country by id from backend API
  */
-export const getCountryById = async (id: string, language: string = 'es') => {
+export const getCountryById = async (id: string, language = 'es'): Promise<unknown> => {
   try {
     const countryEndpoint = `countries/${id}`;
     const countryService = createServiceREST(BASE_URL, countryEndpoint, 'Bearer');
-    
+
     const result = await countryService.get({
       headers: {
-        'X-Language': language
-      }
+        'X-Language': language,
+      },
     });
 
     return result;

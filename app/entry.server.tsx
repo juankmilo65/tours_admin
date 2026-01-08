@@ -6,12 +6,12 @@ import { createReadableStreamFromReadable } from '@remix-run/node';
 
 export const streamTimeout = 5_000;
 
-export default async function handleRequest(
+export default function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
-  remixContext: EntryContext,
-) {
+  remixContext: EntryContext
+): Promise<Response> {
   return new Promise((resolve, reject) => {
     let shellRendered = false;
     const { pipe, abort } = renderToPipeableStream(
@@ -28,7 +28,7 @@ export default async function handleRequest(
             new Response(stream, {
               headers: responseHeaders,
               status: responseStatusCode,
-            }),
+            })
           );
 
           pipe(body);
@@ -39,13 +39,14 @@ export default async function handleRequest(
         onError(error: unknown) {
           responseStatusCode = 500;
           // Log streaming rendering errors from inside the shell
-          if (shellRendered) {
+          if (shellRendered === true) {
             console.error(error);
           }
         },
-      },
+      }
     );
 
+    // eslint-disable-next-line no-undef
     setTimeout(abort, streamTimeout + 1000);
   });
 }

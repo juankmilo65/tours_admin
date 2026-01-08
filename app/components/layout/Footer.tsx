@@ -2,10 +2,11 @@
  * Footer Component - Copyright Information
  */
 
+import type { JSX } from 'react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 
-export function Footer() {
+export function Footer(): JSX.Element {
   const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
   const [isMobile, setIsMobile] = useState(false);
@@ -15,21 +16,21 @@ export function Footer() {
     function checkMobile() {
       setIsMobile(window.innerWidth < 768);
     }
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   return (
-    <footer 
+    <footer
       style={{
         backgroundColor: 'var(--color-neutral-50)',
         borderTop: '1px solid var(--color-neutral-200)',
         padding: isMobile ? 'var(--space-4) var(--space-4)' : 'var(--space-4) var(--space-6)',
       }}
     >
-      <div 
+      <div
         style={{
           display: 'flex',
           alignItems: isMobile ? 'flex-start' : 'center',
@@ -42,8 +43,16 @@ export function Footer() {
         }}
       >
         <p style={{ margin: 0 }}>{t('footer.copyright', { year: currentYear })}</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 'var(--space-3)' : 'var(--space-4)', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
-          <a 
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isMobile ? 'var(--space-3)' : 'var(--space-4)',
+            flexWrap: 'wrap',
+            justifyContent: isMobile ? 'center' : 'flex-start',
+          }}
+        >
+          <a
             href="#"
             style={{
               color: 'inherit',
@@ -59,7 +68,7 @@ export function Footer() {
           >
             {t('footer.privacyPolicy')}
           </a>
-          <a 
+          <a
             href="#"
             style={{
               color: 'inherit',
@@ -75,7 +84,7 @@ export function Footer() {
           >
             {t('footer.termsOfService')}
           </a>
-          <a 
+          <a
             href="#"
             style={{
               color: 'inherit',

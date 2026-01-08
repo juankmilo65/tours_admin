@@ -4,7 +4,16 @@
  */
 
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
-import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+import {
+  persistStore,
+  persistReducer,
+  FLUSH,
+  REHYDRATE,
+  PAUSE,
+  PERSIST,
+  PURGE,
+  REGISTER,
+} from 'redux-persist';
 import storage from './storage';
 import citiesReducer from '~/store/slices/citiesSlice';
 import countriesReducer from '~/store/slices/countriesSlice';
@@ -35,7 +44,8 @@ const rootReducer = combineReducers({
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
-export const makeStore = () => {
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+const makeStore = () => {
   const store = configureStore({
     reducer: persistedReducer,
     middleware: (getDefaultMiddleware) =>
@@ -46,12 +56,19 @@ export const makeStore = () => {
         immutableCheck: false,
       }),
   });
-  
+
   return store;
 };
 
-export const makePersistor = (store: AppStore) => persistStore(store);
+// Export makeStore - primarily used for type definition
+export { makeStore };
 
-export type AppStore = ReturnType<typeof makeStore>
-export type RootState = ReturnType<AppStore['getState']>
-export type AppDispatch = AppStore['dispatch']
+export const makePersistor = (
+  store: ReturnType<typeof makeStore>
+): ReturnType<typeof persistStore> => {
+  return persistStore(store);
+};
+
+export type AppStore = ReturnType<typeof makeStore>;
+export type RootState = ReturnType<AppStore['getState']>;
+export type AppDispatch = AppStore['dispatch'];
