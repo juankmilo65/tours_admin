@@ -8,14 +8,7 @@ import {
   useLoaderData,
 } from '@remix-run/react';
 import { data, type LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
-import {
-  useMemo,
-  useState,
-  useEffect,
-  useLayoutEffect,
-  createContext,
-  type ReactNode,
-} from 'react';
+import { useMemo, useState, useEffect, createContext, type ReactNode } from 'react';
 import React from 'react';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
@@ -403,11 +396,12 @@ export default function App(): React.JSX.Element {
   const selectedCountryCode = dataOrLoader?.selectedCountryCode ?? '';
 
   // Check if we're on client
-  useLayoutEffect(() => {
+  useEffect(() => {
     // Defer setState to avoid cascading renders
-    window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       setIsClient(true);
     }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   // Detectar si es móvil al montar y cuando cambia el tamaño

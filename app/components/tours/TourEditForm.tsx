@@ -3,7 +3,7 @@
  * Complete form for editing all tour information
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
 import type { Tour, Language } from '~/types/PayloadTourDataProps';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
@@ -67,11 +67,17 @@ const LANGUAGE_OPTIONS = [
 
 interface TourEditFormProps {
   tourId: string;
+  initialTourData?: Partial<Tour> | null;
   onSave: () => Promise<void>;
   onCancel: () => void;
 }
 
-export function TourEditForm({ tourId, onSave, onCancel }: TourEditFormProps): JSX.Element {
+export function TourEditForm({
+  tourId,
+  initialTourData,
+  onSave,
+  onCancel,
+}: TourEditFormProps): JSX.Element {
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector(selectLanguage) as Language;
   const rawCities = useAppSelector(selectCities);
@@ -100,8 +106,60 @@ export function TourEditForm({ tourId, onSave, onCancel }: TourEditFormProps): J
   // Time slots
   const [activityTimes, setActivityTimes] = useState<Record<string, string>>({});
 
-  // Load tour data
+  // Track if data has been initialized to prevent re-runs
+  const dataInitialized = useRef(false);
+
+  // Load tour data - only runs once on mount if initialTourData is provided
   useEffect(() => {
+    // Skip if already initialized
+    if (dataInitialized.current) {
+      return;
+    }
+
+    // If initialTourData is provided by loader, use it
+    if (initialTourData !== null && initialTourData !== undefined) {
+      const data = initialTourData;
+      setTourData(data);
+      setOriginalData(JSON.parse(JSON.stringify(data)) as Partial<Tour>); // Deep copy
+
+      // Set multi-select states
+      setSelectedActivities(
+        Array.isArray(data.activities) ? data.activities.map((a) => a.activityId ?? '') : []
+      );
+      setSelectedAmenities(
+        Array.isArray(data.amenities) ? data.amenities.map((a) => a.amenityId ?? '') : []
+      );
+      setSelectedRequirements(
+        Array.isArray(data.requirements) ? data.requirements.map((r) => r.requirementId ?? '') : []
+      );
+      setSelectedOffers(Array.isArray(data.offers) ? data.offers.map((o) => o.id ?? '') : []);
+      setSelectedLanguages(Array.isArray(data.language) ? data.language : ['es']);
+
+      // Set included items
+      const included: Record<string, boolean> = {};
+      if (Array.isArray(data.included)) {
+        data.included.forEach((item) => {
+          if (item.id) included[item.id] = !!item.included;
+        });
+      }
+      setSelectedIncluded(included);
+
+      // Set activity times
+      const times: Record<string, string> = {};
+      if (Array.isArray(data.activities)) {
+        data.activities.forEach((activity) => {
+          if (activity.id) {
+            times[activity.id] = activity.hora ?? '09:00';
+          }
+        });
+      }
+      setActivityTimes(times);
+      setLoading(false);
+      dataInitialized.current = true;
+      return;
+    }
+
+    // Otherwise, load data directly from API (only if no initialTourData)
     async function loadTourData(): Promise<void> {
       dispatch(setGlobalLoading({ isLoading: true, message: 'Cargando tour...' }));
       try {
@@ -156,6 +214,7 @@ export function TourEditForm({ tourId, onSave, onCancel }: TourEditFormProps): J
             });
           }
           setActivityTimes(times);
+          dataInitialized.current = true;
         }
       } catch (error) {
         if (error instanceof Error) {
@@ -179,7 +238,7 @@ export function TourEditForm({ tourId, onSave, onCancel }: TourEditFormProps): J
     }
 
     void loadTourData();
-  }, [tourId, currentLanguage, dispatch]);
+  }, []); // Empty deps - only run once on mount
 
   // Handle image upload
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -27,9 +27,16 @@ export async function getPriceRange(
   language?: string,
   currency?: string
 ): Promise<PriceRangeResponse | null> {
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('BACKEND_URL is not configured, returning null for price range');
+    return null;
+  }
+
   const safeLanguage = language ?? 'es';
   const safeCurrency = currency ?? 'MXN';
   const safeFilters = filters ?? {};
+
   try {
     const params: Record<string, string> = {};
 
@@ -81,7 +88,19 @@ export async function getPriceRange(
 
     return null;
   } catch (error) {
-    console.error('Error fetching price range:', error);
+    // Handle network errors gracefully (ECONNREFUSED, etc.)
+    if (error instanceof Error) {
+      console.error('Error fetching price range:', error.message);
+      // If it's a connection error, log a helpful message
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          'Backend API is not available. Please ensure the backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('Unknown error fetching price range:', error);
+    }
     return null;
   }
 }

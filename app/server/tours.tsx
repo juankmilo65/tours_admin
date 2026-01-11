@@ -4,9 +4,79 @@ import type { ServicePayload } from '../types/PayloadTourDataProps';
 const BASE_URL = process.env.BACKEND_URL ?? '';
 
 /**
+ * Get tour by ID from backend API
+ */
+export const getTourById = async (
+  id: string,
+  language = 'es',
+  currency = 'MXN'
+): Promise<unknown> => {
+  console.warn('🎯 [GET TOUR BY ID] Starting getTourById with params:', {
+    id,
+    language,
+    currency,
+    BASE_URL,
+  });
+
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('⚠️ [GET TOUR BY ID] BACKEND_URL is not configured, returning empty');
+    return { success: false, data: null };
+  }
+
+  try {
+    const tourEndpoint = `tours/${id}`;
+    const fullUrl = `${BASE_URL}/${tourEndpoint}`;
+    console.warn('🌐 [GET TOUR BY ID] Full URL to call:', fullUrl);
+
+    const tourService = createServiceREST(BASE_URL, tourEndpoint, 'Bearer');
+    console.warn('📡 [GET TOUR BY ID] Calling backend with headers:', {
+      'X-Language': language,
+      'X-Currency': currency,
+    });
+
+    const result = await tourService.get({
+      headers: {
+        'X-Language': language,
+        'X-Currency': currency,
+      },
+    });
+
+    console.warn('✅ [GET TOUR BY ID] Success! Result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    // Handle network errors gracefully (ECONNREFUSED, etc.)
+    console.error('❌ [GET TOUR BY ID] Error caught:', error);
+    if (error instanceof Error) {
+      console.error('❌ [GET TOUR BY ID] Error message:', error.message);
+      console.error('❌ [GET TOUR BY ID] Error stack:', error.stack);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          '⚠️ [GET TOUR BY ID] Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('❌ [GET TOUR BY ID] Unknown error:', error);
+    }
+    return { error, success: false, data: null };
+  }
+};
+
+/**
  * Get tours from backend API with filters
  */
 export const getTours = async (payload: ServicePayload): Promise<unknown> => {
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('BACKEND_URL is not configured, returning empty for tours');
+    return {
+      success: false,
+      data: [],
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
+    };
+  }
+
   try {
     const {
       cityId,
@@ -61,7 +131,23 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
 
     return result;
   } catch (error) {
-    console.error('Error in getTours service:', error);
-    return { error };
+    // Handle network errors gracefully (ECONNREFUSED, etc.)
+    if (error instanceof Error) {
+      console.error('Error in getTours service:', error.message);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          'Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('Unknown error in getTours service:', error);
+    }
+    return {
+      error,
+      success: false,
+      data: [],
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
+    };
   }
 };
