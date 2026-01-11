@@ -19,8 +19,8 @@ import citiesReducer from '~/store/slices/citiesSlice';
 import countriesReducer from '~/store/slices/countriesSlice';
 import categoriesReducer from '~/store/slices/categoriesSlice';
 import uiReducer from '~/store/slices/uiSlice';
-/* import authReducer from '~/store/slices/authSlice';
-import toursReducer from '~/store/slices/toursSlice';
+import authReducer from '~/store/slices/authSlice';
+/* import toursReducer from '~/store/slices/toursSlice';
 import usersReducer from '~/store/slices/usersSlice';
 import reservationsReducer from '~/store/slices/reservationsSlice';
 import newsReducer from '~/store/slices/newsSlice';
@@ -39,6 +39,7 @@ const rootReducer = combineReducers({
   country: countriesReducer,
   category: categoriesReducer,
   ui: uiReducer,
+  auth: authReducer,
   /* offers: offersReducer, */
 });
 

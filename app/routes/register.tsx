@@ -1,6 +1,6 @@
 /**
- * Login Route (/)
- * Modern login page with 2 column layout
+ * Register Route
+ * Modern registration page with 2 column layout
  */
 
 import type { JSX, FormEvent } from 'react';
@@ -13,7 +13,7 @@ import {
   loginFailure,
   selectIsAuthenticated,
 } from '~/store/slices/authSlice';
-import { loginUser } from '~/services/auth.service';
+import { registerUser } from '~/services/auth.service';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import Select from '~/components/ui/Select';
 import { useTranslation } from '~/lib/i18n/utils';
@@ -21,8 +21,8 @@ import type { Language } from '~/lib/i18n/types';
 
 export const meta: MetaFunction = () => {
   return [
-    { title: 'Login - Tours Admin' },
-    { name: 'description', content: 'Login to Tours Admin Dashboard' },
+    { title: 'Registro - Tours Admin' },
+    { name: 'description', content: 'Crea tu cuenta en Tours Admin' },
   ];
 };
 
@@ -31,14 +31,17 @@ const LANGUAGES = [
   { value: 'en', label: 'English' },
 ];
 
-export default function IndexRoute(): JSX.Element {
+export default function RegisterRoute(): JSX.Element {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const { t, language: currentLang } = useTranslation();
 
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -53,19 +56,38 @@ export default function IndexRoute(): JSX.Element {
     e.preventDefault();
     setError(null);
 
-    if (!email || !password) {
+    // Validaciones
+    if (!firstName || !lastName || !email || !password || !confirmPassword) {
       setError(t('auth.errorIncomplete'));
+      return;
+    }
+
+    if (password.length < 8) {
+      // Assuming simple validation message here as defined in translations
+      setError(t('validation.minLength', { min: 8 }));
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError(t('auth.errorMatch'));
       return;
     }
 
     setIsLoading(true);
     dispatch(loginStart());
-    dispatch(setGlobalLoading({ isLoading: true, message: t('auth.loggingIn') }));
+    dispatch(setGlobalLoading({ isLoading: true, message: t('auth.registering') }));
 
     try {
-      const response = await loginUser({ email, password });
+      const response = await registerUser({
+        email,
+        password,
+        role: 'user',
+        firstName,
+        lastName,
+      });
 
       if (response.success && response.data) {
+        // Auto login después del registro exitoso
         dispatch(
           loginSuccess({
             user: response.data.user,
@@ -74,12 +96,12 @@ export default function IndexRoute(): JSX.Element {
         );
         navigate('/dashboard');
       } else {
-        const errorMessage = response.error ?? response.message ?? t('auth.errorGenericLogin');
+        const errorMessage = response.error ?? response.message ?? t('auth.errorGenericRegister');
         setError(errorMessage);
         dispatch(loginFailure(errorMessage));
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : t('auth.errorGenericLogin');
+      const errorMessage = err instanceof Error ? err.message : t('auth.errorGenericRegister');
       setError(errorMessage);
       dispatch(loginFailure(errorMessage));
     } finally {
@@ -93,22 +115,22 @@ export default function IndexRoute(): JSX.Element {
   };
 
   return (
-    <div className="login-container">
-      <div className="login-left">
-        <div className="login-decoration-1" />
-        <div className="login-decoration-2" />
+    <div className="register-container">
+      <div className="register-left">
+        <div className="register-decoration-1" />
+        <div className="register-decoration-2" />
 
-        <div className="login-branding">
-          <div className="login-title">🏛️ {t('auth.title')}</div>
-          <p className="login-subtitle">{t('auth.subtitle')}</p>
+        <div className="register-branding">
+          <div className="register-title">🏛️ {t('auth.title')}</div>
+          <p className="register-subtitle">{t('auth.subtitleRegister')}</p>
 
-          <div className="login-image">
+          <div className="register-image">
             <img src="/login_tours_image.png" alt="Tours illustration" />
           </div>
         </div>
       </div>
 
-      <div className="login-right">
+      <div className="register-right">
         {/* Language Selector */}
         <div className="auth-lang-selector">
           <div style={{ width: '140px' }}>
@@ -121,16 +143,48 @@ export default function IndexRoute(): JSX.Element {
           </div>
         </div>
 
-        <div className="login-form-container">
-          <h1 className="login-heading">{t('auth.welcome')}</h1>
-          <p className="login-description">{t('auth.welcomeSub')}</p>
+        <div className="register-form-container">
+          <h1 className="register-heading">{t('auth.createAccount')}</h1>
+          <p className="register-description">{t('auth.fillForm')}</p>
 
           <form
             onSubmit={(e) => {
               void handleSubmit(e);
             }}
-            className="login-form"
+            className="register-form"
           >
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="firstName" className="form-label">
+                  {t('auth.firstName')}
+                </label>
+                <input
+                  id="firstName"
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder={t('auth.namePlaceholder')}
+                  disabled={isLoading}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="lastName" className="form-label">
+                  {t('auth.lastName')}
+                </label>
+                <input
+                  id="lastName"
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder={t('auth.lastNamePlaceholder')}
+                  disabled={isLoading}
+                  className="form-input"
+                />
+              </div>
+            </div>
+
             <div className="form-field">
               <label htmlFor="email" className="form-label">
                 {t('auth.email')}
@@ -159,6 +213,22 @@ export default function IndexRoute(): JSX.Element {
                 disabled={isLoading}
                 className="form-input"
               />
+              <p className="form-hint">{t('auth.minChars')}</p>
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="confirmPassword" className="form-label">
+                {t('auth.confirmPassword')}
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                disabled={isLoading}
+                className="form-input"
+              />
             </div>
 
             {error !== null && (
@@ -172,15 +242,15 @@ export default function IndexRoute(): JSX.Element {
               disabled={isLoading}
               className={`submit-button ${isLoading ? 'loading' : ''}`}
             >
-              {isLoading ? t('auth.loggingIn') : t('auth.login')}
+              {isLoading ? t('auth.registering') : t('auth.register')}
             </button>
           </form>
 
-          <div className="register-link">
+          <div className="login-link">
             <p>
-              {t('auth.registerPrompt')}{' '}
-              <Link to="/register" className="link">
-                {t('auth.registerLink')}
+              {t('auth.alreadyHaveAccount')}{' '}
+              <Link to="/" className="link">
+                {t('auth.loginLink')}
               </Link>
             </p>
           </div>

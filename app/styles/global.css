@@ -521,3 +521,302 @@ input[type='range']::-moz-range-track {
   background: transparent;
   border-radius: 3px;
 }
+
+/* Auth Pages (Login & Register) */
+.login-container,
+.register-container {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background-color: var(--color-neutral-50);
+}
+
+.login-left,
+.register-left {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-12);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-decoration-1,
+.register-decoration-1 {
+  position: absolute;
+  top: -50px;
+  left: -50px;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  filter: blur(60px);
+}
+
+.login-decoration-2,
+.register-decoration-2 {
+  position: absolute;
+  bottom: -100px;
+  right: -100px;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  filter: blur(80px);
+}
+
+.login-branding,
+.register-branding {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.login-title,
+.register-title {
+  font-size: 48px;
+  font-weight: var(--font-weight-bold);
+  color: white;
+  margin-bottom: var(--space-4);
+  text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.login-subtitle,
+.register-subtitle {
+  font-size: var(--text-xl);
+  color: rgba(255,255,255,0.9);
+  margin-bottom: var(--space-8);
+  max-width: 400px;
+}
+
+.login-image,
+.register-image {
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  transform: perspective(1000px) rotateY(-5deg);
+}
+
+.login-image img,
+.register-image img {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+  display: block;
+}
+
+.login-right,
+.register-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-12);
+  position: relative; /* For language selector positioning */
+}
+
+.login-form-container,
+.register-form-container {
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-heading,
+.register-heading {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-neutral-900);
+  margin-bottom: var(--space-2);
+}
+
+.login-description,
+.register-description {
+  color: var(--color-neutral-600);
+  margin-bottom: var(--space-8);
+}
+
+.login-form,
+.register-form {
+  width: 100%;
+}
+
+.form-field {
+  margin-bottom: var(--space-4);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.form-label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-700);
+  margin-bottom: var(--space-1);
+}
+
+.form-input {
+  width: 100%;
+  padding: var(--space-3);
+  border: 2px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  transition: all 0.2s;
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: var(--color-primary-500);
+}
+
+.form-input:disabled {
+  background-color: var(--color-neutral-100);
+  cursor: not-allowed;
+}
+
+.form-hint {
+  font-size: var(--text-xs);
+  color: var(--color-neutral-500);
+  margin-top: var(--space-1);
+}
+
+.error-message {
+  padding: var(--space-3);
+  background-color: #FEE2E2;
+  border-left: 4px solid #EF4444;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.error-message p {
+  color: #991B1B;
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.submit-button {
+  width: 100%;
+  padding: var(--space-3);
+  background-color: var(--color-primary-500);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all 0.2s;
+  transform: translateY(0);
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: var(--color-primary-600);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.submit-button.loading,
+.submit-button:disabled {
+  background-color: var(--color-primary-300);
+  cursor: not-allowed;
+}
+
+.register-link,
+.login-link {
+  margin-top: var(--space-6);
+  text-align: center;
+  padding: var(--space-4);
+  background-color: var(--color-neutral-100);
+  border-radius: var(--radius-md);
+}
+
+.register-link p,
+.login-link p {
+  color: var(--color-neutral-600);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.link {
+  color: var(--color-primary-600);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* Auth Language Selector */
+.auth-lang-selector {
+  position: absolute;
+  top: var(--space-6);
+  right: var(--space-6);
+  z-index: 10;
+}
+
+.auth-lang-select {
+  padding: var(--space-2) var(--space-8) var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-neutral-200);
+  background-color: white;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  transition: all 0.2s;
+}
+
+.auth-lang-select:hover {
+  border-color: var(--color-primary-300);
+}
+
+/* Auth Pages Responsive */
+@media (max-width: 768px) {
+  .login-container,
+  .register-container {
+    grid-template-columns: 1fr;
+    display: flex; /* Use flex to ensure order */
+    flex-direction: column;
+  }
+  
+  .login-left,
+  .register-left {
+    padding: var(--space-6);
+    min-height: 180px;
+    flex: 0 0 auto;
+    /* Maintain header-like appearance */
+  }
+
+  .login-title,
+  .register-title {
+    font-size: 28px;
+    margin-bottom: var(--space-2);
+  }
+
+  .login-subtitle,
+  .register-subtitle {
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-2);
+  }
+
+  /* Hide the large 3D image on mobile to keep it compact as a header */
+  .login-image,
+  .register-image {
+    display: none;
+  }
+  
+  .login-right,
+  .register-right {
+    padding: var(--space-6);
+    flex: 1;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}

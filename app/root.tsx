@@ -298,6 +298,7 @@ interface LoaderData {
   countries: Country[];
   selectedCountryId: string;
   selectedCountryCode: string;
+  language: string;
 }
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<{
@@ -368,6 +369,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
     countries,
     selectedCountryId: countryId ?? '',
     selectedCountryCode: countryCode ?? '',
+    language: currentLanguage,
   };
 
   return data(loaderResponse, {
@@ -478,6 +480,9 @@ export default function App(): React.JSX.Element {
     [cities, countries]
   );
 
+  // Check if current page is an auth page (login or register)
+  const isAuthPage = location.pathname === '/' || location.pathname === '/register';
+
   return (
     <CitiesContext.Provider value={contextValue}>
       {isClient && (
@@ -489,40 +494,45 @@ export default function App(): React.JSX.Element {
       )}
       <ClientOnlyGlobalLoader />
       <ClientOnlyModal />
-      <div style={{ minHeight: '100vh' }}>
-        <ClientOnlySidebar
-          isOpen={isSidebarOpen}
-          isCollapsed={isSidebarCollapsed}
-          onToggle={toggleSidebar}
-        />
-        <div
-          style={{
-            marginLeft: isMobile ? 0 : isSidebarCollapsed ? '80px' : '280px',
-            transition: 'margin-left var(--transition-base)',
-          }}
-        >
-          <ClientOnlyHeader
-            title={pageTitle}
-            isSidebarOpen={isSidebarOpen}
-            isSidebarCollapsed={isSidebarCollapsed}
-            onToggleSidebar={toggleSidebar}
-            onToggleSidebarCollapse={toggleSidebarCollapse}
-            countries={countries}
-            selectedCountryCode={selectedCountryCode}
+
+      {isAuthPage ? (
+        <Outlet />
+      ) : (
+        <div style={{ minHeight: '100vh' }}>
+          <ClientOnlySidebar
+            isOpen={isSidebarOpen}
+            isCollapsed={isSidebarCollapsed}
+            onToggle={toggleSidebar}
           />
-          <main
+          <div
             style={{
-              paddingTop: 'var(--header-height)',
-              paddingBottom: '80px',
-              paddingLeft: 'var(--space-6)',
-              paddingRight: 'var(--space-6)',
+              marginLeft: isMobile ? 0 : isSidebarCollapsed ? '80px' : '280px',
+              transition: 'margin-left var(--transition-base)',
             }}
           >
-            <Outlet />
-          </main>
-          <ClientOnlyFooter />
+            <ClientOnlyHeader
+              title={pageTitle}
+              isSidebarOpen={isSidebarOpen}
+              isSidebarCollapsed={isSidebarCollapsed}
+              onToggleSidebar={toggleSidebar}
+              onToggleSidebarCollapse={toggleSidebarCollapse}
+              countries={countries}
+              selectedCountryCode={selectedCountryCode}
+            />
+            <main
+              style={{
+                paddingTop: 'var(--header-height)',
+                paddingBottom: '80px',
+                paddingLeft: 'var(--space-6)',
+                paddingRight: 'var(--space-6)',
+              }}
+            >
+              <Outlet />
+            </main>
+            <ClientOnlyFooter />
+          </div>
         </div>
-      </div>
+      )}
     </CitiesContext.Provider>
   );
 }
