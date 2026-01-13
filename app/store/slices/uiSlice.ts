@@ -30,6 +30,7 @@ interface UIState {
   // Global transversal state
   isGlobalLoading: boolean;
   globalLoadingMessage: string;
+  showLogoutModal: boolean;
   token: string | null;
   language: string;
   currency: string;
@@ -43,6 +44,7 @@ const initialState: UIState = {
   // Global transversal state
   isGlobalLoading: false,
   globalLoadingMessage: '',
+  showLogoutModal: false,
   token: null,
   language: 'es',
   currency: 'MXN',
@@ -84,6 +86,9 @@ const uiSlice = createSlice({
       state.isGlobalLoading = action.payload.isLoading;
       state.globalLoadingMessage = action.payload.message ?? '';
     },
+    setLogoutModal: (state, action: PayloadAction<boolean>) => {
+      state.showLogoutModal = action.payload;
+    },
     setToken: (state, action: PayloadAction<string | null>) => {
       state.token = action.payload;
     },
@@ -107,6 +112,7 @@ export const {
   closeAllModals,
   setLoading,
   setGlobalLoading,
+  setLogoutModal,
   setToken,
   setLanguage,
   setCurrency,
@@ -116,6 +122,7 @@ export const {
 export const selectIsGlobalLoading = (state: RootState): boolean => state.ui.isGlobalLoading;
 export const selectGlobalLoadingMessage = (state: RootState): string =>
   state.ui.globalLoadingMessage;
+export const selectShowLogoutModal = (state: RootState): boolean => state.ui.showLogoutModal;
 export const selectToken = (state: RootState): string | null => state.ui.token;
 export const selectLanguage = (state: RootState): string => state.ui.language;
 export const selectCurrency = (state: RootState): string => state.ui.currency;

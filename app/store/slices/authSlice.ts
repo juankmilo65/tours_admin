@@ -27,39 +27,16 @@ interface AuthState {
   error: string | null;
 }
 
-// Try to load initial state from localStorage (client-side only)
+// Initial state - always start as not authenticated
+// Authentication state will be synced from server loader
 const getInitialState = (): AuthState => {
-  if (typeof window === 'undefined') {
-    return {
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
-    };
-  }
-
-  try {
-    const token = window.localStorage.getItem('authToken');
-    const userStr = window.localStorage.getItem('authUser');
-    const user = userStr !== null ? (JSON.parse(userStr) as User) : null;
-
-    return {
-      user,
-      token,
-      isAuthenticated: token !== null && user !== null,
-      isLoading: false,
-      error: null,
-    };
-  } catch {
-    return {
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
-    };
-  }
+  return {
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    isLoading: false,
+    error: null,
+  };
 };
 
 const initialState: AuthState = getInitialState();
@@ -121,11 +98,35 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    setAuthenticatedFromServer: (state, action: PayloadAction<boolean>) => {
+      // Only update authentication state if server says not authenticated
+      // If server says authenticated, we keep the current state (from login)
+      if (!action.payload) {
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        state.error = null;
+
+        // Clear localStorage
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem('authToken');
+          window.localStorage.removeItem('authUser');
+        }
+      }
+      // If server says authenticated, we trust the current client state
+    },
   },
 });
 
-export const { loginStart, loginSuccess, loginFailure, logout, updateUser, clearError } =
-  authSlice.actions;
+export const {
+  loginStart,
+  loginSuccess,
+  loginFailure,
+  logout,
+  updateUser,
+  clearError,
+  setAuthenticatedFromServer,
+} = authSlice.actions;
 
 // Selectors
 export const selectAuth = (state: RootState): AuthState => state.auth;

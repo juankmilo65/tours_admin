@@ -1,6 +1,8 @@
 import type { ActionFunctionArgs } from '@remix-run/node';
+import { json } from '@remix-run/node';
 import authBL from '~/server/businessLogic/authBusinessLogic';
 import type { ServiceResult } from '~/server/_index';
+import { getSession, commitSession } from '~/utilities/sessions';
 
 type LogoutResult = {
   success?: boolean;
@@ -10,7 +12,7 @@ type LogoutResult = {
 
 export async function action({ request }: ActionFunctionArgs): Promise<Response> {
   if (request.method !== 'POST') {
-    return Response.json({ error: 'Method not allowed' }, { status: 405 });
+    return json({ error: 'Method not allowed' }, { status: 405 });
   }
 
   try {
@@ -21,22 +23,37 @@ export async function action({ request }: ActionFunctionArgs): Promise<Response>
 
     // Check if result is an error object
     if (result !== null && typeof result === 'object' && 'error' in result) {
-      return Response.json(
-        { error: (result as { error?: string }).error ?? 'Unknown error' },
+      const errorResult = result as { error: unknown };
+      return json(
+        { error: typeof errorResult.error === 'string' ? errorResult.error : 'Unknown error' },
         { status: 400 }
       );
     }
 
-    // Check if result has success property
+    // Result should be LogoutResult type
     const logoutResult = result;
     if (logoutResult?.success === true) {
-      return Response.json(result);
+      // Get session and clear auth token
+      const session = await getSession(request.headers.get('Cookie'));
+      session.unset('authToken');
+
+      return json(
+        { success: true, message: 'Logged out successfully' },
+        {
+          headers: {
+            'Set-Cookie': await commitSession(session),
+          },
+        }
+      );
     } else {
-      return Response.json({ error: logoutResult?.error ?? 'Unknown error' }, { status: 400 });
+      return json(
+        { error: logoutResult?.error ?? logoutResult?.message ?? 'Logout failed' },
+        { status: 400 }
+      );
     }
   } catch (error) {
     console.error('Error in logout action:', error);
-    return Response.json(
+    return json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );

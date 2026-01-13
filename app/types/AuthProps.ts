@@ -7,6 +7,11 @@ export interface RegisterUserPayload {
   termsConditionsId: string;
 }
 
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
 export interface RequestEmailVerificationPayload {
   email: string;
 }

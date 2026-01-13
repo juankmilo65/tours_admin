@@ -22,7 +22,7 @@ type AuthResponse = {
   success: boolean;
   data?: {
     user: unknown;
-    token: string;
+    accessToken: string;
   };
   error?: string;
   message?: string;
@@ -204,7 +204,7 @@ export default function RegisterRoute(): JSX.Element {
         dispatch(
           loginSuccess({
             user: result.data.user,
-            token: result.data.token,
+            token: result.data.accessToken,
           })
         );
         navigate('/dashboard');

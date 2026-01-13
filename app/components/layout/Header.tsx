@@ -6,17 +6,15 @@ import type { JSX } from 'react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { translateCountries, translateCountry, type Country } from '~/store/slices/countriesSlice';
-import { setGlobalLoading, setLanguage, selectLanguage } from '~/store/slices/uiSlice';
-import { logout as logoutAction, selectAuthToken } from '~/store/slices/authSlice';
+import {
+  setGlobalLoading,
+  setLanguage,
+  selectLanguage,
+  setLogoutModal,
+} from '~/store/slices/uiSlice';
 import type { Option } from '~/components/ui/Select';
 import Select from '~/components/ui/Select';
-import {
-  useSubmit,
-  useNavigation,
-  useLocation,
-  useSearchParams,
-  useNavigate,
-} from '@remix-run/react';
+import { useSubmit, useNavigation, useLocation, useSearchParams } from '@remix-run/react';
 import { useTranslation } from '~/lib/i18n/utils';
 import type { Language } from '~/lib/i18n/types';
 
@@ -42,16 +40,13 @@ export function Header({
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // i18n hook
   const { t } = useTranslation();
 
-  // Redux state solo para language
+  // Redux state
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector(selectLanguage);
-  const authToken = useAppSelector(selectAuthToken);
 
   // Translate countries based on current language usando props
   const translatedCountries = useMemo(
@@ -69,7 +64,6 @@ export function Header({
   const submit = useSubmit();
   const navigation = useNavigation();
   const location = useLocation();
-  const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
 
   const isChangingCountry = navigation.state === 'submitting' || navigation.state === 'loading';
@@ -125,38 +119,6 @@ export function Header({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  // Handle logout
-  const handleLogout = () => {
-    setIsLoggingOut(true);
-    dispatch(setGlobalLoading({ isLoading: true, message: t('auth.loggingOut') }));
-
-    try {
-      // Create FormData with token
-      const formData = new FormData();
-      formData.append('action', 'logoutUserBusinessLogic');
-      if (authToken !== null && authToken.trim() !== '') {
-        formData.append('token', authToken);
-      }
-
-      // Call logout API using Remix submit
-      submit(formData, { method: 'post', action: '/api/auth/logout' });
-      // Clear Redux state
-      dispatch(logoutAction());
-      // Redirect to login
-      navigate('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Still logout locally even if API fails
-      dispatch(logoutAction());
-      navigate('/');
-    } finally {
-      setIsLoggingOut(false);
-      dispatch(setGlobalLoading({ isLoading: false }));
-      setShowLogoutModal(false);
-      setIsUserMenuOpen(false);
-    }
-  };
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -521,7 +483,7 @@ export function Header({
                 ></div>
                 <button
                   onClick={() => {
-                    setShowLogoutModal(true);
+                    dispatch(setLogoutModal(true));
                     setIsUserMenuOpen(false);
                   }}
                   style={{
@@ -553,115 +515,6 @@ export function Header({
           </div>
         </div>
       </div>
-
-      {/* Logout Confirmation Modal */}
-      {showLogoutModal && (
-        <>
-          {/* Backdrop that blocks all interactions */}
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              zIndex: 9999,
-              pointerEvents: 'auto',
-            }}
-            onClick={() => setShowLogoutModal(false)}
-          />
-          {/* Modal content */}
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10000,
-              pointerEvents: 'none',
-            }}
-          >
-            <div
-              style={{
-                backgroundColor: 'white',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-6)',
-                maxWidth: '400px',
-                width: '90%',
-                boxShadow: 'var(--shadow-lg)',
-                pointerEvents: 'auto',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  marginBottom: 'var(--space-4)',
-                  fontSize: 'var(--text-lg)',
-                  fontWeight: '600',
-                  color: 'var(--color-neutral-900)',
-                }}
-              >
-                {t('auth.logoutConfirmTitle')}
-              </h3>
-              <p
-                style={{
-                  marginBottom: 'var(--space-6)',
-                  color: 'var(--color-neutral-700)',
-                  lineHeight: 1.5,
-                }}
-              >
-                {t('auth.logoutConfirmMessage')}
-              </p>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 'var(--space-3)',
-                  justifyContent: 'flex-end',
-                }}
-              >
-                <button
-                  onClick={() => setShowLogoutModal(false)}
-                  disabled={isLoggingOut}
-                  style={{
-                    padding: 'var(--space-2) var(--space-4)',
-                    backgroundColor: 'var(--color-neutral-200)',
-                    color: 'var(--color-neutral-700)',
-                    border: 'none',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: '500',
-                  }}
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  onClick={handleLogout}
-                  disabled={isLoggingOut}
-                  style={{
-                    padding: 'var(--space-2) var(--space-4)',
-                    backgroundColor: 'var(--color-error-600)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: '500',
-                  }}
-                >
-                  {isLoggingOut ? t('auth.loggingOut') : t('auth.logoutConfirmButton')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </header>
   );
 }

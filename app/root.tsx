@@ -7,7 +7,7 @@ import {
   useLocation,
   useLoaderData,
 } from '@remix-run/react';
-import { data, type LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
+import { data, redirect, type LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
 import { useMemo, useState, useEffect, createContext, type ReactNode } from 'react';
 import React from 'react';
 import { Provider } from 'react-redux';
@@ -19,6 +19,7 @@ import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
 import { GlobalLoader } from './components/ui/GlobalLoader';
+import { LogoutModal } from './components/ui/LogoutModal';
 import { ModalRoot } from './components/ui/Modal';
 import citiesBL from './server/businessLogic/citiesBusinessLogic';
 import countriesBL from './server/businessLogic/countriesBusinessLogic';
@@ -28,6 +29,7 @@ import { getSession, commitSession } from '~/utilities/sessions';
 import { useAppDispatch } from '~/store/hooks';
 import { fetchCitiesSuccess } from './store/slices/citiesSlice';
 import { fetchCountriesSuccess, setSelectedCountryByCode } from './store/slices/countriesSlice';
+import { setAuthenticatedFromServer } from './store/slices/authSlice';
 
 // Context for sharing cities and countries globally
 export const CitiesContext = createContext<{
@@ -40,10 +42,12 @@ function DataSyncDispatcher({
   cities,
   countries,
   selectedCountryCode,
+  isAuthenticated,
 }: {
   cities: City[];
   countries: Country[];
   selectedCountryCode: string;
+  isAuthenticated: boolean;
 }) {
   const dispatch = useAppDispatch();
 
@@ -66,7 +70,12 @@ function DataSyncDispatcher({
     ) {
       dispatch(setSelectedCountryByCode(selectedCountryCode));
     }
-  }, [cities, countries, selectedCountryCode, dispatch]);
+
+    // Sync authentication state from server
+    // If server says not authenticated, clear client state
+    // If server says authenticated, trust current client state (from login)
+    dispatch(setAuthenticatedFromServer(isAuthenticated));
+  }, [cities, countries, selectedCountryCode, isAuthenticated, dispatch]);
 
   return null;
 }
@@ -181,6 +190,25 @@ function ClientOnlyGlobalLoader(): ReactNode {
   }
 
   return <GlobalLoader />;
+}
+
+// Wrapper to only render LogoutModal on client
+function ClientOnlyLogoutModal(): ReactNode {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // Defer setState to avoid cascading renders
+    const timeoutId = window.setTimeout(() => {
+      setIsClient(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  if (!isClient) {
+    return null;
+  }
+
+  return <LogoutModal />;
 }
 
 // Wrapper to only render Modal on client
@@ -299,14 +327,30 @@ interface LoaderData {
   selectedCountryId: string;
   selectedCountryCode: string;
   language: string;
+  isAuthenticated: boolean;
+  user: unknown; // We'll add proper typing later
 }
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<{
   data: LoaderData;
 }> {
-  // Load cities and countries globally for all routes
-  const session = await getSession(request.headers.get('Cookie'));
+  const url = new URL(request.url);
+  const pathname = url.pathname;
 
+  // Rutas públicas que no requieren autenticación
+  const publicRoutes = ['/', '/register'];
+  const isPublicRoute = publicRoutes.includes(pathname);
+
+  // Load session to check authentication
+  const session = await getSession(request.headers.get('Cookie'));
+  const authToken = session.get('authToken') as string | undefined;
+
+  // Si no es una ruta pública y no hay token, redirigir al login
+  if (!isPublicRoute && (authToken?.trim() ?? '') === '') {
+    throw redirect('/');
+  }
+
+  // Load cities and countries globally for all routes
   // Get selected country from session
   const selectedCountryId = session.get('selectedCountryId') as string | undefined;
   const selectedCountryCode = session.get('selectedCountryCode') as string | undefined;
@@ -322,7 +366,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
     success: boolean;
     data: Country[];
   };
-  const countries = countriesResult.success ? countriesResult.data : [];
+  const countries = countriesResult.success === true ? countriesResult.data : [];
 
   // Determine country to filter by
   // Priority: 1. selectedCountryId from session (if valid), 2. Default to Mexico
@@ -370,6 +414,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
     selectedCountryId: countryId ?? '',
     selectedCountryCode: countryCode ?? '',
     language: currentLanguage,
+    isAuthenticated: (authToken?.trim() ?? '') !== '',
+    user: null, // For now, we'll set this to null and handle user data separately
   };
 
   return data(loaderResponse, {
@@ -389,13 +435,14 @@ export default function App(): React.JSX.Element {
 
   // Extract loader data - Los datos están en loaderData.data cuando usamos data() con headers
   const typedLoader = loaderData as unknown as { data?: LoaderData };
-  const hasData = typedLoader.data !== undefined;
+  const hasData = typedLoader.data !== undefined && typedLoader.data !== null;
   const dataOrLoader = hasData
     ? (typedLoader as { data: LoaderData }).data
     : (loaderData as LoaderData);
   const cities = useMemo(() => dataOrLoader?.cities ?? [], [dataOrLoader]);
   const countries = useMemo(() => dataOrLoader?.countries ?? [], [dataOrLoader]);
   const selectedCountryCode = dataOrLoader?.selectedCountryCode ?? '';
+  const isAuthenticated = dataOrLoader?.isAuthenticated ?? false;
 
   // Check if we're on client
   useEffect(() => {
@@ -490,9 +537,11 @@ export default function App(): React.JSX.Element {
           cities={cities}
           countries={countries}
           selectedCountryCode={selectedCountryCode}
+          isAuthenticated={isAuthenticated}
         />
       )}
       <ClientOnlyGlobalLoader />
+      <ClientOnlyLogoutModal />
       <ClientOnlyModal />
 
       {isAuthPage ? (

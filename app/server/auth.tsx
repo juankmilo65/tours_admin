@@ -35,6 +35,21 @@ export interface LogoutResponse {
   error?: unknown;
 }
 
+export interface LoginResponse {
+  success?: boolean;
+  data?: {
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+    };
+    token: string;
+  };
+  error?: unknown;
+}
+
 /**
  * Register user
  */
@@ -59,6 +74,34 @@ export const registerUser = async (payload: {
     return result as RegisterUserResponse;
   } catch (error: unknown) {
     console.error('Error in registerUser service:', error);
+    // @ts-ignore
+    return {
+      error: error instanceof Error ? error.message : 'Internal server error',
+      success: false,
+    };
+  }
+};
+
+/**
+ * Login user
+ */
+export const login = async (payload: {
+  email: string;
+  password: string;
+}): Promise<LoginResponse> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('BACKEND_URL is not configured');
+    return { success: false, error: 'Backend not configured' };
+  }
+
+  try {
+    const authService = createServiceREST(BASE_URL, 'auth/login', 'POST');
+
+    const result = await authService.create(payload);
+
+    return result as LoginResponse;
+  } catch (error: unknown) {
+    console.error('Error in login service:', error);
     // @ts-ignore
     return {
       error: error instanceof Error ? error.message : 'Internal server error',

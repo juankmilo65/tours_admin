@@ -13,7 +13,6 @@ import {
   loginFailure,
   selectIsAuthenticated,
 } from '~/store/slices/authSlice';
-import { loginUser } from '~/services/auth.service';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import Select from '~/components/ui/Select';
 import { useTranslation } from '~/lib/i18n/utils';
@@ -69,18 +68,33 @@ export default function IndexRoute(): JSX.Element {
     dispatch(setGlobalLoading({ isLoading: true, message: t('auth.loggingIn') }));
 
     try {
-      const response = await loginUser({ email, password });
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('password', password);
 
-      if (response.success && response.data) {
+      // eslint-disable-next-line no-undef
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: { user: unknown; accessToken: string };
+        error?: string;
+        message?: string;
+      };
+
+      if (response.ok && result.success === true && result.data) {
         dispatch(
           loginSuccess({
-            user: response.data.user,
-            token: response.data.token,
+            user: result.data.user,
+            token: result.data.accessToken,
           })
         );
         navigate('/dashboard');
       } else {
-        const errorMessage = response.error ?? response.message ?? t('auth.errorGenericLogin');
+        const errorMessage = result.error ?? result.message ?? t('auth.errorGenericLogin');
         setError(errorMessage);
         dispatch(loginFailure(errorMessage));
       }

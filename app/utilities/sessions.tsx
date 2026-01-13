@@ -1,4 +1,8 @@
 import { createCookieSessionStorage } from '@remix-run/node';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const sessionSecret = process.env.SESSION_SECRET;
 if (sessionSecret === undefined || sessionSecret === '') {

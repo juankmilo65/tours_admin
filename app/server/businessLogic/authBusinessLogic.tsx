@@ -1,11 +1,13 @@
 import {
   registerUser as registerUserService,
+  login as loginService,
   requestEmailVerification,
   verifyEmail,
   logout,
 } from '../auth';
 import type {
   RegisterUserPayload,
+  LoginPayload,
   RequestEmailVerificationPayload,
   VerifyEmailPayload,
   LogoutPayload,
@@ -52,6 +54,24 @@ const generateVerifyEmailPayload = (formData: FormData): VerifyEmailPayload => {
   };
 };
 
+const generateLogoutPayload = (formData: FormData): LogoutPayload => {
+  const token = formData.get('token');
+
+  return {
+    token: token !== null && token !== undefined ? token.toString() : '',
+  };
+};
+
+const generateLoginData = (formData: FormData): LoginPayload => {
+  const email = formData.get('email');
+  const password = formData.get('password');
+
+  return {
+    email: typeof email === 'string' ? email : '',
+    password: typeof password === 'string' ? password : '',
+  };
+};
+
 /**
  * Business logic for registering user
  */
@@ -61,9 +81,9 @@ const registerUserBusinessLogic = async (
   try {
     const result = await registerUserService(data);
     return result;
-  } catch (error) {
-    console.error('Error in registerUserBusiness:', error);
-    return Promise.resolve({ error });
+  } catch (err) {
+    console.error('Error in registerUserBusiness:', err);
+    return Promise.resolve({ error: err });
   }
 };
 
@@ -76,9 +96,9 @@ const requestEmailVerificationBusinessLogic = async (
   try {
     const result = await requestEmailVerification(data);
     return result;
-  } catch (error) {
-    console.error('Error in requestEmailVerificationBusiness:', error);
-    return Promise.resolve({ error });
+  } catch (err) {
+    console.error('Error in requestEmailVerificationBusiness:', err);
+    return Promise.resolve({ error: err });
   }
 };
 
@@ -91,9 +111,9 @@ const verifyEmailBusinessLogic = async (
   try {
     const result = await verifyEmail(data);
     return result;
-  } catch (error) {
-    console.error('Error in verifyEmailBusiness:', error);
-    return Promise.resolve({ error });
+  } catch (err) {
+    console.error('Error in verifyEmailBusiness:', err);
+    return Promise.resolve({ error: err });
   }
 };
 
@@ -106,9 +126,38 @@ const logoutUserBusinessLogic = async (data: unknown): Promise<ServiceResult<unk
     const token = logoutData?.token ?? '';
     const result = await logout({ token });
     return result;
-  } catch (error) {
-    console.error('Error in logoutUserBusiness:', error);
-    return Promise.resolve({ error });
+  } catch (err) {
+    console.error('Error in logoutUserBusiness:', err);
+    return Promise.resolve({ error: err });
+  }
+};
+
+/**
+ * Business logic for user login
+ */
+const loginUserBusinessLogic = async (data: unknown): Promise<ServiceResult<unknown>> => {
+  try {
+    // Validate that data has the correct structure
+    if (typeof data !== 'object' || data === null) {
+      throw new Error('Invalid login data');
+    }
+
+    const loginData = data as Record<string, unknown>;
+    if (typeof loginData.email !== 'string' || typeof loginData.password !== 'string') {
+      throw new Error('Invalid login data structure');
+    }
+
+    const loginDataValidated: LoginPayload = {
+      email: loginData.email,
+      password: loginData.password,
+    };
+
+    const result = await loginService(loginDataValidated);
+    return result;
+  } catch (err) {
+    console.error('Error in loginUserBusiness:', err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return Promise.resolve({ error: new Error(errorMessage) });
   }
 };
 
@@ -118,6 +167,7 @@ const logoutUserBusinessLogic = async (data: unknown): Promise<ServiceResult<unk
 const authBusinessLogic = (action: string, data: unknown): Promise<ServiceResult<unknown>> => {
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
     registerUserBusinessLogic: () => registerUserBusinessLogic(data as RegisterUserPayload),
+    loginUserBusinessLogic: () => loginUserBusinessLogic(data as LoginPayload),
     requestEmailVerificationBusinessLogic: () =>
       requestEmailVerificationBusinessLogic(data as RequestEmailVerificationPayload),
     verifyEmailBusinessLogic: () => verifyEmailBusinessLogic(data as VerifyEmailPayload),
@@ -145,28 +195,30 @@ const auth = (formData: FormData): Promise<ServiceResult<unknown>> => {
     const action = formData.get('action')?.toString() ?? '';
     let payload:
       | RegisterUserPayload
+      | LoginPayload
       | RequestEmailVerificationPayload
       | VerifyEmailPayload
       | LogoutPayload;
 
     if (action === 'registerUserBusinessLogic') {
       payload = generatePayload(formData);
+    } else if (action === 'loginUserBusinessLogic') {
+      payload = generateLoginData(formData);
     } else if (action === 'requestEmailVerificationBusinessLogic') {
       payload = generateRequestEmailPayload(formData);
     } else if (action === 'verifyEmailBusinessLogic') {
       payload = generateVerifyEmailPayload(formData);
     } else if (action === 'logoutUserBusinessLogic') {
-      // For logout, create payload with token from formData
-      const token = formData.get('token')?.toString() ?? '';
-      payload = { token };
+      payload = generateLogoutPayload(formData);
     } else {
       return Promise.resolve({ error: { status: 400, message: 'Invalid action' } });
     }
 
     return authBusinessLogic(action, payload);
-  } catch (error) {
-    console.error('Error in auth business logic:', error);
-    return Promise.resolve({ error });
+  } catch (err) {
+    console.error('Error in auth business logic:', err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return Promise.resolve({ error: new Error(errorMessage) });
   }
 };
 
