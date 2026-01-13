@@ -15,9 +15,18 @@ import {
   loginFailure,
   selectIsAuthenticated,
 } from '~/store/slices/authSlice';
-import { registerUser } from '~/services/auth.service';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import Select from '~/components/ui/Select';
+
+type AuthResponse = {
+  success: boolean;
+  data?: {
+    user: unknown;
+    token: string;
+  };
+  error?: string;
+  message?: string;
+};
 import { useTranslation } from '~/lib/i18n/utils';
 import type { Language } from '~/lib/i18n/types';
 import termsConditionsBL from '~/server/businessLogic/termsConditionsBusinessLogic';
@@ -42,18 +51,14 @@ type LoaderData = {
 export async function loader({ request }: LoaderFunctionArgs): Promise<{ terms: unknown }> {
   const url = new URL(request.url);
   const lang = url.searchParams.get('lang') ?? 'es';
-  console.warn('Loader called with lang:', lang);
+
   const formData = new FormData();
   formData.append('action', 'getTermsConditionsByTypeBusinessLogic');
   formData.append('type', 'registration');
   formData.append('language', lang);
-  console.warn('Calling termsConditionsBL with formData:', {
-    action: formData.get('action'),
-    type: formData.get('type'),
-    language: formData.get('language'),
-  });
+
   const result = await termsConditionsBL(formData);
-  console.warn('Terms and conditions loaded in register loader:', result);
+
   return { terms: result };
 }
 
@@ -111,12 +116,24 @@ export default function RegisterRoute(): JSX.Element {
     ) {
       const termsObj = loaderData.terms.data[0];
       const contentKey = `termsConditions_${currentLang}` as keyof typeof termsObj;
-      const content = termsObj[contentKey] as string;
+      let content = termsObj[contentKey] as string;
       console.warn('Setting termsData with contentKey:', contentKey, 'content:', content);
-      setTermsData(content);
-      setTermsTitle(t('auth.termsTitle'));
+      if (!content) {
+        // Fallback to Spanish if current language not available
+        const fallbackKey = 'termsConditions_es' as keyof typeof termsObj;
+        content = termsObj[fallbackKey] as string;
+        console.warn('Using fallback contentKey:', fallbackKey, 'content:', content);
+      }
+      if (content !== undefined && content !== null && content !== '') {
+        setTermsData(content);
+        setTermsTitle(t('auth.termsTitle'));
+      } else {
+        console.warn('No content found');
+        setTermsData(null);
+      }
     } else {
       console.warn('Terms not successful or no data');
+      setTermsData(null);
     }
   }, [loaderData.terms, currentLang, t]);
 
@@ -159,25 +176,42 @@ export default function RegisterRoute(): JSX.Element {
     dispatch(setGlobalLoading({ isLoading: true, message: t('auth.registering') }));
 
     try {
-      const response = await registerUser({
-        email,
-        password,
-        role: 'user',
-        firstName,
-        lastName,
+      const termsConditionsId = loaderData.terms.data?.[0]?.id;
+      if (termsConditionsId === null) {
+        setError(t('auth.termsNotLoaded'));
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('action', 'registerUserBusinessLogic');
+      formData.append('email', email);
+      formData.append('password', password);
+      formData.append('role', 'user');
+      formData.append('firstName', firstName);
+      formData.append('lastName', lastName);
+      formData.append('termsConditionsId', termsConditionsId);
+
+      // eslint-disable-next-line no-undef
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        body: formData,
       });
 
-      if (response.success && response.data) {
+      const result = (await response.json()) as AuthResponse;
+
+      if (response.ok && result.success === true && result.data !== null) {
         // Auto login después del registro exitoso
         dispatch(
           loginSuccess({
-            user: response.data.user,
-            token: response.data.token,
+            user: result.data.user,
+            token: result.data.token,
           })
         );
         navigate('/dashboard');
       } else {
-        const errorMessage = response.error ?? response.message ?? t('auth.errorGenericRegister');
+        // @ts-ignore
+        const errorMessage: string =
+          result.error ?? result.message ?? t('auth.errorGenericRegister');
         setError(errorMessage);
         dispatch(loginFailure(errorMessage));
       }

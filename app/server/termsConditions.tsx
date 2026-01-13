@@ -4,7 +4,7 @@ const BASE_URL = process.env.BACKEND_URL ?? '';
 
 export interface TermsConditionsResponse {
   success?: boolean;
-  data?: {
+  data?: Array<{
     id: string;
     type: string;
     title: string;
@@ -12,8 +12,11 @@ export interface TermsConditionsResponse {
     version: string;
     effectiveDate: string;
     language: string;
-  };
+    termsConditions_es?: string;
+    termsConditions_en?: string;
+  }>;
   error?: unknown;
+  count?: number;
 }
 
 /**
@@ -23,16 +26,13 @@ export const getTermsConditionsByType = async (
   type: string,
   language?: string
 ): Promise<TermsConditionsResponse> => {
-  console.warn('getTermsConditionsByType called with type:', type, 'language:', language);
   // Check if backend URL is configured
   if (BASE_URL === '' || BASE_URL === undefined) {
-    console.warn('BACKEND_URL is not configured, returning empty for terms and conditions');
     return { success: false, data: undefined };
   }
 
   try {
     const termsEndpoint = `terms-conditions/type/${type}`;
-    console.warn('Making request to:', `${BASE_URL}${termsEndpoint}`, 'with language:', language);
     const termsService = createServiceREST(BASE_URL, termsEndpoint, 'Bearer');
 
     const result = await termsService.get({
@@ -40,7 +40,6 @@ export const getTermsConditionsByType = async (
         'X-Language': language ?? 'es',
       },
     });
-    console.warn('Request result:', result);
 
     return result as TermsConditionsResponse;
   } catch (error) {

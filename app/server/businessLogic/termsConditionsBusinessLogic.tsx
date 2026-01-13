@@ -23,13 +23,10 @@ const generatePayload = (formData: FormData): TermsConditionsFilterPayload => {
 const getTermsConditionsByTypeBusinessLogic = async (
   data: TermsConditionsFilterPayload
 ): Promise<ServiceResult<unknown>> => {
-  console.warn('getTermsConditionsByTypeBusinessLogic called with data:', data);
   try {
     const result = await getTermsConditionsByType(data.type, data.language);
-    console.warn('getTermsConditionsByType returned:', result);
     return result;
   } catch (error) {
-    console.error('Error in getToursBusiness:', error);
     return Promise.resolve({ error });
   }
 };
@@ -41,14 +38,12 @@ const termsConditionsBusinessLogic = (
   action: string,
   data: TermsConditionsFilterPayload
 ): Promise<ServiceResult<unknown>> => {
-  console.warn('termsConditionsBusinessLogic called with action:', action, 'data:', data);
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
     getTermsConditionsByTypeBusinessLogic: () => getTermsConditionsByTypeBusinessLogic(data),
   };
 
   const handler = ACTIONS[action];
   if (handler === undefined) {
-    console.warn('Invalid action:', action);
     return Promise.resolve({
       error: {
         status: 400,
@@ -64,16 +59,14 @@ const termsConditionsBusinessLogic = (
  * Main export function
  */
 const termsConditions = (formData: FormData): Promise<ServiceResult<unknown>> => {
-  console.warn('termsConditions main function called with formData');
   try {
     const payload = generatePayload(formData);
-    console.warn('Generated payload:', payload);
+
     const { action } = payload;
     const result = termsConditionsBusinessLogic(action, payload);
-    console.warn('termsConditionsBusinessLogic result:', result);
+
     return result;
   } catch (error) {
-    console.error('Error in tours business logic:', error);
     return Promise.resolve({ error });
   }
 };
