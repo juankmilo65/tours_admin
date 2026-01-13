@@ -132,6 +132,12 @@ export const es: Translation = {
     errorGenericRegister: 'Error al crear la cuenta',
     errorIncomplete: 'Por favor completa todos los campos',
     errorMatch: 'Las contraseñas no coinciden',
+    acceptTerms: 'Acepto los términos y condiciones',
+    viewTerms: 'Ver términos y condiciones',
+    termsTitle: 'Términos y Condiciones',
+    acceptTermsButton: 'Aceptar',
+    termsRequired: 'Debes aceptar los términos y condiciones',
+    termsLoadingError: 'Error al cargar los términos y condiciones',
   },
   dashboard: {
     title: 'Panel de Control',

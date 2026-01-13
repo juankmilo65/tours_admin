@@ -39,6 +39,12 @@ export default function IndexRoute(): JSX.Element {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Password Visibility Logic
+  const [passLocked, setPassLocked] = useState(false);
+  const [passHover, setPassHover] = useState(false);
+  const showPassword = passLocked || passHover;
+
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -91,6 +97,42 @@ export default function IndexRoute(): JSX.Element {
   const handleLanguageChange = (value: string) => {
     dispatch(setLanguage(value as Language));
   };
+
+  // Icons
+  const EyeIcon = (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+  const EyeOffIcon = (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7c.68 0 1.35-.06 1.99-.17" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
 
   return (
     <div className="login-container">
@@ -150,15 +192,29 @@ export default function IndexRoute(): JSX.Element {
               <label htmlFor="password" className="form-label">
                 {t('auth.password')}
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                disabled={isLoading}
-                className="form-input"
-              />
+              <div className="password-input-container">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={isLoading}
+                  className="form-input"
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setPassLocked(!passLocked)}
+                  onMouseEnter={() => setPassHover(true)}
+                  onMouseLeave={() => setPassHover(false)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title="Click to toggle, hover to peek"
+                >
+                  {showPassword ? EyeOffIcon : EyeIcon}
+                </button>
+              </div>
             </div>
 
             {error !== null && (

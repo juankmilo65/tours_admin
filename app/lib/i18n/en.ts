@@ -132,6 +132,12 @@ export const en: Translation = {
     errorGenericRegister: 'Account creation failed',
     errorIncomplete: 'Please fill in all fields',
     errorMatch: 'Passwords do not match',
+    acceptTerms: 'I accept the terms and conditions',
+    viewTerms: 'View terms and conditions',
+    termsTitle: 'Terms and Conditions',
+    acceptTermsButton: 'Accept',
+    termsRequired: 'You must accept the terms and conditions',
+    termsLoadingError: 'Error loading terms and conditions',
   },
   dashboard: {
     title: 'Dashboard',

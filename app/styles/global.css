@@ -615,12 +615,14 @@ input[type='range']::-moz-range-track {
   align-items: center;
   padding: var(--space-12);
   position: relative; /* For language selector positioning */
+  overflow: visible; /* Ensure dropdowns are visible */
 }
 
 .login-form-container,
 .register-form-container {
   width: 100%;
   max-width: 420px;
+  overflow: visible; /* Ensure dropdowns are not clipped */
 }
 
 .login-heading,
@@ -756,7 +758,16 @@ input[type='range']::-moz-range-track {
   position: absolute;
   top: var(--space-6);
   right: var(--space-6);
-  z-index: 10;
+  z-index: 50;
+}
+
+.auth-lang-selector .custom-select {
+  position: relative;
+  z-index: 50;
+}
+
+.auth-lang-selector .custom-select ul {
+  z-index: 51;
 }
 
 .auth-lang-select {
@@ -819,4 +830,47 @@ input[type='range']::-moz-range-track {
   .form-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* Password Visibility Toggle */
+.password-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-container input {
+  padding-right: 2.5rem; /* Space for the eye icon */
+  width: 100%;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-neutral-400);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  /* Reset button default styles that might conflict */
+  width: auto;
+  height: auto;
+}
+
+.password-toggle:hover {
+  color: var(--color-primary-500);
+}
+
+/* Validation Feedback */
+.validation-error {
+  color: #EF4444;
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }

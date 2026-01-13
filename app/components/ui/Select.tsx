@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import React from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 
@@ -30,29 +30,38 @@ export default function Select({
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const isOpeningRef = useRef(false);
   const { t } = useTranslation();
 
   const selected = options.find((o) => o.value === value);
 
   useEffect(() => {
-    function handleOutside(e: MouseEvent) {
+    function handleOutside(e: Event) {
+      if (isOpeningRef.current) {
+        isOpeningRef.current = false;
+        return;
+      }
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         setOpen(false);
         setHighlightedIndex(-1);
       }
     }
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
+    document.addEventListener('click', handleOutside);
+    return () => document.removeEventListener('click', handleOutside);
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     window.setTimeout(() => {
       if (!open) setHighlightedIndex(-1);
     }, 0);
   }, [open]);
 
-  const toggle = (): void => {
+  const toggle = (e: React.MouseEvent<HTMLButtonElement>): void => {
     if (disabled === true) return;
+    e.stopPropagation();
+    if (!open) {
+      isOpeningRef.current = true;
+    }
     setOpen((v) => !v);
   };
 
@@ -102,7 +111,7 @@ export default function Select({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={toggle}
+        onClick={(e) => toggle(e)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
         className="custom-select-button"
@@ -141,7 +150,7 @@ export default function Select({
             boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
             maxHeight: '280px',
             overflow: 'auto',
-            zIndex: 2000,
+            zIndex: 10000,
             padding: '8px 0',
             margin: 0,
             listStyle: 'none',
