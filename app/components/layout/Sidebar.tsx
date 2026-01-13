@@ -83,7 +83,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.El
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 'var(--z-modal-backdrop)',
+            zIndex: 999,
             transition: 'opacity var(--transition-base)',
           }}
         ></div>

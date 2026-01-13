@@ -138,6 +138,12 @@ export const es: Translation = {
     acceptTermsButton: 'Aceptar',
     termsRequired: 'Debes aceptar los términos y condiciones',
     termsLoadingError: 'Error al cargar los términos y condiciones',
+    logoutConfirmTitle: 'Confirmar Cierre de Sesión',
+    logoutConfirmMessage: '¿Estás seguro de que quieres cerrar sesión?',
+    logoutConfirmButton: 'Cerrar Sesión',
+    logoutSuccess: 'Sesión cerrada exitosamente',
+    logoutError: 'Error al cerrar sesión',
+    loggingOut: 'Cerrando sesión...',
   },
   dashboard: {
     title: 'Panel de Control',

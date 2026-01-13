@@ -138,6 +138,12 @@ export const en: Translation = {
     acceptTermsButton: 'Accept',
     termsRequired: 'You must accept the terms and conditions',
     termsLoadingError: 'Error loading terms and conditions',
+    logoutConfirmTitle: 'Confirm Logout',
+    logoutConfirmMessage: 'Are you sure you want to log out of your account?',
+    logoutConfirmButton: 'Logout',
+    logoutSuccess: 'Logged out successfully',
+    logoutError: 'Error logging out',
+    loggingOut: 'Logging out...',
   },
   dashboard: {
     title: 'Dashboard',

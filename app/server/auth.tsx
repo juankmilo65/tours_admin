@@ -29,6 +29,12 @@ export interface VerifyEmailResponse {
   error?: unknown;
 }
 
+export interface LogoutResponse {
+  success?: boolean;
+  message?: string;
+  error?: unknown;
+}
+
 /**
  * Register user
  */
@@ -105,6 +111,30 @@ export const verifyEmail = async (payload: { otp: string }): Promise<VerifyEmail
     return result as VerifyEmailResponse;
   } catch (error: unknown) {
     console.error('Error in verifyEmail service:', error);
+    // @ts-ignore
+    return {
+      error: error instanceof Error ? error.message : 'Internal server error',
+      success: false,
+    };
+  }
+};
+
+/**
+ * Logout user service
+ */
+export const logout = async (payload: { token: string }): Promise<LogoutResponse> => {
+  if (!BASE_URL || BASE_URL === '') {
+    return { success: false, error: 'Backend not configured' };
+  }
+
+  try {
+    const authService = createServiceREST(BASE_URL, 'auth/logout', payload.token);
+
+    const result = await authService.create({}); // Empty payload for logout
+
+    return result as LogoutResponse;
+  } catch (error: unknown) {
+    console.error('Error in logout service:', error);
     // @ts-ignore
     return {
       error: error instanceof Error ? error.message : 'Internal server error',

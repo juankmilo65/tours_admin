@@ -2,11 +2,13 @@ import {
   registerUser as registerUserService,
   requestEmailVerification,
   verifyEmail,
+  logout,
 } from '../auth';
 import type {
   RegisterUserPayload,
   RequestEmailVerificationPayload,
   VerifyEmailPayload,
+  LogoutPayload,
 } from '../../types/AuthProps';
 import type { ServiceResult } from '../_index';
 
@@ -96,17 +98,30 @@ const verifyEmailBusinessLogic = async (
 };
 
 /**
+ * Business logic for user logout
+ */
+const logoutUserBusinessLogic = async (data: unknown): Promise<ServiceResult<unknown>> => {
+  try {
+    const logoutData = data as LogoutPayload;
+    const token = logoutData?.token ?? '';
+    const result = await logout({ token });
+    return result;
+  } catch (error) {
+    console.error('Error in logoutUserBusiness:', error);
+    return Promise.resolve({ error });
+  }
+};
+
+/**
  * Main business logic router
  */
-const authBusinessLogic = (
-  action: string,
-  data: RegisterUserPayload | RequestEmailVerificationPayload | VerifyEmailPayload
-): Promise<ServiceResult<unknown>> => {
+const authBusinessLogic = (action: string, data: unknown): Promise<ServiceResult<unknown>> => {
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
     registerUserBusinessLogic: () => registerUserBusinessLogic(data as RegisterUserPayload),
     requestEmailVerificationBusinessLogic: () =>
       requestEmailVerificationBusinessLogic(data as RequestEmailVerificationPayload),
     verifyEmailBusinessLogic: () => verifyEmailBusinessLogic(data as VerifyEmailPayload),
+    logoutUserBusinessLogic: () => logoutUserBusinessLogic(data as LogoutPayload),
   };
 
   const handler = ACTIONS[action];
@@ -128,7 +143,11 @@ const authBusinessLogic = (
 const auth = (formData: FormData): Promise<ServiceResult<unknown>> => {
   try {
     const action = formData.get('action')?.toString() ?? '';
-    let payload: RegisterUserPayload | RequestEmailVerificationPayload | VerifyEmailPayload;
+    let payload:
+      | RegisterUserPayload
+      | RequestEmailVerificationPayload
+      | VerifyEmailPayload
+      | LogoutPayload;
 
     if (action === 'registerUserBusinessLogic') {
       payload = generatePayload(formData);
@@ -136,6 +155,10 @@ const auth = (formData: FormData): Promise<ServiceResult<unknown>> => {
       payload = generateRequestEmailPayload(formData);
     } else if (action === 'verifyEmailBusinessLogic') {
       payload = generateVerifyEmailPayload(formData);
+    } else if (action === 'logoutUserBusinessLogic') {
+      // For logout, create payload with token from formData
+      const token = formData.get('token')?.toString() ?? '';
+      payload = { token };
     } else {
       return Promise.resolve({ error: { status: 400, message: 'Invalid action' } });
     }
