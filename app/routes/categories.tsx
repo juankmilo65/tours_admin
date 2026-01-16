@@ -11,6 +11,7 @@ import { Table } from '~/components/ui/Table';
 import type { Column } from '~/components/ui/Table';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { getSession } from '~/utilities/sessions';
+import { requireAuth } from '~/utilities/auth.loader';
 
 interface Category {
   id: string;
@@ -30,8 +31,11 @@ interface LoaderData {
   language: string;
 }
 
-export async function loader({ request }: LoaderFunctionArgs): Promise<LoaderData> {
-  const session = await getSession(request.headers.get('Cookie'));
+export async function loader(args: LoaderFunctionArgs): Promise<LoaderData> {
+  // Verificar autenticación
+  await requireAuth(args);
+
+  const session = await getSession(args.request.headers.get('Cookie'));
   const currentLanguage = (session.get('language') as string) ?? 'es';
 
   const formData = new FormData();

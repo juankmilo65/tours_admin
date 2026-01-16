@@ -6,17 +6,18 @@
 import React from 'react';
 import { useNavigate, useParams, useLoaderData } from '@remix-run/react';
 import { data, type LoaderFunctionArgs } from '@remix-run/node';
+import { requireAuth } from '~/utilities/auth.loader';
 import { getTourById } from '~/server/tours';
 import type { Tour } from '~/types/PayloadTourDataProps';
 import { TourEditForm } from '~/components/tours/TourEditForm';
 
 // Loader function - runs on server
-export async function loader({
-  params,
-  request,
-}: LoaderFunctionArgs): Promise<ReturnType<typeof data>> {
-  const { id } = params;
-  const url = new URL(request.url);
+export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeof data>> {
+  // Verificar autenticación
+  await requireAuth(args);
+
+  const { id } = args.params;
+  const url = new URL(args.request.url);
   const language = url.searchParams.get('language') ?? 'es';
   const currency = url.searchParams.get('currency') ?? 'MXN';
 

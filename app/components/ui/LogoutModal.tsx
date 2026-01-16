@@ -9,14 +9,12 @@ import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectShowLogoutModal, setLogoutModal } from '~/store/slices/uiSlice';
 import { logout as logoutAction, selectAuthToken } from '~/store/slices/authSlice';
 import { useTranslation } from '~/lib/i18n/utils';
-import { useNavigate } from '@remix-run/react';
 
 // Declare fetch for ESLint
 declare const fetch: typeof globalThis.fetch;
 
 export function LogoutModal(): JSX.Element | null {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   const { t } = useTranslation();
 
   const showModal = useAppSelector(selectShowLogoutModal);
@@ -26,17 +24,16 @@ export function LogoutModal(): JSX.Element | null {
   if (!showModal) return null;
 
   const handleLogout = async () => {
-    if ((authToken?.trim() ?? '') === '') {
-      console.error('No auth token available');
-      return;
-    }
-
     setIsLoggingOut(true);
 
     try {
+      // The server will get the token from the session cookie
+      // No need to send token from Redux - server handles it
       const formData = new FormData();
       formData.append('action', 'logoutUserBusinessLogic');
-      formData.append('token', authToken);
+      if (authToken !== null && authToken !== undefined && authToken.trim() !== '') {
+        formData.append('token', authToken);
+      }
 
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
@@ -48,23 +45,26 @@ export function LogoutModal(): JSX.Element | null {
         dispatch(logoutAction());
         // Close modal
         dispatch(setLogoutModal(false));
-        // Navigate to login
-        navigate('/');
+        // Force full page reload to clear server session
+        window.location.href = '/';
       } else {
         console.error('Logout failed');
         // Still close modal and logout locally
         dispatch(logoutAction());
         dispatch(setLogoutModal(false));
-        navigate('/');
+        // Force full page reload to clear server session
+        window.location.href = '/';
       }
     } catch (error) {
       console.error('Logout error:', error);
       // Still logout locally on error
       dispatch(logoutAction());
       dispatch(setLogoutModal(false));
-      navigate('/');
+      // Force full page reload to clear server session
+      window.location.href = '/';
     } finally {
-      setIsLoggingOut(false);
+      // Don't set logging out to false since we're reloading
+      // setIsLoggingOut(false);
     }
   };
 

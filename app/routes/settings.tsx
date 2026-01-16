@@ -4,10 +4,17 @@
 
 import type { JSX } from 'react';
 import { useState } from 'react';
+import { requireAuth } from '~/utilities/auth.loader';
+import type { LoaderFunctionArgs } from '@remix-run/node';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
+
+export async function loader(args: LoaderFunctionArgs): Promise<null> {
+  await requireAuth(args);
+  return null;
+}
 
 export default function Settings(): JSX.Element {
   const [language, setLanguage] = useState('en');

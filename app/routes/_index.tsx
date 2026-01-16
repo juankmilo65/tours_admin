@@ -6,6 +6,8 @@
 import type { JSX, FormEvent } from 'react';
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, type MetaFunction } from '@remix-run/react';
+import type { LoaderFunctionArgs } from '@remix-run/node';
+import { requireNoAuth } from '~/utilities/auth.loader';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import {
   loginStart,
@@ -24,6 +26,11 @@ export const meta: MetaFunction = () => {
     { name: 'description', content: 'Login to Tours Admin Dashboard' },
   ];
 };
+
+export async function loader(args: LoaderFunctionArgs): Promise<null> {
+  await requireNoAuth(args);
+  return null;
+}
 
 const LANGUAGES = [
   { value: 'es', label: 'Español' },

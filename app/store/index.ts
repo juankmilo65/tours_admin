@@ -31,7 +31,7 @@ const persistConfig = {
   key: 'root',
   version: 1,
   storage,
-  whitelist: ['country'], // Only persist countries (transversal data)
+  whitelist: ['country', 'auth'], // Persist countries and auth state
 };
 
 const rootReducer = combineReducers({

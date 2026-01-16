@@ -344,13 +344,17 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
   // Load session to check authentication
   const session = await getSession(request.headers.get('Cookie'));
   const authToken = session.get('authToken') as string | undefined;
+  const hasToken = (authToken?.trim() ?? '') !== '';
 
   // Si no es una ruta pública y no hay token, redirigir al login
-  if (!isPublicRoute && (authToken?.trim() ?? '') === '') {
+  if (!isPublicRoute && !hasToken) {
     throw redirect('/');
   }
 
-  // Load cities and countries globally for all routes
+  // Si es una ruta pública (/ o /register) y el usuario SÍ está autenticado, redirigir al dashboard
+  if (isPublicRoute && hasToken) {
+    throw redirect('/dashboard');
+  }
   // Get selected country from session
   const selectedCountryId = session.get('selectedCountryId') as string | undefined;
   const selectedCountryCode = session.get('selectedCountryCode') as string | undefined;

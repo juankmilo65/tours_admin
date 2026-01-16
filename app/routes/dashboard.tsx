@@ -3,8 +3,15 @@
  */
 
 import type { JSX } from 'react';
+import type { LoaderFunctionArgs } from '@remix-run/node';
+import { requireAuth } from '~/utilities/auth.loader';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
+
+export async function loader(args: LoaderFunctionArgs): Promise<null> {
+  await requireAuth(args);
+  return null;
+}
 
 export default function Dashboard(): JSX.Element {
   return (

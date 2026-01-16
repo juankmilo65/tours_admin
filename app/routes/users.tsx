@@ -4,6 +4,8 @@
 
 import type { JSX } from 'react';
 import { useState } from 'react';
+import { requireAuth } from '~/utilities/auth.loader';
+import type { LoaderFunctionArgs } from '@remix-run/node';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
@@ -63,6 +65,11 @@ const mockUsers: readonly User[] = [
     createdAt: '2025-01-04',
   },
 ];
+
+export async function loader(args: LoaderFunctionArgs): Promise<null> {
+  await requireAuth(args);
+  return null;
+}
 
 export default function Users(): JSX.Element {
   const columns: Column<User>[] = [

@@ -3,6 +3,8 @@
  */
 
 import type { JSX } from 'react';
+import type { LoaderFunctionArgs } from '@remix-run/node';
+import { requireAuth } from '~/utilities/auth.loader';
 import { useState } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
@@ -53,6 +55,11 @@ const mockCities: readonly City[] = [
     createdAt: '2025-01-04',
   },
 ];
+
+export async function loader(args: LoaderFunctionArgs): Promise<null> {
+  await requireAuth(args);
+  return null;
+}
 
 export default function Cities(): JSX.Element {
   const columns: Column<City>[] = [

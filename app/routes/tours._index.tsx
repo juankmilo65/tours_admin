@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { useLoaderData, useNavigation, useSearchParams } from '@remix-run/react';
 import { data, type LoaderFunctionArgs } from '@remix-run/node';
+import { requireAuth } from '~/utilities/auth.loader';
 import type { Tour, TranslatedTour, Language } from '~/types/PayloadTourDataProps';
 import { translateTours } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
@@ -21,8 +22,11 @@ import { useTranslation } from '~/lib/i18n/utils';
 import Select from '~/components/ui/Select';
 
 // Loader function - runs on server
-export async function loader({ request }: LoaderFunctionArgs): Promise<ReturnType<typeof data>> {
-  const url = new URL(request.url);
+export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeof data>> {
+  // Verificar autenticación
+  await requireAuth(args);
+
+  const url = new URL(args.request.url);
   const cityId = url.searchParams.get('cityId') ?? null;
   const page = url.searchParams.get('page') ?? '1';
   const category = url.searchParams.get('category') ?? '';
