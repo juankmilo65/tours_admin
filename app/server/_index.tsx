@@ -41,9 +41,12 @@ function createServiceREST<T = unknown>(url: string, endpoint: string, token: st
     const defaultConfig = {
       baseURL: url + '/api/',
       timeout: timeout,
-      headers: {
-        Authorization: token,
-      },
+      headers:
+        token !== ''
+          ? {
+              Authorization: token,
+            }
+          : {},
     };
 
     // Merge default config with any additional config

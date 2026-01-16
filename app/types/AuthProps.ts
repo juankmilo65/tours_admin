@@ -18,6 +18,7 @@ export interface RequestEmailVerificationPayload {
 
 export interface VerifyEmailPayload {
   otp: string;
+  email: string;
 }
 
 export interface LogoutPayload {

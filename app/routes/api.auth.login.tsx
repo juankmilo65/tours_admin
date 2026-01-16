@@ -29,12 +29,23 @@ export async function action({ request }: ActionFunctionArgs): Promise<Response>
     const result = (await authBL(formData)) as ServiceResult<LoginResult>;
     console.warn('authBL result for login:', result);
 
-    // Check if result is an error object
+    // Check if result is an error object (including AxiosError)
     if (result !== null && typeof result === 'object' && 'error' in result) {
-      return json(
-        { error: (result as { error?: string }).error ?? 'Unknown error' },
-        { status: 400 }
-      );
+      // Handle different error types
+      const errorObj = result as { error?: unknown };
+      let errorMessage = 'Unknown error';
+
+      if (typeof errorObj.error === 'string') {
+        errorMessage = errorObj.error;
+      } else if (errorObj.error !== null && typeof errorObj.error === 'object') {
+        // AxiosError or similar error object
+        const axiosError = errorObj.error as { message?: string; code?: string };
+        errorMessage =
+          axiosError.message ??
+          (typeof axiosError.code === 'string' ? axiosError.code : 'Unknown error');
+      }
+
+      return json({ error: errorMessage }, { status: 400 });
     }
 
     // Check if result has success property and data

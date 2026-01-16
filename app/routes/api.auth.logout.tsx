@@ -28,7 +28,7 @@ export async function action({ request }: ActionFunctionArgs): Promise<Response>
     }
 
     // Call the business logic (may fail with 401 if token is expired)
-    const result = (await authBL(formData)) as ServiceResult<LogoutResult>;
+    const result = (await authBL(formData, token ?? null)) as ServiceResult<LogoutResult>;
     console.warn('authBL result for logout:', result);
 
     // Clear the session regardless of the backend response

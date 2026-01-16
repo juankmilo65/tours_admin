@@ -1,6 +1,6 @@
 /**
  * Login Route (/)
- * Modern login page with 2 column layout
+ * Modern login page with 2 column layout and 2-step wizard (Login + OTP)
  */
 
 import type { JSX, FormEvent } from 'react';
@@ -10,10 +10,25 @@ import type { LoaderFunctionArgs } from '@remix-run/node';
 import { requireNoAuth } from '~/utilities/auth.loader';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import {
+  loginUserBusinessLogic,
+  requestEmailVerificationBusinessLogic,
+  verifyEmailBusinessLogic,
+} from '~/server/businessLogic/authBusinessLogic';
+import {
   loginStart,
   loginSuccess,
   loginFailure,
+  requestOtpStart,
+  requestOtpSuccess,
+  requestOtpFailure,
+  verifyOtpStart,
+  verifyOtpSuccess,
+  verifyOtpFailure,
   selectIsAuthenticated,
+  selectPendingEmail,
+  selectOtpSent,
+  selectRequiresOtp,
+  selectAuthToken,
 } from '~/store/slices/authSlice';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import Select from '~/components/ui/Select';
@@ -41,8 +56,25 @@ export default function IndexRoute(): JSX.Element {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const requiresOtp = useAppSelector(selectRequiresOtp);
   const { t, language: currentLang } = useTranslation();
+  const otpEmail = useAppSelector(selectPendingEmail);
+  const otpSent = useAppSelector(selectOtpSent);
+  const authToken = useAppSelector(selectAuthToken);
 
+  // Wizard step: 'login' or 'otp'
+  const [step, setStep] = useState<'login' | 'otp'>('login');
+
+  // Update step based on requiresOtp state
+  useEffect(() => {
+    if (requiresOtp === true && otpEmail !== null) {
+      setStep('otp');
+    } else if (requiresOtp === false) {
+      setStep('login');
+    }
+  }, [requiresOtp, otpEmail]);
+
+  // Login form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -54,6 +86,10 @@ export default function IndexRoute(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // OTP form state
+  const [otpCode, setOtpCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -61,7 +97,8 @@ export default function IndexRoute(): JSX.Element {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async (e: FormEvent) => {
+  // Handle login form submission
+  const handleLoginSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
     setError(null);
 
@@ -75,33 +112,35 @@ export default function IndexRoute(): JSX.Element {
     dispatch(setGlobalLoading({ isLoading: true, message: t('auth.loggingIn') }));
 
     try {
-      const formData = new FormData();
-      formData.append('email', email);
-      formData.append('password', password);
+      const result = await loginUserBusinessLogic({ email, password });
 
-      // eslint-disable-next-line no-undef
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = (await response.json()) as {
-        success?: boolean;
-        data?: { user: unknown; accessToken: string };
-        error?: string;
-        message?: string;
-      };
-
-      if (response.ok && result.success === true && result.data) {
+      if (result.success === true && result.data) {
+        // Login successful, save to Redux
         dispatch(
           loginSuccess({
-            user: result.data.user,
-            token: result.data.accessToken,
+            user: result.data.user as never,
+            token: result.data.token,
           })
         );
-        navigate('/dashboard');
+
+        // Request OTP for 2FA
+        await requestOtpCode(email);
       } else {
-        const errorMessage = result.error ?? result.message ?? t('auth.errorGenericLogin');
+        // Extract error message from various possible formats
+        let errorMessage = t('auth.errorGenericLogin');
+
+        if (result.error !== null) {
+          if (typeof result.error === 'string') {
+            errorMessage = result.error;
+          } else if (
+            typeof result.error === 'object' &&
+            'message' in result.error &&
+            result.error.message !== undefined
+          ) {
+            errorMessage = result.error.message as string;
+          }
+        }
+
         setError(errorMessage);
         dispatch(loginFailure(errorMessage));
       }
@@ -115,7 +154,118 @@ export default function IndexRoute(): JSX.Element {
     }
   };
 
-  const handleLanguageChange = (value: string) => {
+  // Request OTP code
+  const requestOtpCode = async (userEmail: string): Promise<void> => {
+    dispatch(requestOtpStart(userEmail));
+
+    try {
+      const result = await requestEmailVerificationBusinessLogic({ email: userEmail });
+
+      if (result.success === true) {
+        dispatch(requestOtpSuccess());
+        // Move to OTP step
+        setStep('otp');
+      } else {
+        let errorMessage: string;
+        if (result.error !== null) {
+          if (typeof result.error === 'string') {
+            errorMessage = result.error;
+          } else if (
+            typeof result.error === 'object' &&
+            'message' in result.error &&
+            result.error.message !== undefined
+          ) {
+            errorMessage = result.error.message as string;
+          } else {
+            errorMessage = result.message ?? t('auth.errorGenericLogin');
+          }
+        } else {
+          errorMessage = result.message ?? t('auth.errorGenericLogin');
+        }
+        dispatch(requestOtpFailure(errorMessage));
+        setError(errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : t('auth.errorGenericLogin');
+      dispatch(requestOtpFailure(errorMessage));
+      setError(errorMessage);
+    }
+  };
+
+  // Handle OTP verification
+  const handleOtpSubmit = async (e: FormEvent): Promise<void> => {
+    e.preventDefault();
+    setError(null);
+
+    if (otpCode?.length !== 6) {
+      setError(t('auth.invalidOtp'));
+      return;
+    }
+
+    setIsVerifying(true);
+    dispatch(verifyOtpStart());
+    dispatch(setGlobalLoading({ isLoading: true, message: t('auth.verifying') }));
+
+    try {
+      const result = await verifyEmailBusinessLogic(
+        { otp: otpCode, email: otpEmail ?? '' },
+        authToken ?? ''
+      );
+
+      console.log('Verify OTP Response:', result);
+
+      if (result.success === true) {
+        dispatch(verifyOtpSuccess());
+        // Navigate to dashboard
+        navigate('/dashboard');
+      } else {
+        // Extract error message from various possible formats
+        let errorMessage = t('auth.invalidOtp');
+
+        if (result.error !== null) {
+          if (typeof result.error === 'string') {
+            errorMessage = result.error;
+          } else if (
+            typeof result.error === 'object' &&
+            'message' in result.error &&
+            result.error.message !== undefined
+          ) {
+            errorMessage = result.error.message as string;
+          } else if (result.message !== undefined) {
+            errorMessage = result.message;
+          }
+        }
+
+        setError(errorMessage);
+        dispatch(verifyOtpFailure(errorMessage));
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : t('auth.errorGenericOtp');
+      setError(errorMessage);
+      dispatch(verifyOtpFailure(errorMessage));
+    } finally {
+      setIsVerifying(false);
+      dispatch(setGlobalLoading({ isLoading: false }));
+    }
+  };
+
+  // Go back to login step
+  const handleBackToLogin = (): void => {
+    setStep('login');
+    setOtpCode('');
+    setError(null);
+  };
+
+  // Resend OTP code
+  const handleResendOtp = async (): Promise<void> => {
+    if (otpEmail !== null && otpEmail !== undefined) {
+      await requestOtpCode(otpEmail);
+      setOtpCode('');
+      setError(null);
+    }
+  };
+
+  const handleLanguageChange = (value: string): void => {
     dispatch(setLanguage(value as Language));
   };
 
@@ -154,6 +304,22 @@ export default function IndexRoute(): JSX.Element {
       <line x1="1" y1="1" x2="23" y2="23" />
     </svg>
   );
+  const ArrowLeftIcon = (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 12H5" />
+      <path d="M12 19l-7-7 7-7" />
+    </svg>
+  );
 
   return (
     <div className="login-container">
@@ -185,82 +351,276 @@ export default function IndexRoute(): JSX.Element {
         </div>
 
         <div className="login-form-container">
-          <h1 className="login-heading">{t('auth.welcome')}</h1>
-          <p className="login-description">{t('auth.welcomeSub')}</p>
+          <h1 className="login-heading">
+            {step === 'login' ? t('auth.welcome') : t('auth.otpTitle')}
+          </h1>
+          <p className="login-description">
+            {step === 'login' ? t('auth.welcomeSub') : `${t('auth.otpDescription')} ${otpEmail}`}
+          </p>
 
-          <form
-            onSubmit={(e) => {
-              void handleSubmit(e);
+          {/* Step Indicator */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 'var(--space-2)',
+              marginBottom: 'var(--space-6)',
+              alignItems: 'center',
             }}
-            className="login-form"
           >
-            <div className="form-field">
-              <label htmlFor="email" className="form-label">
-                {t('auth.email')}
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t('auth.emailPlaceholder')}
-                disabled={isLoading}
-                className="form-input"
-              />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+              }}
+            >
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor:
+                    step === 'login' ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
+                  color: step === 'login' ? 'white' : 'var(--color-primary-600)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                }}
+              >
+                1
+              </div>
+              <span
+                style={{
+                  fontSize: '14px',
+                  fontWeight: step === 'login' ? '600' : '400',
+                  color: step === 'login' ? 'var(--color-neutral-900)' : 'var(--color-neutral-500)',
+                }}
+              >
+                {t('auth.login')}
+              </span>
             </div>
+            <div
+              style={{ width: '24px', height: '2px', backgroundColor: 'var(--color-neutral-300)' }}
+            />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+              }}
+            >
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor:
+                    step === 'otp' ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
+                  color: step === 'otp' ? 'white' : 'var(--color-primary-600)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                }}
+              >
+                2
+              </div>
+              <span
+                style={{
+                  fontSize: '14px',
+                  fontWeight: step === 'otp' ? '600' : '400',
+                  color: step === 'otp' ? 'var(--color-neutral-900)' : 'var(--color-neutral-500)',
+                }}
+              >
+                {t('auth.otpTitle')}
+              </span>
+            </div>
+          </div>
 
-            <div className="form-field">
-              <label htmlFor="password" className="form-label">
-                {t('auth.password')}
-              </label>
-              <div className="password-input-container">
+          {/* Login Step */}
+          {step === 'login' ? (
+            <form
+              onSubmit={(e) => {
+                void handleLoginSubmit(e);
+              }}
+              className="login-form"
+            >
+              <div className="form-field">
+                <label htmlFor="email" className="form-label">
+                  {t('auth.email')}
+                </label>
                 <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t('auth.emailPlaceholder')}
                   disabled={isLoading}
                   className="form-input"
                 />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setPassLocked(!passLocked)}
-                  onMouseEnter={() => setPassHover(true)}
-                  onMouseLeave={() => setPassHover(false)}
-                  tabIndex={-1}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  title="Click to toggle, hover to peek"
-                >
-                  {showPassword ? EyeOffIcon : EyeIcon}
-                </button>
               </div>
-            </div>
 
-            {error !== null && (
-              <div className="error-message">
-                <p>{error}</p>
+              <div className="form-field">
+                <label htmlFor="password" className="form-label">
+                  {t('auth.password')}
+                </label>
+                <div className="password-input-container">
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    disabled={isLoading}
+                    className="form-input"
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setPassLocked(!passLocked)}
+                    onMouseEnter={() => setPassHover(true)}
+                    onMouseLeave={() => setPassHover(false)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    title="Click to toggle, hover to peek"
+                  >
+                    {showPassword ? EyeOffIcon : EyeIcon}
+                  </button>
+                </div>
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`submit-button ${isLoading ? 'loading' : ''}`}
+              {error !== null && (
+                <div className="error-message">
+                  <p>{error}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`submit-button ${isLoading ? 'loading' : ''}`}
+              >
+                {isLoading ? t('auth.loggingIn') : t('auth.login')}
+              </button>
+            </form>
+          ) : (
+            /* OTP Step */
+            <form
+              onSubmit={(e) => {
+                void handleOtpSubmit(e);
+              }}
+              className="login-form"
             >
-              {isLoading ? t('auth.loggingIn') : t('auth.login')}
-            </button>
-          </form>
+              <div className="form-field">
+                <label htmlFor="otp" className="form-label">
+                  {t('auth.otpLabel')}
+                </label>
+                <input
+                  id="otp"
+                  type="text"
+                  value={otpCode}
+                  onChange={(e) => {
+                    // Only allow numbers, max 6 digits
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setOtpCode(value);
+                  }}
+                  placeholder={t('auth.otpPlaceholder')}
+                  disabled={isVerifying}
+                  className="form-input"
+                  style={{
+                    fontSize: '24px',
+                    letterSpacing: '8px',
+                    textAlign: 'center',
+                    fontWeight: '600',
+                  }}
+                  maxLength={6}
+                />
+              </div>
 
-          <div className="register-link">
-            <p>
-              {t('auth.registerPrompt')}{' '}
-              <Link to="/register" className="link">
-                {t('auth.registerLink')}
-              </Link>
-            </p>
-          </div>
+              {error !== null && (
+                <div className="error-message">
+                  <p>{error}</p>
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-3)',
+                }}
+              >
+                <button
+                  type="submit"
+                  disabled={isVerifying}
+                  className={`submit-button ${isVerifying ? 'loading' : ''}`}
+                >
+                  {isVerifying ? t('auth.verifying') : t('auth.verifyOtp')}
+                </button>
+
+                {otpSent && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleResendOtp();
+                    }}
+                    disabled={isVerifying}
+                    style={{
+                      padding: 'var(--space-2)',
+                      backgroundColor: 'transparent',
+                      color: 'var(--color-primary-600)',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: isVerifying ? 'not-allowed' : 'pointer',
+                      fontSize: 'var(--text-sm)',
+                      fontWeight: '500',
+                    }}
+                  >
+                    {t('auth.resendOtp')}
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+
+          {/* Back button for OTP step */}
+          {step === 'otp' && (
+            <button
+              type="button"
+              onClick={handleBackToLogin}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                padding: 'var(--space-2) 0',
+                backgroundColor: 'transparent',
+                color: 'var(--color-neutral-600)',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 'var(--text-sm)',
+                fontWeight: '500',
+                marginTop: 'var(--space-4)',
+              }}
+            >
+              {ArrowLeftIcon}
+              {t('common.back')}
+            </button>
+          )}
+
+          {/* Register link - only show on login step */}
+          {step === 'login' && (
+            <div className="register-link">
+              <p>
+                {t('auth.registerPrompt')}{' '}
+                <Link to="/register" className="link">
+                  {t('auth.registerLink')}
+                </Link>
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

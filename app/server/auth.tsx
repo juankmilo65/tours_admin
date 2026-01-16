@@ -1,6 +1,16 @@
 import { createServiceREST } from './_index';
 
-const BASE_URL = process.env.BACKEND_URL ?? '';
+// Type declaration for Vite environment variables
+interface ViteImportMetaEnv {
+  readonly VITE_BACKEND_URL?: string;
+}
+
+interface ViteImportMeta {
+  readonly env: ViteImportMetaEnv;
+}
+
+const BASE_URL =
+  (import.meta as unknown as ViteImportMeta).env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
 export interface RegisterUserResponse {
   success?: boolean;
@@ -61,20 +71,14 @@ export const registerUser = async (payload: {
   lastName: string;
   termsConditionsId: string;
 }): Promise<RegisterUserResponse> => {
-  if (BASE_URL === '' || BASE_URL === undefined) {
-    console.warn('BACKEND_URL is not configured');
-    return { success: false, error: 'Backend not configured' };
-  }
-
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/register', 'POST');
+    const authService = createServiceREST(BASE_URL, 'auth/register', '');
 
     const result = await authService.create(payload);
 
     return result as RegisterUserResponse;
   } catch (error: unknown) {
     console.error('Error in registerUser service:', error);
-    // @ts-ignore
     return {
       error: error instanceof Error ? error.message : 'Internal server error',
       success: false,
@@ -89,20 +93,14 @@ export const login = async (payload: {
   email: string;
   password: string;
 }): Promise<LoginResponse> => {
-  if (BASE_URL === '' || BASE_URL === undefined) {
-    console.warn('BACKEND_URL is not configured');
-    return { success: false, error: 'Backend not configured' };
-  }
-
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/login', 'POST');
+    const authService = createServiceREST(BASE_URL, 'auth/login', '');
 
     const result = await authService.create(payload);
 
     return result as LoginResponse;
   } catch (error: unknown) {
     console.error('Error in login service:', error);
-    // @ts-ignore
     return {
       error: error instanceof Error ? error.message : 'Internal server error',
       success: false,
@@ -116,20 +114,14 @@ export const login = async (payload: {
 export const requestEmailVerification = async (payload: {
   email: string;
 }): Promise<RequestEmailVerificationResponse> => {
-  if (BASE_URL === '' || BASE_URL === undefined) {
-    console.warn('BACKEND_URL is not configured');
-    return { success: false, error: 'Backend not configured' };
-  }
-
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/request-email-verification', 'POST');
+    const authService = createServiceREST(BASE_URL, 'auth/request-email-verification', '');
 
     const result = await authService.create(payload);
 
     return result as RequestEmailVerificationResponse;
   } catch (error: unknown) {
     console.error('Error in requestEmailVerification service:', error);
-    // @ts-ignore
     return {
       error: error instanceof Error ? error.message : 'Internal server error',
       success: false,
@@ -140,21 +132,28 @@ export const requestEmailVerification = async (payload: {
 /**
  * Verify email
  */
-export const verifyEmail = async (payload: { otp: string }): Promise<VerifyEmailResponse> => {
-  if (BASE_URL === '' || BASE_URL === undefined) {
-    console.warn('BACKEND_URL is not configured');
-    return { success: false, error: 'Backend not configured' };
-  }
+export const verifyEmail = async (
+  payload: { otp: string; email: string },
+  token: string
+): Promise<VerifyEmailResponse> => {
+  console.log('verifyEmail payload:', payload);
+  console.log('verifyEmail token length:', token.length);
+  console.log('verifyEmail token:', token);
+  console.log('verifyEmail BASE_URL:', BASE_URL);
 
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/verify-email', 'POST');
+    const authService = createServiceREST(BASE_URL, 'auth/verify-email', `Bearer ${token}`);
 
     const result = await authService.create(payload);
 
+    console.log('verifyEmail result:', result);
     return result as VerifyEmailResponse;
   } catch (error: unknown) {
     console.error('Error in verifyEmail service:', error);
-    // @ts-ignore
+    const axiosError = error as { response?: { data?: unknown }; status?: number };
+    if (axiosError.response?.data !== undefined) {
+      console.error('Backend response data:', axiosError.response.data);
+    }
     return {
       error: error instanceof Error ? error.message : 'Internal server error',
       success: false,
@@ -166,19 +165,22 @@ export const verifyEmail = async (payload: { otp: string }): Promise<VerifyEmail
  * Logout user service
  */
 export const logout = async (payload: { token: string }): Promise<LogoutResponse> => {
-  if (!BASE_URL || BASE_URL === '') {
-    return { success: false, error: 'Backend not configured' };
-  }
+  console.log('logout payload token length:', payload.token.length);
+  console.log('logout payload token:', payload.token);
 
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/logout', payload.token);
+    const authService = createServiceREST(BASE_URL, 'auth/logout', `Bearer ${payload.token}`);
 
     const result = await authService.create({}); // Empty payload for logout
 
+    console.log('logout result:', result);
     return result as LogoutResponse;
   } catch (error: unknown) {
     console.error('Error in logout service:', error);
-    // @ts-ignore
+    const axiosError = error as { response?: { data?: unknown }; status?: number };
+    if (axiosError.response?.data !== undefined) {
+      console.error('Backend response data:', axiosError.response.data);
+    }
     return {
       error: error instanceof Error ? error.message : 'Internal server error',
       success: false,

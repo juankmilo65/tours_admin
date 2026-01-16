@@ -43,11 +43,13 @@ function DataSyncDispatcher({
   countries,
   selectedCountryCode,
   isAuthenticated,
+  authToken,
 }: {
   cities: City[];
   countries: Country[];
   selectedCountryCode: string;
   isAuthenticated: boolean;
+  authToken: string | null;
 }) {
   const dispatch = useAppDispatch();
 
@@ -73,9 +75,9 @@ function DataSyncDispatcher({
 
     // Sync authentication state from server
     // If server says not authenticated, clear client state
-    // If server says authenticated, trust current client state (from login)
-    dispatch(setAuthenticatedFromServer(isAuthenticated));
-  }, [cities, countries, selectedCountryCode, isAuthenticated, dispatch]);
+    // If server says authenticated, sync token to Redux and localStorage
+    dispatch(setAuthenticatedFromServer({ isAuthenticated, authToken }));
+  }, [cities, countries, selectedCountryCode, isAuthenticated, authToken, dispatch]);
 
   return null;
 }
@@ -328,6 +330,7 @@ interface LoaderData {
   selectedCountryCode: string;
   language: string;
   isAuthenticated: boolean;
+  authToken: string | null; // Add token from server session
   user: unknown; // We'll add proper typing later
 }
 
@@ -346,8 +349,14 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
   const authToken = session.get('authToken') as string | undefined;
   const hasToken = (authToken?.trim() ?? '') !== '';
 
+  console.log('root.tsx loader - pathname:', pathname);
+  console.log('root.tsx loader - isPublicRoute:', isPublicRoute);
+  console.log('root.tsx loader - authToken from session:', authToken);
+  console.log('root.tsx loader - hasToken:', hasToken);
+
   // Si no es una ruta pública y no hay token, redirigir al login
   if (!isPublicRoute && !hasToken) {
+    console.log('root.tsx loader - Redirecting to login (no token)');
     throw redirect('/');
   }
 
@@ -419,6 +428,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
     selectedCountryCode: countryCode ?? '',
     language: currentLanguage,
     isAuthenticated: (authToken?.trim() ?? '') !== '',
+    authToken: authToken ?? null, // Pass token from server session to client
     user: null, // For now, we'll set this to null and handle user data separately
   };
 
@@ -542,6 +552,7 @@ export default function App(): React.JSX.Element {
           countries={countries}
           selectedCountryCode={selectedCountryCode}
           isAuthenticated={isAuthenticated}
+          authToken={dataOrLoader?.authToken ?? null}
         />
       )}
       <ClientOnlyGlobalLoader />

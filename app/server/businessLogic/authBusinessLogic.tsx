@@ -4,6 +4,11 @@ import {
   requestEmailVerification,
   verifyEmail,
   logout,
+  type RegisterUserResponse,
+  type LoginResponse,
+  type RequestEmailVerificationResponse,
+  type VerifyEmailResponse,
+  type LogoutResponse,
 } from '../auth';
 import type {
   RegisterUserPayload,
@@ -48,9 +53,11 @@ const generateRequestEmailPayload = (formData: FormData): RequestEmailVerificati
 
 const generateVerifyEmailPayload = (formData: FormData): VerifyEmailPayload => {
   const otp = formData.get('otp');
+  const email = formData.get('email');
 
   return {
     otp: otp !== null && otp !== undefined ? otp.toString() : '',
+    email: email !== null && email !== undefined ? email.toString() : '',
   };
 };
 
@@ -77,7 +84,7 @@ const generateLoginData = (formData: FormData): LoginPayload => {
  */
 const registerUserBusinessLogic = async (
   data: RegisterUserPayload
-): Promise<ServiceResult<unknown>> => {
+): Promise<RegisterUserResponse> => {
   try {
     const result = await registerUserService(data);
     return result;
@@ -92,7 +99,7 @@ const registerUserBusinessLogic = async (
  */
 const requestEmailVerificationBusinessLogic = async (
   data: RequestEmailVerificationPayload
-): Promise<ServiceResult<unknown>> => {
+): Promise<RequestEmailVerificationResponse> => {
   try {
     const result = await requestEmailVerification(data);
     return result;
@@ -106,10 +113,11 @@ const requestEmailVerificationBusinessLogic = async (
  * Business logic for verifying email
  */
 const verifyEmailBusinessLogic = async (
-  data: VerifyEmailPayload
-): Promise<ServiceResult<unknown>> => {
+  data: VerifyEmailPayload,
+  token: string | null = null
+): Promise<VerifyEmailResponse> => {
   try {
-    const result = await verifyEmail(data);
+    const result = await verifyEmail(data, token ?? '');
     return result;
   } catch (err) {
     console.error('Error in verifyEmailBusiness:', err);
@@ -120,7 +128,7 @@ const verifyEmailBusinessLogic = async (
 /**
  * Business logic for user logout
  */
-const logoutUserBusinessLogic = async (data: unknown): Promise<ServiceResult<unknown>> => {
+const logoutUserBusinessLogic = async (data: unknown): Promise<LogoutResponse> => {
   try {
     const logoutData = data as LogoutPayload;
     const token = logoutData?.token ?? '';
@@ -135,9 +143,9 @@ const logoutUserBusinessLogic = async (data: unknown): Promise<ServiceResult<unk
 /**
  * Business logic for user login
  */
-const loginUserBusinessLogic = async (data: unknown): Promise<ServiceResult<unknown>> => {
+const loginUserBusinessLogic = async (data: unknown): Promise<LoginResponse> => {
   try {
-    // Validate that data has the correct structure
+    // Validate that data has correct structure
     if (typeof data !== 'object' || data === null) {
       throw new Error('Invalid login data');
     }
@@ -164,13 +172,17 @@ const loginUserBusinessLogic = async (data: unknown): Promise<ServiceResult<unkn
 /**
  * Main business logic router
  */
-const authBusinessLogic = (action: string, data: unknown): Promise<ServiceResult<unknown>> => {
+const authBusinessLogic = (
+  action: string,
+  data: unknown,
+  token: string | null = null
+): Promise<ServiceResult<unknown>> => {
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
     registerUserBusinessLogic: () => registerUserBusinessLogic(data as RegisterUserPayload),
     loginUserBusinessLogic: () => loginUserBusinessLogic(data as LoginPayload),
     requestEmailVerificationBusinessLogic: () =>
       requestEmailVerificationBusinessLogic(data as RequestEmailVerificationPayload),
-    verifyEmailBusinessLogic: () => verifyEmailBusinessLogic(data as VerifyEmailPayload),
+    verifyEmailBusinessLogic: () => verifyEmailBusinessLogic(data as VerifyEmailPayload, token),
     logoutUserBusinessLogic: () => logoutUserBusinessLogic(data as LogoutPayload),
   };
 
@@ -190,7 +202,7 @@ const authBusinessLogic = (action: string, data: unknown): Promise<ServiceResult
 /**
  * Main export function
  */
-const auth = (formData: FormData): Promise<ServiceResult<unknown>> => {
+const auth = (formData: FormData, token: string | null = null): Promise<ServiceResult<unknown>> => {
   try {
     const action = formData.get('action')?.toString() ?? '';
     let payload:
@@ -214,7 +226,7 @@ const auth = (formData: FormData): Promise<ServiceResult<unknown>> => {
       return Promise.resolve({ error: { status: 400, message: 'Invalid action' } });
     }
 
-    return authBusinessLogic(action, payload);
+    return authBusinessLogic(action, payload, token);
   } catch (err) {
     console.error('Error in auth business logic:', err);
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -223,3 +235,10 @@ const auth = (formData: FormData): Promise<ServiceResult<unknown>> => {
 };
 
 export default auth;
+
+// Export individual functions for direct use
+export { registerUserBusinessLogic };
+export { loginUserBusinessLogic };
+export { requestEmailVerificationBusinessLogic };
+export { verifyEmailBusinessLogic };
+export { logoutUserBusinessLogic };
