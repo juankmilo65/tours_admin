@@ -417,11 +417,11 @@ export function Header({
                   {userEmail}
                 </p>
               </div>
-              {currentUser?.avatar !== undefined &&
-              currentUser?.avatar !== null &&
-              currentUser.avatar !== '' ? (
+              {currentUser?.avatarUrl !== undefined &&
+              currentUser?.avatarUrl !== null &&
+              currentUser.avatarUrl !== '' ? (
                 <img
-                  src={currentUser.avatar}
+                  src={currentUser.avatarUrl as string}
                   alt={userDisplayName}
                   style={{
                     width: '40px',
