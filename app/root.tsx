@@ -6,6 +6,7 @@ import {
   ScrollRestoration,
   useLocation,
   useLoaderData,
+  Navigate,
 } from '@remix-run/react';
 import { data, redirect, type LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
 import { useMemo, useState, useEffect, createContext, type ReactNode } from 'react';
@@ -21,6 +22,8 @@ import { Footer } from './components/layout/Footer';
 import { GlobalLoader } from './components/ui/GlobalLoader';
 import { LogoutModal } from './components/ui/LogoutModal';
 import { ModalRoot } from './components/ui/Modal';
+import { useAppSelector } from '~/store/hooks';
+import { selectIsAuthenticated, selectIsOtpVerified } from './store/slices/authSlice';
 import citiesBL from './server/businessLogic/citiesBusinessLogic';
 import countriesBL from './server/businessLogic/countriesBusinessLogic';
 import type { City } from './store/slices/citiesSlice';
@@ -82,7 +85,24 @@ function DataSyncDispatcher({
   return null;
 }
 
-// Wrapper to only render Sidebar on client
+// AuthGuard component to protect routes that require full authentication (token + OTP)
+function AuthGuard({ children }: { children: ReactNode }): ReactNode {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const isOtpVerified = useAppSelector(selectIsOtpVerified);
+  const location = useLocation();
+
+  // If not authenticated or OTP not verified, redirect to login
+  if (!isAuthenticated || !isOtpVerified) {
+    // Allow access to public routes
+    if (location.pathname === '/' || location.pathname === '/register') {
+      return children;
+    }
+    // For protected routes, redirect to login
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
 function ClientOnlySidebar({
   isOpen,
   isCollapsed,
@@ -583,16 +603,18 @@ export default function App(): React.JSX.Element {
               countries={countries}
               selectedCountryCode={selectedCountryCode}
             />
-            <main
-              style={{
-                paddingTop: 'var(--header-height)',
-                paddingBottom: '80px',
-                paddingLeft: 'var(--space-6)',
-                paddingRight: 'var(--space-6)',
-              }}
-            >
-              <Outlet />
-            </main>
+            <AuthGuard>
+              <main
+                style={{
+                  paddingTop: 'var(--header-height)',
+                  paddingBottom: '80px',
+                  paddingLeft: 'var(--space-6)',
+                  paddingRight: 'var(--space-6)',
+                }}
+              >
+                <Outlet />
+              </main>
+            </AuthGuard>
             <ClientOnlyFooter />
           </div>
         </div>

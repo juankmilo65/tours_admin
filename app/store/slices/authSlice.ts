@@ -23,6 +23,7 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  isOtpVerified: boolean;
   isLoading: boolean;
   error: string | null;
   requiresOtp: boolean;
@@ -40,6 +41,7 @@ const getInitialState = (): AuthState => {
     user: null,
     token: null,
     isAuthenticated: false,
+    isOtpVerified: false,
     isLoading: false,
     error: null,
     requiresOtp: false,
@@ -91,6 +93,7 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
+      state.isOtpVerified = false;
       state.pendingUser = null;
       state.pendingToken = null;
       state.requiresOtp = false;
@@ -102,6 +105,7 @@ const authSlice = createSlice({
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem('authToken');
         window.localStorage.removeItem('authUser');
+        window.localStorage.removeItem('isOtpVerified');
       }
     },
     updateUser: (state, action: PayloadAction<User>) => {
@@ -140,6 +144,7 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
+        state.isOtpVerified = false;
         state.error = null;
         state.requiresOtp = false;
         state.otpSent = false;
@@ -149,6 +154,7 @@ const authSlice = createSlice({
         if (typeof window !== 'undefined') {
           window.localStorage.removeItem('authToken');
           window.localStorage.removeItem('authUser');
+          window.localStorage.removeItem('isOtpVerified');
         }
       } else {
         // Server says authenticated - use token from server if available
@@ -193,6 +199,14 @@ const authSlice = createSlice({
               );
             }
           }
+
+          const storedIsOtpVerified = window.localStorage.getItem('isOtpVerified');
+          if (storedIsOtpVerified === 'true') {
+            state.isOtpVerified = true;
+            console.log(
+              'authSlice.setAuthenticatedFromServer - Restored isOtpVerified from localStorage'
+            );
+          }
         } else {
           console.log('authSlice.setAuthenticatedFromServer - Keeping current Redux state');
         }
@@ -225,6 +239,7 @@ const authSlice = createSlice({
       state.pendingUser = null;
       state.pendingToken = null;
       state.isAuthenticated = true;
+      state.isOtpVerified = true;
       state.isLoading = false;
       state.requiresOtp = false;
       state.otpSent = false;
@@ -234,6 +249,7 @@ const authSlice = createSlice({
       if (typeof window !== 'undefined' && state.token !== null && state.user !== null) {
         window.localStorage.setItem('authToken', state.token);
         window.localStorage.setItem('authUser', JSON.stringify(state.user));
+        window.localStorage.setItem('isOtpVerified', 'true');
       }
     },
     verifyOtpFailure: (state, action: PayloadAction<string>) => {
@@ -273,6 +289,7 @@ export const selectCurrentUser = (state: RootState): User | null => state.auth.u
 export const selectAuthToken = (state: RootState): string | null => state.auth.token;
 export const selectPendingToken = (state: RootState): string | null => state.auth.pendingToken;
 export const selectIsAuthenticated = (state: RootState): boolean => state.auth.isAuthenticated;
+export const selectIsOtpVerified = (state: RootState): boolean => state.auth.isOtpVerified;
 export const selectAuthLoading = (state: RootState): boolean => state.auth.isLoading;
 export const selectAuthError = (state: RootState): string | null => state.auth.error;
 export const selectRequiresOtp = (state: RootState): boolean => state.auth.requiresOtp;
