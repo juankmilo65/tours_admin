@@ -13,7 +13,7 @@ export interface User {
   firstName: string;
   lastName: string;
   role: 'admin' | 'manager' | 'user';
-  avatar?: string;
+  avatarUrl?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

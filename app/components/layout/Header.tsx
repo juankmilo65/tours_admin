@@ -421,7 +421,7 @@ export function Header({
               currentUser?.avatarUrl !== null &&
               currentUser.avatarUrl !== '' ? (
                 <img
-                  src={currentUser.avatarUrl as string}
+                  src={currentUser.avatarUrl}
                   alt={userDisplayName}
                   style={{
                     width: '40px',
