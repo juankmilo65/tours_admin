@@ -101,8 +101,24 @@ export const login = async (payload: {
     return result as LoginResponse;
   } catch (error: unknown) {
     console.error('Error in login service:', error);
+
+    // Handle Axios errors to extract backend error message
+    let errorMessage = 'Internal server error';
+
+    if (error instanceof Error) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      if (
+        axiosError.response?.data?.error !== undefined &&
+        axiosError.response?.data?.error !== null
+      ) {
+        errorMessage = axiosError.response.data.error;
+      } else {
+        errorMessage = error.message;
+      }
+    }
+
     return {
-      error: error instanceof Error ? error.message : 'Internal server error',
+      error: errorMessage,
       success: false,
     };
   }
