@@ -99,59 +99,48 @@ export default function NewPasswordRoute(): JSX.Element {
 
   console.log('🔑 [NEW PASSWORD] decodedToken:', decodedToken);
 
-  // Calculate expiration immediately
-  const isExpired = useMemo(() => {
-    if (decodedToken === null) {
-      return false;
-    }
-    const exp = decodedToken.exp * 1000; // Convert to milliseconds
-    const now = Date.now();
-    const remaining = exp - now;
-    return remaining <= 0;
-  }, [decodedToken]);
-
-  console.log('🔑 [NEW PASSWORD] isExpired:', isExpired);
-
   // Calculate time remaining
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
-  // Set up countdown timer if not expired
+  // Set up countdown timer
   useEffect(() => {
-    console.log(
-      '🔑 [NEW PASSWORD] useEffect, isExpired:',
-      isExpired,
-      'decodedToken:',
-      decodedToken
-    );
-
-    if (decodedToken === null || isExpired) {
+    if (decodedToken === null) {
       setTimeRemaining(null);
-      console.log('🔑 [NEW PASSWORD] Token is null or expired, no countdown');
+      console.log('🔑 [NEW PASSWORD] Token is null, no countdown');
       return;
     }
 
     const exp = decodedToken.exp * 1000; // Convert to milliseconds
     const now = Date.now();
-    const remaining = exp - now;
+    const initialRemaining = exp - now;
 
-    console.log('🔑 [NEW PASSWORD] Setting initial timeRemaining:', remaining);
-    setTimeRemaining(remaining);
+    console.log('🔑 [NEW PASSWORD] Initial remaining:', initialRemaining);
+
+    if (initialRemaining <= 0) {
+      setTimeRemaining(0);
+      console.log('🔑 [NEW PASSWORD] Token already expired');
+      return;
+    }
+
+    setTimeRemaining(initialRemaining);
 
     // Update countdown every second
     const intervalId = window.setInterval(() => {
       const newRemaining = exp - Date.now();
-      console.log('🔑 [NEW PASSWORD] Countdown tick, remaining:', newRemaining);
       if (newRemaining <= 0) {
         setTimeRemaining(0);
         window.clearInterval(intervalId);
-        console.log('🔑 [NEW PASSWORD] Token expired during countdown');
+        console.log('🔑 [NEW PASSWORD] Countdown reached zero, token expired');
       } else {
         setTimeRemaining(newRemaining);
       }
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [decodedToken, isExpired]);
+  }, [decodedToken]);
+
+  // Check if token is expired
+  const isExpired = timeRemaining === null ? false : timeRemaining <= 0;
 
   // Format time remaining
   const formattedTimeRemaining = useMemo(() => {
