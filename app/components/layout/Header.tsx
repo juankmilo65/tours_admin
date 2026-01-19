@@ -6,6 +6,7 @@ import type { JSX } from 'react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { translateCountries, translateCountry, type Country } from '~/store/slices/countriesSlice';
+import { selectCurrentUser } from '~/store/slices/authSlice';
 import {
   setGlobalLoading,
   setLanguage,
@@ -47,6 +48,34 @@ export function Header({
   // Redux state
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector(selectLanguage);
+  const currentUser = useAppSelector(selectCurrentUser);
+
+  // Get user initials for avatar
+  const userInitials = useMemo(() => {
+    if (!currentUser) return '?';
+    const firstInitial = currentUser.firstName.charAt(0).toUpperCase();
+    const lastInitial = currentUser.lastName.charAt(0).toUpperCase();
+    return firstInitial + lastInitial;
+  }, [currentUser]);
+
+  // Get user display name and email (to avoid ESLint warnings about nullable strings)
+  const { userDisplayName, userEmail } = useMemo(() => {
+    if (!currentUser) {
+      return {
+        userDisplayName: t('header.guest'),
+        userEmail: t('header.noEmail'),
+      };
+    }
+
+    const displayName = `${currentUser.firstName} ${currentUser.lastName}`;
+    const email =
+      currentUser.email && currentUser.email !== '' ? currentUser.email : t('header.noEmail');
+
+    return {
+      userDisplayName: displayName,
+      userEmail: email,
+    };
+  }, [currentUser, t]);
 
   // Translate countries based on current language usando props
   const translatedCountries = useMemo(
@@ -376,7 +405,7 @@ export function Header({
                     margin: 0,
                   }}
                 >
-                  Admin User
+                  {userDisplayName}
                 </p>
                 <p
                   style={{
@@ -385,24 +414,40 @@ export function Header({
                     margin: 0,
                   }}
                 >
-                  admin@tours.com
+                  {userEmail}
                 </p>
               </div>
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  backgroundColor: 'var(--color-primary-500)',
-                  borderRadius: 'var(--radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: 'var(--font-weight-semibold)',
-                }}
-              >
-                A
-              </div>
+              {currentUser?.avatar !== undefined &&
+              currentUser?.avatar !== null &&
+              currentUser.avatar !== '' ? (
+                <img
+                  src={currentUser.avatar}
+                  alt={userDisplayName}
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: 'var(--radius-full)',
+                    objectFit: 'cover',
+                    backgroundColor: 'var(--color-primary-500)',
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    backgroundColor: 'var(--color-primary-500)',
+                    borderRadius: 'var(--radius-full)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 'var(--font-weight-semibold)',
+                  }}
+                >
+                  {userInitials}
+                </div>
+              )}
               <span style={{ color: 'var(--color-neutral-500)', fontSize: 'var(--text-sm)' }}>
                 {isUserMenuOpen ? '▲' : '▼'}
               </span>

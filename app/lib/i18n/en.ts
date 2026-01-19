@@ -92,6 +92,8 @@ export const en: Translation = {
     logout: 'Logout',
     notifications: 'Notifications',
     help: 'Help',
+    guest: 'Guest',
+    noEmail: 'No email',
   },
   auth: {
     login: 'Login',

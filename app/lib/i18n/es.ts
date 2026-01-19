@@ -92,6 +92,8 @@ export const es: Translation = {
     logout: 'Cerrar Sesión',
     notifications: 'Notificaciones',
     help: 'Ayuda',
+    guest: 'Invitado',
+    noEmail: 'Sin correo',
   },
   auth: {
     login: 'Iniciar Sesión',
