@@ -173,6 +173,14 @@ export const es: Translation = {
     sendingResetLink: 'Enviando enlace de restablecimiento...',
     resettingPassword: 'Restableciendo contraseña...',
     redirectingToLogin: 'Redirigiendo al inicio de sesión...',
+    submit: 'Restablecer Contraseña',
+    tokenExpired: 'Enlace expirado',
+    tokenExpiredDescription:
+      'El enlace para restablecer tu contraseña ha caducado. Por seguridad, este enlace solo es válido por un tiempo limitado.',
+    requestNewPassword: 'Solicitar restablecimiento de contraseña',
+    timeRemaining: 'Tiempo restante',
+    linkExpiresSoon: 'Este enlace expirará pronto',
+    linkExpiredAt: 'El enlace expiró en',
   },
   dashboard: {
     title: 'Panel de Control',

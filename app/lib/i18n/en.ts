@@ -172,6 +172,14 @@ export const en: Translation = {
     sendingResetLink: 'Sending reset link...',
     resettingPassword: 'Resetting password...',
     redirectingToLogin: 'Redirecting to login...',
+    submit: 'Reset Password',
+    tokenExpired: 'Link expired',
+    tokenExpiredDescription:
+      'The password reset link has expired. For security, this link is only valid for a limited time.',
+    requestNewPassword: 'Request password reset',
+    timeRemaining: 'Time remaining',
+    linkExpiresSoon: 'This link will expire soon',
+    linkExpiredAt: 'Link expired at',
   },
   dashboard: {
     title: 'Dashboard',

@@ -3,10 +3,11 @@
  * User sets new password using token from email link
  */
 
-import type { JSX, FormEvent } from 'react';
-import { useState, useEffect } from 'react';
-import { useNavigate, Link, useSearchParams, type MetaFunction } from '@remix-run/react';
+import type { JSX, FormEvent, MouseEvent } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams, Link, type MetaFunction } from '@remix-run/react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
+import jwt from 'jsonwebtoken';
 import { resetPasswordBusinessLogic } from '~/server/businessLogic/authBusinessLogic';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import { useAppDispatch } from '~/store/hooks';
@@ -20,6 +21,51 @@ export const meta: MetaFunction = () => {
     { name: 'description', content: 'Set your new password' },
   ];
 };
+
+/**
+ * Decode JWT token using jsonwebtoken library
+ * Verifies the token and returns the decoded payload
+ */
+function decodeJWT(token: string): {
+  userId: string;
+  email: string;
+  type: string;
+  iat: number;
+  exp: number;
+} | null {
+  try {
+    // Decode without verification (we only need the payload for expiration check)
+    const decoded = jwt.decode(token) as {
+      userId: string;
+      email: string;
+      type: string;
+      iat: number;
+      exp: number;
+    } | null;
+
+    if (decoded === null) {
+      console.error('🔑 [NEW PASSWORD] Failed to decode JWT');
+      return null;
+    }
+
+    // Validate required fields
+    if (
+      decoded.userId === undefined ||
+      decoded.email === undefined ||
+      decoded.type === undefined ||
+      decoded.iat === undefined ||
+      decoded.exp === undefined
+    ) {
+      console.error('🔑 [NEW PASSWORD] Invalid JWT payload structure');
+      return null;
+    }
+
+    return decoded;
+  } catch (error) {
+    console.error('🔑 [NEW PASSWORD] Error decoding JWT:', error);
+    return null;
+  }
+}
 
 export function loader(args: LoaderFunctionArgs): Promise<null> {
   const request = args.request;
@@ -53,6 +99,82 @@ export default function NewPasswordRoute(): JSX.Element {
 
   // Safe token extraction with explicit null/undefined/empty check
   const safeToken = token === null || token === undefined || token === '' ? null : token;
+
+  // Decode token to get expiration time
+  const decodedToken = useMemo(() => {
+    if (safeToken !== null) {
+      return decodeJWT(safeToken);
+    }
+    return null;
+  }, [safeToken]);
+
+  console.log('🔑 [NEW PASSWORD] decodedToken:', decodedToken);
+
+  // Calculate expiration immediately
+  const isExpired = useMemo(() => {
+    if (decodedToken === null) {
+      return false;
+    }
+    const exp = decodedToken.exp * 1000; // Convert to milliseconds
+    const now = Date.now();
+    const remaining = exp - now;
+    return remaining <= 0;
+  }, [decodedToken]);
+
+  console.log('🔑 [NEW PASSWORD] isExpired:', isExpired);
+
+  // Calculate time remaining
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+
+  // Set up countdown timer if not expired
+  useEffect(() => {
+    console.log(
+      '🔑 [NEW PASSWORD] useEffect, isExpired:',
+      isExpired,
+      'decodedToken:',
+      decodedToken
+    );
+
+    if (decodedToken === null || isExpired) {
+      setTimeRemaining(null);
+      console.log('🔑 [NEW PASSWORD] Token is null or expired, no countdown');
+      return;
+    }
+
+    const exp = decodedToken.exp * 1000; // Convert to milliseconds
+    const now = Date.now();
+    const remaining = exp - now;
+
+    console.log('🔑 [NEW PASSWORD] Setting initial timeRemaining:', remaining);
+    setTimeRemaining(remaining);
+
+    // Update countdown every second
+    const intervalId = window.setInterval(() => {
+      const newRemaining = exp - Date.now();
+      console.log('🔑 [NEW PASSWORD] Countdown tick, remaining:', newRemaining);
+      if (newRemaining <= 0) {
+        setTimeRemaining(0);
+        window.clearInterval(intervalId);
+        console.log('🔑 [NEW PASSWORD] Token expired during countdown');
+      } else {
+        setTimeRemaining(newRemaining);
+      }
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [decodedToken, isExpired]);
+
+  // Format time remaining
+  const formattedTimeRemaining = useMemo(() => {
+    if (timeRemaining === null || timeRemaining <= 0) {
+      return null;
+    }
+
+    const minutes = Math.floor(timeRemaining / 60000);
+    const seconds = Math.floor((timeRemaining % 60000) / 1000);
+
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }, [timeRemaining]);
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -275,118 +397,173 @@ export default function NewPasswordRoute(): JSX.Element {
         <div className="login-form-container">
           {!success ? (
             <>
-              <h1 className="login-heading">{t('auth.resetPasswordTitle')}</h1>
-              <p className="login-description">{t('auth.resetPasswordDescription')}</p>
+              {isExpired === false ? (
+                <>
+                  <h1 className="login-heading">{t('auth.resetPasswordTitle')}</h1>
+                  <p className="login-description">{t('auth.resetPasswordDescription')}</p>
 
-              <form
-                onSubmit={(e) => {
-                  void handleSubmit(e);
-                }}
-                className="login-form"
-              >
-                <div className="form-field">
-                  <label htmlFor="newPassword" className="form-label">
-                    {t('auth.newPassword')}
-                  </label>
-                  <div className="password-input-container">
-                    <input
-                      id="newPassword"
-                      type={showPassword ? 'text' : 'password'}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="•••••••"
-                      disabled={isLoading}
-                      className="form-input"
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      className="password-toggle"
-                      onClick={() => setPassLocked(!passLocked)}
-                      onMouseEnter={() => setPassHover(true)}
-                      onMouseLeave={() => setPassHover(false)}
-                      tabIndex={-1}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      title="Click to toggle, hover to peek"
+                  {/* Countdown Timer - Small gray label below description */}
+                  {formattedTimeRemaining !== null && (
+                    <p
+                      style={{
+                        fontSize: '12px',
+                        color: 'var(--color-neutral-500)',
+                        marginTop: '4px',
+                        marginBottom: 'var(--space-4)',
+                      }}
                     >
-                      {showPassword ? EyeOffIcon : EyeIcon}
+                      {t('auth.timeRemaining')}: {formattedTimeRemaining}
+                    </p>
+                  )}
+
+                  <form
+                    onSubmit={(e) => {
+                      void handleSubmit(e);
+                    }}
+                    className="login-form"
+                  >
+                    <div className="form-field">
+                      <label htmlFor="newPassword" className="form-label">
+                        {t('auth.newPassword')}
+                      </label>
+                      <div className="password-input-container">
+                        <input
+                          id="newPassword"
+                          type={showPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••"
+                          disabled={isLoading}
+                          className="form-input"
+                          autoComplete="new-password"
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle"
+                          onClick={() => setPassLocked(!passLocked)}
+                          onMouseEnter={() => setPassHover(true)}
+                          onMouseLeave={() => setPassHover(false)}
+                          tabIndex={-1}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          title="Click to toggle, hover to peek"
+                        >
+                          {showPassword ? EyeOffIcon : EyeIcon}
+                        </button>
+                      </div>
+                      <p
+                        style={{
+                          fontSize: '12px',
+                          color: 'var(--color-neutral-500)',
+                          marginTop: '4px',
+                        }}
+                      >
+                        {t('auth.minChars')}
+                      </p>
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="confirmPassword" className="form-label">
+                        {t('auth.confirmNewPassword')}
+                      </label>
+                      <div className="password-input-container">
+                        <input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••"
+                          disabled={isLoading}
+                          className="form-input"
+                          autoComplete="new-password"
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle"
+                          onClick={() => setConfirmPassLocked(!confirmPassLocked)}
+                          onMouseEnter={() => setConfirmPassHover(true)}
+                          onMouseLeave={() => setConfirmPassHover(false)}
+                          tabIndex={-1}
+                          aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                          title="Click to toggle, hover to peek"
+                        >
+                          {showConfirmPassword ? EyeOffIcon : EyeIcon}
+                        </button>
+                      </div>
+                    </div>
+
+                    {error !== null && (
+                      <div className="error-message">
+                        <p>{error}</p>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className={`submit-button ${isLoading ? 'loading' : ''}`}
+                    >
+                      {isLoading ? t('common.loading') : t('auth.submit')}
                     </button>
-                  </div>
-                  <p
+                  </form>
+                </>
+              ) : (
+                <>
+                  <div
                     style={{
-                      fontSize: '12px',
-                      color: 'var(--color-neutral-500)',
-                      marginTop: '4px',
+                      textAlign: 'center',
+                      padding: 'var(--space-6)',
                     }}
                   >
-                    {t('auth.minChars')}
-                  </p>
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="confirmPassword" className="form-label">
-                    {t('auth.confirmNewPassword')}
-                  </label>
-                  <div className="password-input-container">
-                    <input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="•••••••"
-                      disabled={isLoading}
-                      className="form-input"
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      className="password-toggle"
-                      onClick={() => setConfirmPassLocked(!confirmPassLocked)}
-                      onMouseEnter={() => setConfirmPassHover(true)}
-                      onMouseLeave={() => setConfirmPassHover(false)}
-                      tabIndex={-1}
-                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                      title="Click to toggle, hover to peek"
+                    <div
+                      style={{
+                        fontSize: '48px',
+                        marginBottom: 'var(--space-4)',
+                      }}
                     >
-                      {showConfirmPassword ? EyeOffIcon : EyeIcon}
-                    </button>
+                      ⏰
+                    </div>
+                    <h3
+                      style={{
+                        marginBottom: 'var(--space-2)',
+                        fontSize: '20px',
+                        fontWeight: '600',
+                      }}
+                    >
+                      {t('auth.tokenExpired')}
+                    </h3>
+                    <p
+                      style={{
+                        color: 'var(--color-neutral-600)',
+                        marginBottom: 'var(--space-4)',
+                        lineHeight: '1.5',
+                      }}
+                    >
+                      {t('auth.tokenExpiredDescription')}
+                    </p>
+                    <Link
+                      to="/forgot-password"
+                      style={{
+                        display: 'inline-block',
+                        padding: '10px 20px',
+                        backgroundColor: 'var(--color-primary-600)',
+                        color: 'white',
+                        textDecoration: 'none',
+                        borderRadius: '6px',
+                        fontWeight: '500',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e: MouseEvent<HTMLAnchorElement>) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-primary-700)';
+                      }}
+                      onMouseLeave={(e: MouseEvent<HTMLAnchorElement>) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-primary-600)';
+                      }}
+                    >
+                      {t('auth.requestNewPassword')}
+                    </Link>
                   </div>
-                </div>
-
-                {error !== null && (
-                  <div className="error-message">
-                    <p>{error}</p>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className={`submit-button ${isLoading ? 'loading' : ''}`}
-                >
-                  {isLoading ? t('common.loading') : t('auth.submit')}
-                </button>
-              </form>
-
-              {/* Back to login link */}
-              <div
-                style={{
-                  marginTop: 'var(--space-4)',
-                  textAlign: 'center',
-                }}
-              >
-                <Link
-                  to="/"
-                  style={{
-                    color: 'var(--color-primary-600)',
-                    textDecoration: 'none',
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: '500',
-                  }}
-                >
-                  ← {t('auth.backToLogin')}
-                </Link>
-              </div>
+                </>
+              )}
             </>
           ) : (
             <div className="success-message">
