@@ -29,6 +29,8 @@ import {
   selectOtpSent,
   selectRequiresOtp,
   selectAuthToken,
+  selectAuthError,
+  clearError,
 } from '~/store/slices/authSlice';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import Select from '~/components/ui/Select';
@@ -52,6 +54,45 @@ const LANGUAGES = [
   { value: 'en', label: 'English' },
 ];
 
+// Helper function to extract error message from various error formats
+const extractErrorMessage = (error: unknown): string => {
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (error instanceof Error) {
+    // Check if it's an Axios error with response
+    const axiosError = error as { response?: { data?: unknown } };
+    if (axiosError.response?.data !== undefined && axiosError.response?.data !== null) {
+      const data = axiosError.response.data;
+
+      // Try different possible error message properties
+      if (typeof data === 'string') {
+        return data;
+      }
+
+      if (typeof data === 'object' && data !== null) {
+        const possibleKeys = ['error', 'message', 'msg', 'detail', 'description'] as const;
+        for (const key of possibleKeys) {
+          const value = (data as Record<string, unknown>)[key];
+          if (value !== undefined && value !== null && typeof value === 'string') {
+            return value;
+          }
+        }
+      }
+    }
+
+    // Fallback to error message
+    return error.message || 'Error de autenticación';
+  }
+
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String(error.message);
+  }
+
+  return 'Error desconocido';
+};
+
 export default function IndexRoute(): JSX.Element {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -61,6 +102,7 @@ export default function IndexRoute(): JSX.Element {
   const otpEmail = useAppSelector(selectPendingEmail);
   const otpSent = useAppSelector(selectOtpSent);
   const authToken = useAppSelector(selectAuthToken);
+  const authError = useAppSelector(selectAuthError);
 
   // Wizard step: 'login' or 'otp'
   const [step, setStep] = useState<'login' | 'otp'>('login');
@@ -69,26 +111,41 @@ export default function IndexRoute(): JSX.Element {
   useEffect(() => {
     if (requiresOtp === true && otpEmail !== null) {
       setStep('otp');
+      // Clear any previous login errors when moving to OTP step
+      dispatch(clearError());
     } else if (requiresOtp === false) {
       setStep('login');
     }
-  }, [requiresOtp, otpEmail]);
+  }, [requiresOtp, otpEmail, dispatch]);
 
   // Login form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // OTP form state
+  const [otpCode, setOtpCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // Clear error when user changes credentials
+  useEffect(() => {
+    if (authError !== null && (email.trim() !== '' || password.trim() !== '')) {
+      dispatch(clearError());
+    }
+  }, [email, password, authError, dispatch]);
+
+  // Clear error when user changes OTP code
+  useEffect(() => {
+    if (authError !== null && otpCode.trim() !== '') {
+      dispatch(clearError());
+    }
+  }, [otpCode, authError, dispatch]);
 
   // Password Visibility Logic
   const [passLocked, setPassLocked] = useState(false);
   const [passHover, setPassHover] = useState(false);
   const showPassword = passLocked || passHover;
 
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // OTP form state
-  const [otpCode, setOtpCode] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -100,10 +157,10 @@ export default function IndexRoute(): JSX.Element {
   // Handle login form submission
   const handleLoginSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
-    setError(null);
+    dispatch(clearError());
 
     if (!email || !password) {
-      setError(t('auth.errorIncomplete'));
+      dispatch(loginFailure(t('auth.errorIncomplete')));
       return;
     }
 
@@ -127,26 +184,12 @@ export default function IndexRoute(): JSX.Element {
         await requestOtpCode(email);
       } else {
         // Extract error message from various possible formats
-        let errorMessage = t('auth.errorGenericLogin');
+        const errorMessage = extractErrorMessage(result.error);
 
-        if (result.error !== null) {
-          if (typeof result.error === 'string') {
-            errorMessage = result.error;
-          } else if (
-            typeof result.error === 'object' &&
-            'message' in result.error &&
-            result.error.message !== undefined
-          ) {
-            errorMessage = result.error.message as string;
-          }
-        }
-
-        setError(errorMessage);
         dispatch(loginFailure(errorMessage));
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t('auth.errorGenericLogin');
-      setError(errorMessage);
       dispatch(loginFailure(errorMessage));
     } finally {
       setIsLoading(false);
@@ -166,39 +209,23 @@ export default function IndexRoute(): JSX.Element {
         // Move to OTP step
         setStep('otp');
       } else {
-        let errorMessage: string;
-        if (result.error !== null) {
-          if (typeof result.error === 'string') {
-            errorMessage = result.error;
-          } else if (
-            typeof result.error === 'object' &&
-            'message' in result.error &&
-            result.error.message !== undefined
-          ) {
-            errorMessage = result.error.message as string;
-          } else {
-            errorMessage = result.message ?? t('auth.errorGenericLogin');
-          }
-        } else {
-          errorMessage = result.message ?? t('auth.errorGenericLogin');
-        }
+        const errorMessage =
+          extractErrorMessage(result.error) ?? result.message ?? t('auth.errorGenericLogin');
         dispatch(requestOtpFailure(errorMessage));
-        setError(errorMessage);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : t('auth.errorGenericLogin');
       dispatch(requestOtpFailure(errorMessage));
-      setError(errorMessage);
     }
   };
 
   // Handle OTP verification
   const handleOtpSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
-    setError(null);
+    dispatch(clearError());
 
     if (otpCode?.length !== 6) {
-      setError(t('auth.invalidOtp'));
+      dispatch(verifyOtpFailure(t('auth.invalidOtp')));
       return;
     }
 
@@ -212,36 +239,18 @@ export default function IndexRoute(): JSX.Element {
         authToken ?? ''
       );
 
-      console.log('Verify OTP Response:', result);
-
       if (result.success === true) {
         dispatch(verifyOtpSuccess());
         // Navigate to dashboard
         navigate('/dashboard');
       } else {
         // Extract error message from various possible formats
-        let errorMessage = t('auth.invalidOtp');
+        const errorMessage = extractErrorMessage(result.error) || t('auth.invalidOtp');
 
-        if (result.error !== null) {
-          if (typeof result.error === 'string') {
-            errorMessage = result.error;
-          } else if (
-            typeof result.error === 'object' &&
-            'message' in result.error &&
-            result.error.message !== undefined
-          ) {
-            errorMessage = result.error.message as string;
-          } else if (result.message !== undefined) {
-            errorMessage = result.message;
-          }
-        }
-
-        setError(errorMessage);
         dispatch(verifyOtpFailure(errorMessage));
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : t('auth.errorGenericOtp');
-      setError(errorMessage);
       dispatch(verifyOtpFailure(errorMessage));
     } finally {
       setIsVerifying(false);
@@ -253,7 +262,7 @@ export default function IndexRoute(): JSX.Element {
   const handleBackToLogin = (): void => {
     setStep('login');
     setOtpCode('');
-    setError(null);
+    dispatch(clearError());
   };
 
   // Resend OTP code
@@ -261,7 +270,7 @@ export default function IndexRoute(): JSX.Element {
     if (otpEmail !== null && otpEmail !== undefined) {
       await requestOtpCode(otpEmail);
       setOtpCode('');
-      setError(null);
+      dispatch(clearError());
     }
   };
 
@@ -492,9 +501,9 @@ export default function IndexRoute(): JSX.Element {
                 </div>
               </div>
 
-              {error !== null && (
+              {authError !== null && (
                 <div className="error-message">
-                  <p>{error}</p>
+                  <p>{authError}</p>
                 </div>
               )}
 
@@ -540,9 +549,9 @@ export default function IndexRoute(): JSX.Element {
                 />
               </div>
 
-              {error !== null && (
+              {authError !== null && (
                 <div className="error-message">
-                  <p>{error}</p>
+                  <p>{authError}</p>
                 </div>
               )}
 
