@@ -61,6 +61,7 @@ export interface RequestPasswordResetResponse {
 export interface ResetPasswordPayload {
   token: string;
   newPassword: string;
+  loginUrl: string;
 }
 
 export interface ResetPasswordResponse {
@@ -246,9 +247,11 @@ export const requestPasswordReset = async (
 /**
  * Reset password with token
  */
-export const resetPassword = async (
-  payload: ResetPasswordPayload
-): Promise<ResetPasswordResponse> => {
+export const resetPassword = async (payload: {
+  token: string;
+  newPassword: string;
+  loginUrl: string;
+}): Promise<ResetPasswordResponse> => {
   try {
     const authService = createServiceREST(BASE_URL, 'auth/reset-password', '');
 

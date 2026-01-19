@@ -15,6 +15,17 @@ import { useTranslation } from '~/lib/i18n/utils';
 import type { Language } from '~/lib/i18n/types';
 import Select from '~/components/ui/Select';
 
+// Type declaration for Vite environment variables
+interface ViteImportMetaEnv {
+  readonly VITE_LOGIN_URL?: string;
+}
+
+interface ViteImportMeta {
+  readonly env: ViteImportMetaEnv;
+}
+
+const LOGIN_URL = (import.meta as unknown as ViteImportMeta).env.VITE_LOGIN_URL ?? '/';
+
 export const meta: MetaFunction = () => {
   return [
     { title: 'Reset Password - Tours Admin' },
@@ -295,7 +306,11 @@ export default function NewPasswordRoute(): JSX.Element {
     dispatch(setGlobalLoading({ isLoading: true, message: 'Restableciendo contraseña...' }));
 
     try {
-      const result = await resetPasswordBusinessLogic({ token: safeToken, newPassword });
+      const result = await resetPasswordBusinessLogic({
+        token: safeToken,
+        newPassword,
+        loginUrl: LOGIN_URL,
+      });
 
       console.log('🔑 [NEW PASSWORD SUBMIT] Backend response:', result);
 

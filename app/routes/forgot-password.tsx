@@ -142,46 +142,48 @@ export default function ForgotPasswordRoute(): JSX.Element {
         </div>
 
         <div className="login-form-container">
-          <h1 className="login-heading">{t('auth.forgotPasswordTitle')}</h1>
-          <p className="login-description">{t('auth.forgotPasswordDescription')}</p>
-
           {!success ? (
-            <form
-              onSubmit={(e) => {
-                void handleSubmit(e);
-              }}
-              className="login-form"
-            >
-              <div className="form-field">
-                <label htmlFor="email" className="form-label">
-                  {t('auth.email')}
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={t('auth.emailPlaceholder')}
-                  disabled={isLoading}
-                  className="form-input"
-                  autoComplete="email"
-                />
-              </div>
+            <>
+              <h1 className="login-heading">{t('auth.forgotPasswordTitle')}</h1>
+              <p className="login-description">{t('auth.forgotPasswordDescription')}</p>
 
-              {error !== null && (
-                <div className="error-message">
-                  <p>{error}</p>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className={`submit-button ${isLoading ? 'loading' : ''}`}
+              <form
+                onSubmit={(e) => {
+                  void handleSubmit(e);
+                }}
+                className="login-form"
               >
-                {isLoading ? t('common.loading') : t('auth.sendResetLink')}
-              </button>
-            </form>
+                <div className="form-field">
+                  <label htmlFor="email" className="form-label">
+                    {t('auth.email')}
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t('auth.emailPlaceholder')}
+                    disabled={isLoading}
+                    className="form-input"
+                    autoComplete="email"
+                  />
+                </div>
+
+                {error !== null && (
+                  <div className="error-message">
+                    <p>{error}</p>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className={`submit-button ${isLoading ? 'loading' : ''}`}
+                >
+                  {isLoading ? t('common.loading') : t('auth.sendResetLink')}
+                </button>
+              </form>
+            </>
           ) : (
             <div className="success-message">
               <div

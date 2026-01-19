@@ -33,4 +33,5 @@ export interface RequestPasswordResetPayload {
 export interface ResetPasswordPayload {
   token: string;
   newPassword: string;
+  loginUrl: string;
 }

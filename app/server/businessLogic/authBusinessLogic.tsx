@@ -88,10 +88,12 @@ const generateRequestPasswordResetPayload = (formData: FormData): RequestPasswor
 const generateResetPasswordPayload = (formData: FormData): ResetPasswordPayload => {
   const token = formData.get('token');
   const newPassword = formData.get('newPassword');
+  const loginUrl = formData.get('loginUrl');
 
   return {
     token: token !== null && token !== undefined ? token.toString() : '',
     newPassword: newPassword !== null && newPassword !== undefined ? newPassword.toString() : '',
+    loginUrl: loginUrl !== null && loginUrl !== undefined ? loginUrl.toString() : '',
   };
 };
 
