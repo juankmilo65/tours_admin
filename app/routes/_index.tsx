@@ -129,9 +129,40 @@ export default function IndexRoute(): JSX.Element {
         // Extract error message from various possible formats
         let errorMessage = t('auth.errorGenericLogin');
 
-        if (result.error !== null) {
+        if (result.error !== null && result.error !== undefined) {
           if (typeof result.error === 'string') {
             errorMessage = result.error;
+          } else if (result.error instanceof Error) {
+            // Handle Axios error
+            const axiosError = result.error as { response?: { data?: unknown } };
+            if (
+              axiosError.response?.data !== undefined &&
+              typeof axiosError.response.data === 'object'
+            ) {
+              const data = axiosError.response.data as Record<string, unknown>;
+              if (data.error !== undefined && typeof data.error === 'string') {
+                errorMessage = data.error;
+              } else if (data.message !== undefined && typeof data.message === 'string') {
+                errorMessage = data.message;
+              } else if (data.msg !== undefined && typeof data.msg === 'string') {
+                errorMessage = data.msg;
+              } else if (typeof axiosError.response.data === 'string') {
+                errorMessage = axiosError.response.data;
+              } else {
+                // Try to find any string property that might contain the error
+                const possibleKeys = ['error', 'message', 'msg', 'detail', 'description'];
+                for (const key of possibleKeys) {
+                  if (data[key] !== undefined && typeof data[key] === 'string') {
+                    errorMessage = data[key];
+                    break;
+                  }
+                }
+              }
+            } else if (result.error.message) {
+              errorMessage = result.error.message;
+            } else {
+              errorMessage = 'Error de autenticación';
+            }
           } else if (
             typeof result.error === 'object' &&
             'message' in result.error &&
@@ -167,9 +198,40 @@ export default function IndexRoute(): JSX.Element {
         setStep('otp');
       } else {
         let errorMessage: string;
-        if (result.error !== null) {
+        if (result.error !== null && result.error !== undefined) {
           if (typeof result.error === 'string') {
             errorMessage = result.error;
+          } else if (result.error instanceof Error) {
+            // Handle Axios error
+            const axiosError = result.error as { response?: { data?: unknown } };
+            if (
+              axiosError.response?.data !== undefined &&
+              typeof axiosError.response.data === 'object'
+            ) {
+              const data = axiosError.response.data as Record<string, unknown>;
+              if (data.error !== undefined && typeof data.error === 'string') {
+                errorMessage = data.error;
+              } else if (data.message !== undefined && typeof data.message === 'string') {
+                errorMessage = data.message;
+              } else if (data.msg !== undefined && typeof data.msg === 'string') {
+                errorMessage = data.msg;
+              } else if (typeof axiosError.response.data === 'string') {
+                errorMessage = axiosError.response.data;
+              } else {
+                // Try to find any string property that might contain the error
+                const possibleKeys = ['error', 'message', 'msg', 'detail', 'description'];
+                for (const key of possibleKeys) {
+                  if (data[key] !== undefined && typeof data[key] === 'string') {
+                    errorMessage = data[key];
+                    break;
+                  }
+                }
+              }
+            } else if (result.error.message) {
+              errorMessage = result.error.message;
+            } else {
+              errorMessage = 'Error de autenticación';
+            }
           } else if (
             typeof result.error === 'object' &&
             'message' in result.error &&
@@ -222,9 +284,40 @@ export default function IndexRoute(): JSX.Element {
         // Extract error message from various possible formats
         let errorMessage = t('auth.invalidOtp');
 
-        if (result.error !== null) {
+        if (result.error !== null && result.error !== undefined) {
           if (typeof result.error === 'string') {
             errorMessage = result.error;
+          } else if (result.error instanceof Error) {
+            // Handle Axios error
+            const axiosError = result.error as { response?: { data?: unknown } };
+            if (
+              axiosError.response?.data !== undefined &&
+              typeof axiosError.response.data === 'object'
+            ) {
+              const data = axiosError.response.data as Record<string, unknown>;
+              if (data.error !== undefined && typeof data.error === 'string') {
+                errorMessage = data.error;
+              } else if (data.message !== undefined && typeof data.message === 'string') {
+                errorMessage = data.message;
+              } else if (data.msg !== undefined && typeof data.msg === 'string') {
+                errorMessage = data.msg;
+              } else if (typeof axiosError.response.data === 'string') {
+                errorMessage = axiosError.response.data;
+              } else {
+                // Try to find any string property that might contain the error
+                const possibleKeys = ['error', 'message', 'msg', 'detail', 'description'];
+                for (const key of possibleKeys) {
+                  if (data[key] !== undefined && typeof data[key] === 'string') {
+                    errorMessage = data[key];
+                    break;
+                  }
+                }
+              }
+            } else if (result.error.message) {
+              errorMessage = result.error.message;
+            } else {
+              errorMessage = 'Error de autenticación';
+            }
           } else if (
             typeof result.error === 'object' &&
             'message' in result.error &&
