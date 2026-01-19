@@ -7,7 +7,7 @@ import type { JSX, FormEvent, MouseEvent } from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, Link, type MetaFunction } from '@remix-run/react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
-import jwt from 'jsonwebtoken';
+import { jwtDecode } from 'jwt-decode';
 import { resetPasswordBusinessLogic } from '~/server/businessLogic/authBusinessLogic';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import { useAppDispatch } from '~/store/hooks';
@@ -23,8 +23,8 @@ export const meta: MetaFunction = () => {
 };
 
 /**
- * Decode JWT token using jsonwebtoken library
- * Verifies the token and returns the decoded payload
+ * Decode JWT token using jwt-decode library (browser-compatible)
+ * Returns the decoded payload
  */
 function decodeJWT(token: string): {
   userId: string;
@@ -34,19 +34,8 @@ function decodeJWT(token: string): {
   exp: number;
 } | null {
   try {
-    // Decode without verification (we only need the payload for expiration check)
-    const decoded = jwt.decode(token) as {
-      userId: string;
-      email: string;
-      type: string;
-      iat: number;
-      exp: number;
-    } | null;
-
-    if (decoded === null) {
-      console.error('🔑 [NEW PASSWORD] Failed to decode JWT');
-      return null;
-    }
+    // Decode without verification (we only need payload for expiration check)
+    const decoded = jwtDecode(token);
 
     // Validate required fields
     if (

@@ -224,28 +224,6 @@ export default function ForgotPasswordRoute(): JSX.Element {
               </div>
             </div>
           )}
-
-          {/* Back to login link */}
-          {!success && (
-            <div
-              style={{
-                marginTop: 'var(--space-4)',
-                textAlign: 'center',
-              }}
-            >
-              <Link
-                to="/"
-                style={{
-                  color: 'var(--color-primary-600)',
-                  textDecoration: 'none',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: '500',
-                }}
-              >
-                ← {t('auth.backToLogin')}
-              </Link>
-            </div>
-          )}
         </div>
       </div>
     </div>
