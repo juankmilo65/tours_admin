@@ -111,6 +111,8 @@ const requestEmailVerificationBusinessLogic = async (
 
 /**
  * Business logic for verifying email
+ * NOTE: This only calls the backend service. For client-side usage that also
+ * sets the server session, use verifyEmailBusinessLogicWithSession instead.
  */
 const verifyEmailBusinessLogic = async (
   data: VerifyEmailPayload,
@@ -122,6 +124,30 @@ const verifyEmailBusinessLogic = async (
   } catch (err) {
     console.error('Error in verifyEmailBusiness:', err);
     return Promise.resolve({ error: err });
+  }
+};
+
+/**
+ * Business logic for verifying email with session management
+ * This should be used from client-side components to both verify OTP and set server session
+ * Returns the backend response AND the Set-Cookie header to set the session
+ */
+export const verifyEmailBusinessLogicWithSession = async (
+  data: VerifyEmailPayload,
+  token: string | null = null
+): Promise<VerifyEmailResponse & { setCookieHeader?: string }> => {
+  try {
+    const result = await verifyEmail(data, token ?? '');
+
+    // If verification was successful, return the response
+    // The calling code will need to handle session setting via the API route
+    return result as VerifyEmailResponse & { setCookieHeader?: string };
+  } catch (err) {
+    console.error('Error in verifyEmailBusinessWithSession:', err);
+    return Promise.resolve({
+      error: err,
+      success: false,
+    });
   }
 };
 

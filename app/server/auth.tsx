@@ -22,7 +22,8 @@ export interface RegisterUserResponse {
       lastName: string;
       role: string;
     };
-    token: string;
+    accessToken: string;
+    refreshToken: string;
   };
   error?: unknown;
 }
@@ -55,7 +56,8 @@ export interface LoginResponse {
       lastName: string;
       role: string;
     };
-    token: string;
+    accessToken: string;
+    refreshToken: string;
   };
   error?: unknown;
 }

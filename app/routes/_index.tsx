@@ -12,7 +12,6 @@ import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import {
   loginUserBusinessLogic,
   requestEmailVerificationBusinessLogic,
-  verifyEmailBusinessLogic,
 } from '~/server/businessLogic/authBusinessLogic';
 import {
   loginStart,
@@ -28,7 +27,7 @@ import {
   selectPendingEmail,
   selectOtpSent,
   selectRequiresOtp,
-  selectAuthToken,
+  selectPendingToken,
 } from '~/store/slices/authSlice';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import Select from '~/components/ui/Select';
@@ -60,7 +59,7 @@ export default function IndexRoute(): JSX.Element {
   const { t, language: currentLang } = useTranslation();
   const otpEmail = useAppSelector(selectPendingEmail);
   const otpSent = useAppSelector(selectOtpSent);
-  const authToken = useAppSelector(selectAuthToken);
+  const authToken = useAppSelector(selectPendingToken);
 
   // Wizard step: 'login' or 'otp'
   const [step, setStep] = useState<'login' | 'otp'>('login');
@@ -115,13 +114,20 @@ export default function IndexRoute(): JSX.Element {
       const result = await loginUserBusinessLogic({ email, password });
 
       if (result.success === true && result.data) {
+        console.log('Login successful - result.data:', result.data);
+        console.log('Login successful - accessToken:', result.data.accessToken);
+        console.log('Login successful - user:', result.data.user);
+
         // Login successful, save to Redux
+        // Note: Backend returns 'accessToken', not 'token'
         dispatch(
           loginSuccess({
             user: result.data.user as never,
-            token: result.data.token,
+            token: result.data.accessToken,
           })
         );
+
+        console.log('Login - Dispatching loginSuccess');
 
         // Request OTP for 2FA
         await requestOtpCode(email);
@@ -268,65 +274,40 @@ export default function IndexRoute(): JSX.Element {
     dispatch(verifyOtpStart());
     dispatch(setGlobalLoading({ isLoading: true, message: t('auth.verifying') }));
 
+    console.log('handleOtpSubmit - authToken:', authToken);
+    console.log('handleOtpSubmit - otpEmail:', otpEmail);
+    console.log('handleOtpSubmit - otpCode:', otpCode);
+
     try {
-      const result = await verifyEmailBusinessLogic(
-        { otp: otpCode, email: otpEmail ?? '' },
-        authToken ?? ''
-      );
+      // Call to API endpoint to verify OTP and set server session
+      // Note: We use fetch to call the Remix route /api/auth/verify-email
+      // which handles both: 1) calling backend verifyEmail service, 2) setting server session cookie
+      const response = await window.fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken ?? ''}`,
+        },
+        body: JSON.stringify({
+          otp: otpCode,
+          email: otpEmail ?? '',
+        }),
+      });
+
+      const result = (await response.json()) as { success?: boolean; error?: string };
 
       console.log('Verify OTP Response:', result);
 
-      if (result.success === true) {
+      if (response.ok && result.success === true) {
         dispatch(verifyOtpSuccess());
         // Navigate to dashboard
         navigate('/dashboard');
       } else {
-        // Extract error message from various possible formats
+        // Extract error message from response
         let errorMessage = t('auth.invalidOtp');
 
         if (result.error !== null && result.error !== undefined) {
-          if (typeof result.error === 'string') {
-            errorMessage = result.error;
-          } else if (result.error instanceof Error) {
-            // Handle Axios error
-            const axiosError = result.error as { response?: { data?: unknown } };
-            if (
-              axiosError.response?.data !== undefined &&
-              typeof axiosError.response.data === 'object'
-            ) {
-              const data = axiosError.response.data as Record<string, unknown>;
-              if (data.error !== undefined && typeof data.error === 'string') {
-                errorMessage = data.error;
-              } else if (data.message !== undefined && typeof data.message === 'string') {
-                errorMessage = data.message;
-              } else if (data.msg !== undefined && typeof data.msg === 'string') {
-                errorMessage = data.msg;
-              } else if (typeof axiosError.response.data === 'string') {
-                errorMessage = axiosError.response.data;
-              } else {
-                // Try to find any string property that might contain the error
-                const possibleKeys = ['error', 'message', 'msg', 'detail', 'description'];
-                for (const key of possibleKeys) {
-                  if (data[key] !== undefined && typeof data[key] === 'string') {
-                    errorMessage = data[key];
-                    break;
-                  }
-                }
-              }
-            } else if (result.error.message) {
-              errorMessage = result.error.message;
-            } else {
-              errorMessage = 'Error de autenticación';
-            }
-          } else if (
-            typeof result.error === 'object' &&
-            'message' in result.error &&
-            result.error.message !== undefined
-          ) {
-            errorMessage = result.error.message as string;
-          } else if (result.message !== undefined) {
-            errorMessage = result.message;
-          }
+          errorMessage = result.error;
         }
 
         setError(errorMessage);
