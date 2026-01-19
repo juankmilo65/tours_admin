@@ -93,8 +93,13 @@ function AuthGuard({ children }: { children: ReactNode }): ReactNode {
 
   // If not authenticated or OTP not verified, redirect to login
   if (!isAuthenticated || !isOtpVerified) {
-    // Allow access to public routes
-    if (location.pathname === '/' || location.pathname === '/register') {
+    // Allow access to public routes (/, /register, /newPassword, /forgot-password)
+    if (
+      location.pathname === '/' ||
+      location.pathname === '/register' ||
+      location.pathname === '/newPassword' ||
+      location.pathname === '/forgot-password'
+    ) {
       return children;
     }
     // For protected routes, redirect to login
@@ -361,7 +366,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
   const pathname = url.pathname;
 
   // Rutas públicas que no requieren autenticación
-  const publicRoutes = ['/', '/register'];
+  const publicRoutes = ['/', '/register', '/newPassword', '/forgot-password'];
   const isPublicRoute = publicRoutes.includes(pathname);
 
   // Load session to check authentication
@@ -381,7 +386,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
   }
 
   // Si es una ruta pública (/ o /register) y el usuario SÍ está autenticado, redirigir al dashboard
-  if (isPublicRoute && hasToken) {
+  // EXCEPTO para /newPassword y /forgot-password que permiten acceso aunque estés autenticado
+  if (isPublicRoute && hasToken && pathname !== '/newPassword' && pathname !== '/forgot-password') {
     throw redirect('/dashboard');
   }
   // Get selected country from session
@@ -561,8 +567,12 @@ export default function App(): React.JSX.Element {
     [cities, countries]
   );
 
-  // Check if current page is an auth page (login or register)
-  const isAuthPage = location.pathname === '/' || location.pathname === '/register';
+  // Check if current page is an auth page (login, register, newPassword, forgot-password)
+  const isAuthPage =
+    location.pathname === '/' ||
+    location.pathname === '/register' ||
+    location.pathname === '/newPassword' ||
+    location.pathname === '/forgot-password';
 
   return (
     <CitiesContext.Provider value={contextValue}>

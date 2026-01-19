@@ -533,20 +533,25 @@ export default function IndexRoute(): JSX.Element {
         </div>
 
         <div className="login-form-container">
-          <h1 className="login-heading">
-            {step === 'login'
-              ? t('auth.welcome')
-              : step === 'otp'
-                ? t('auth.otpTitle')
-                : t('auth.forgotPasswordTitle')}
-          </h1>
-          <p className="login-description">
-            {step === 'login'
-              ? t('auth.welcomeSub')
-              : step === 'otp'
-                ? `${t('auth.otpDescription')} ${otpEmail}`
-                : t('auth.forgotPasswordDescription')}
-          </p>
+          {/* Only show heading and description if not in forgot-password success */}
+          {!(step === 'forgot-password' && forgotSuccess) && (
+            <>
+              <h1 className="login-heading">
+                {step === 'login'
+                  ? t('auth.welcome')
+                  : step === 'otp'
+                    ? t('auth.otpTitle')
+                    : t('auth.forgotPasswordTitle')}
+              </h1>
+              <p className="login-description">
+                {step === 'login'
+                  ? t('auth.welcomeSub')
+                  : step === 'otp'
+                    ? `${t('auth.otpDescription')} ${otpEmail}`
+                    : t('auth.forgotPasswordDescription')}
+              </p>
+            </>
+          )}
 
           {/* Step Indicator - Only show for login and OTP steps */}
           {step !== 'forgot-password' && (

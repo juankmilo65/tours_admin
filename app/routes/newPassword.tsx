@@ -7,7 +7,6 @@ import type { JSX, FormEvent } from 'react';
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams, type MetaFunction } from '@remix-run/react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
-import { requireNoAuth } from '~/utilities/auth.loader';
 import { resetPasswordBusinessLogic } from '~/server/businessLogic/authBusinessLogic';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import { useAppDispatch } from '~/store/hooks';
@@ -22,9 +21,22 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-export async function loader(args: LoaderFunctionArgs): Promise<null> {
-  await requireNoAuth(args);
-  return null;
+export function loader(args: LoaderFunctionArgs): Promise<null> {
+  const request = args.request;
+  const url = new URL(request.url);
+  const token = url.searchParams.get('token');
+
+  const tokenPreview =
+    token !== null && token !== undefined && token !== '' ? `${token.substring(0, 20)}...` : 'null';
+
+  console.log('🔑 [NEW PASSWORD LOADER] Token from URL:', tokenPreview);
+
+  console.log('🔑 [NEW PASSWORD LOADER] Allowing access to /newPassword');
+  console.log('🔑 [NEW PASSWORD LOADER] Component will validate token and redirect if needed');
+
+  // Always allow access to this route
+  // The component will validate token and redirect if needed
+  return Promise.resolve(null);
 }
 
 const LANGUAGES = [
@@ -38,6 +50,9 @@ export default function NewPasswordRoute(): JSX.Element {
   const { t, language: currentLang } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
+
+  // Safe token extraction with explicit null/undefined/empty check
+  const safeToken = token === null || token === undefined || token === '' ? null : token;
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -91,10 +106,20 @@ export default function NewPasswordRoute(): JSX.Element {
 
   // Redirect to login if no token is provided
   useEffect(() => {
-    if (token === null || token === '') {
+    const tokenPreview =
+      safeToken !== null && safeToken !== undefined && safeToken !== ''
+        ? `${safeToken.substring(0, 20)}...`
+        : 'null';
+
+    console.log('🔑 [NEW PASSWORD COMPONENT] Token from searchParams:', tokenPreview);
+
+    if (safeToken === null) {
+      console.log('🔑 [NEW PASSWORD COMPONENT] No token, redirecting to login...');
       navigate('/');
+    } else {
+      console.log('🔑 [NEW PASSWORD COMPONENT] Token valid, showing reset password form');
     }
-  }, [token, navigate]);
+  }, [safeToken, navigate]);
 
   const handleLanguageChange = (value: string): void => {
     dispatch(setLanguage(value as Language));
@@ -132,34 +157,53 @@ export default function NewPasswordRoute(): JSX.Element {
     e.preventDefault();
     setError(null);
 
-    if (!newPassword || !confirmPassword) {
+    console.log('🔑 [NEW PASSWORD SUBMIT] Starting password reset process');
+
+    if (
+      newPassword === null ||
+      newPassword === undefined ||
+      newPassword === '' ||
+      confirmPassword === null ||
+      confirmPassword === undefined ||
+      confirmPassword === ''
+    ) {
+      console.log('🔑 [NEW PASSWORD SUBMIT] Fields incomplete');
       setError(t('auth.errorIncomplete'));
       return;
     }
 
     if (!validatePassword(newPassword)) {
+      console.log('🔑 [NEW PASSWORD SUBMIT] Password validation failed');
       return;
     }
 
     if (newPassword !== confirmPassword) {
+      console.log('🔑 [NEW PASSWORD SUBMIT] Passwords do not match');
       setError(t('auth.errorMatch'));
       return;
     }
 
-    if (token === null || token === '') {
+    if (safeToken === null) {
+      console.log('🔑 [NEW PASSWORD SUBMIT] Invalid token');
       setError(t('auth.invalidToken'));
       return;
     }
+
+    console.log('🔑 [NEW PASSWORD SUBMIT] All validations passed, calling backend...');
 
     setIsLoading(true);
     dispatch(setGlobalLoading({ isLoading: true, message: 'Restableciendo contraseña...' }));
 
     try {
-      const result = await resetPasswordBusinessLogic({ token, newPassword });
+      const result = await resetPasswordBusinessLogic({ token: safeToken, newPassword });
+
+      console.log('🔑 [NEW PASSWORD SUBMIT] Backend response:', result);
 
       if (result.success === true) {
+        console.log('🔑 [NEW PASSWORD SUBMIT] Password reset successful');
         setSuccess(true);
       } else {
+        console.log('🔑 [NEW PASSWORD SUBMIT] Password reset failed:', result.error);
         let errorMessage = t('auth.errorResetPassword');
 
         if (result.error !== null && result.error !== undefined) {
@@ -179,6 +223,7 @@ export default function NewPasswordRoute(): JSX.Element {
         setError(errorMessage);
       }
     } catch (err) {
+      console.log('🔑 [NEW PASSWORD SUBMIT] Exception caught:', err);
       const errorMessage = err instanceof Error ? err.message : t('auth.errorResetPassword');
       setError(errorMessage);
     } finally {
@@ -188,7 +233,7 @@ export default function NewPasswordRoute(): JSX.Element {
   };
 
   // Show loading if no token
-  if (token === null || token === '') {
+  if (safeToken === null) {
     return (
       <div
         style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}
