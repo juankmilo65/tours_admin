@@ -4,11 +4,15 @@ import {
   requestEmailVerification,
   verifyEmail,
   logout,
+  requestPasswordReset,
+  resetPassword,
   type RegisterUserResponse,
   type LoginResponse,
   type RequestEmailVerificationResponse,
   type VerifyEmailResponse,
   type LogoutResponse,
+  type RequestPasswordResetResponse,
+  type ResetPasswordResponse,
 } from '../auth';
 import type {
   RegisterUserPayload,
@@ -16,6 +20,8 @@ import type {
   RequestEmailVerificationPayload,
   VerifyEmailPayload,
   LogoutPayload,
+  RequestPasswordResetPayload,
+  ResetPasswordPayload,
 } from '../../types/AuthProps';
 import type { ServiceResult } from '../_index';
 
@@ -66,6 +72,26 @@ const generateLogoutPayload = (formData: FormData): LogoutPayload => {
 
   return {
     token: token !== null && token !== undefined ? token.toString() : '',
+  };
+};
+
+const generateRequestPasswordResetPayload = (formData: FormData): RequestPasswordResetPayload => {
+  const email = formData.get('email');
+  const resetUrl = formData.get('resetUrl');
+
+  return {
+    email: email !== null && email !== undefined ? email.toString() : '',
+    resetUrl: resetUrl !== null && resetUrl !== undefined ? resetUrl.toString() : '',
+  };
+};
+
+const generateResetPasswordPayload = (formData: FormData): ResetPasswordPayload => {
+  const token = formData.get('token');
+  const newPassword = formData.get('newPassword');
+
+  return {
+    token: token !== null && token !== undefined ? token.toString() : '',
+    newPassword: newPassword !== null && newPassword !== undefined ? newPassword.toString() : '',
   };
 };
 
@@ -196,6 +222,36 @@ const loginUserBusinessLogic = async (data: unknown): Promise<LoginResponse> => 
 };
 
 /**
+ * Business logic for requesting password reset
+ */
+const requestPasswordResetBusinessLogic = async (
+  data: RequestPasswordResetPayload
+): Promise<RequestPasswordResetResponse> => {
+  try {
+    const result = await requestPasswordReset(data);
+    return result;
+  } catch (err) {
+    console.error('Error in requestPasswordResetBusiness:', err);
+    return Promise.resolve({ error: err });
+  }
+};
+
+/**
+ * Business logic for resetting password with token
+ */
+const resetPasswordBusinessLogic = async (
+  data: ResetPasswordPayload
+): Promise<ResetPasswordResponse> => {
+  try {
+    const result = await resetPassword(data);
+    return result;
+  } catch (err) {
+    console.error('Error in resetPasswordBusiness:', err);
+    return Promise.resolve({ error: err });
+  }
+};
+
+/**
  * Main business logic router
  */
 const authBusinessLogic = (
@@ -210,6 +266,9 @@ const authBusinessLogic = (
       requestEmailVerificationBusinessLogic(data as RequestEmailVerificationPayload),
     verifyEmailBusinessLogic: () => verifyEmailBusinessLogic(data as VerifyEmailPayload, token),
     logoutUserBusinessLogic: () => logoutUserBusinessLogic(data as LogoutPayload),
+    requestPasswordResetBusinessLogic: () =>
+      requestPasswordResetBusinessLogic(data as RequestPasswordResetPayload),
+    resetPasswordBusinessLogic: () => resetPasswordBusinessLogic(data as ResetPasswordPayload),
   };
 
   const handler = ACTIONS[action];
@@ -236,7 +295,9 @@ const auth = (formData: FormData, token: string | null = null): Promise<ServiceR
       | LoginPayload
       | RequestEmailVerificationPayload
       | VerifyEmailPayload
-      | LogoutPayload;
+      | LogoutPayload
+      | RequestPasswordResetPayload
+      | ResetPasswordPayload;
 
     if (action === 'registerUserBusinessLogic') {
       payload = generatePayload(formData);
@@ -248,6 +309,10 @@ const auth = (formData: FormData, token: string | null = null): Promise<ServiceR
       payload = generateVerifyEmailPayload(formData);
     } else if (action === 'logoutUserBusinessLogic') {
       payload = generateLogoutPayload(formData);
+    } else if (action === 'requestPasswordResetBusinessLogic') {
+      payload = generateRequestPasswordResetPayload(formData);
+    } else if (action === 'resetPasswordBusinessLogic') {
+      payload = generateResetPasswordPayload(formData);
     } else {
       return Promise.resolve({ error: { status: 400, message: 'Invalid action' } });
     }
@@ -268,3 +333,5 @@ export { loginUserBusinessLogic };
 export { requestEmailVerificationBusinessLogic };
 export { verifyEmailBusinessLogic };
 export { logoutUserBusinessLogic };
+export { requestPasswordResetBusinessLogic };
+export { resetPasswordBusinessLogic };

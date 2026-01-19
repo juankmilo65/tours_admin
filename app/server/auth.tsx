@@ -46,6 +46,29 @@ export interface LogoutResponse {
   error?: unknown;
 }
 
+export interface RequestPasswordResetPayload {
+  email: string;
+  resetUrl: string;
+}
+
+export interface RequestPasswordResetResponse {
+  success?: boolean;
+  message?: string;
+  resetUrl?: string;
+  error?: unknown;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordResponse {
+  success?: boolean;
+  message?: string;
+  error?: unknown;
+}
+
 export interface LoginResponse {
   success?: boolean;
   data?: {
@@ -174,6 +197,88 @@ export const verifyEmail = async (
     }
     return {
       error: error instanceof Error ? error.message : 'Internal server error',
+      success: false,
+    };
+  }
+};
+
+/**
+ * Request password reset
+ */
+export const requestPasswordReset = async (
+  payload: RequestPasswordResetPayload
+): Promise<RequestPasswordResetResponse> => {
+  try {
+    const authService = createServiceREST(BASE_URL, 'auth/request-password-reset', '');
+
+    const result = await authService.create(payload, {
+      headers: {
+        'x-Language': 'es',
+      },
+    });
+
+    return result as RequestPasswordResetResponse;
+  } catch (error: unknown) {
+    console.error('Error in requestPasswordReset service:', error);
+
+    // Handle Axios errors to extract backend error message
+    let errorMessage = 'Internal server error';
+
+    if (error instanceof Error) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      if (
+        axiosError.response?.data?.error !== undefined &&
+        axiosError.response?.data?.error !== null
+      ) {
+        errorMessage = axiosError.response.data.error;
+      } else {
+        errorMessage = error.message;
+      }
+    }
+
+    return {
+      error: errorMessage,
+      success: false,
+    };
+  }
+};
+
+/**
+ * Reset password with token
+ */
+export const resetPassword = async (
+  payload: ResetPasswordPayload
+): Promise<ResetPasswordResponse> => {
+  try {
+    const authService = createServiceREST(BASE_URL, 'auth/reset-password', '');
+
+    const result = await authService.create(payload, {
+      headers: {
+        'x-Language': 'es',
+      },
+    });
+
+    return result as ResetPasswordResponse;
+  } catch (error: unknown) {
+    console.error('Error in resetPassword service:', error);
+
+    // Handle Axios errors to extract backend error message
+    let errorMessage = 'Internal server error';
+
+    if (error instanceof Error) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      if (
+        axiosError.response?.data?.error !== undefined &&
+        axiosError.response?.data?.error !== null
+      ) {
+        errorMessage = axiosError.response.data.error;
+      } else {
+        errorMessage = error.message;
+      }
+    }
+
+    return {
+      error: errorMessage,
       success: false,
     };
   }

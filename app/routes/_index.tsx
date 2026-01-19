@@ -4,7 +4,7 @@
  */
 
 import type { JSX, FormEvent } from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, type MetaFunction } from '@remix-run/react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { requireNoAuth } from '~/utilities/auth.loader';
@@ -23,6 +23,7 @@ import {
   verifyOtpStart,
   verifyOtpSuccess,
   verifyOtpFailure,
+  clearOtpState,
   selectIsAuthenticated,
   selectPendingEmail,
   selectOtpSent,
@@ -61,17 +62,24 @@ export default function IndexRoute(): JSX.Element {
   const otpSent = useAppSelector(selectOtpSent);
   const authToken = useAppSelector(selectPendingToken);
 
-  // Wizard step: 'login' or 'otp'
-  const [step, setStep] = useState<'login' | 'otp'>('login');
+  // Wizard step: 'login', 'otp', or 'forgot-password'
+  const [step, setStep] = useState<'login' | 'otp' | 'forgot-password'>('login');
+  // Ref to prevent auto-redirect when user clicks back button
+  const isNavigatingBackRef = useRef(false);
 
   // Update step based on requiresOtp state
   useEffect(() => {
-    if (requiresOtp === true && otpEmail !== null) {
+    if (
+      !isNavigatingBackRef.current &&
+      requiresOtp === true &&
+      otpEmail !== null &&
+      step !== 'forgot-password'
+    ) {
       setStep('otp');
-    } else if (requiresOtp === false) {
+    } else if (!isNavigatingBackRef.current && requiresOtp === false && step === 'otp') {
       setStep('login');
     }
-  }, [requiresOtp, otpEmail]);
+  }, [requiresOtp, otpEmail, step]);
 
   // Login form state
   const [email, setEmail] = useState('');
@@ -88,6 +96,12 @@ export default function IndexRoute(): JSX.Element {
   // OTP form state
   const [otpCode, setOtpCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+
+  // Forgot password form state
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -133,7 +147,7 @@ export default function IndexRoute(): JSX.Element {
         await requestOtpCode(email);
       } else {
         // Extract error message from various possible formats
-        let errorMessage = t('auth.errorGenericLogin');
+        let errorMessage: string;
 
         if (result.error !== null && result.error !== undefined) {
           if (typeof result.error === 'string') {
@@ -175,7 +189,11 @@ export default function IndexRoute(): JSX.Element {
             result.error.message !== undefined
           ) {
             errorMessage = result.error.message as string;
+          } else {
+            errorMessage = t('auth.errorGenericLogin');
           }
+        } else {
+          errorMessage = t('auth.errorGenericLogin');
         }
 
         setError(errorMessage);
@@ -325,9 +343,99 @@ export default function IndexRoute(): JSX.Element {
 
   // Go back to login step
   const handleBackToLogin = (): void => {
+    isNavigatingBackRef.current = true;
     setStep('login');
     setOtpCode('');
     setError(null);
+    // Clear all OTP-related state from Redux to prevent auto-redirect back to OTP
+    dispatch(clearOtpState());
+    // Reset ref after a short delay
+    window.setTimeout(() => {
+      isNavigatingBackRef.current = false;
+    }, 100);
+  };
+
+  // Handle forgot password submit
+  const handleForgotPassword = async (e: FormEvent): Promise<void> => {
+    e.preventDefault();
+    setForgotError(null);
+
+    if (!forgotEmail) {
+      setForgotError(t('auth.errorIncomplete'));
+      return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(forgotEmail)) {
+      setForgotError(t('validation.email'));
+      return;
+    }
+
+    setIsSendingReset(true);
+    dispatch(setGlobalLoading({ isLoading: true, message: t('auth.sendingResetLink') }));
+
+    try {
+      const { requestPasswordResetBusinessLogic } =
+        await import('~/server/businessLogic/authBusinessLogic');
+
+      // Type declaration for Vite environment variables
+      interface ViteImportMetaEnv {
+        readonly VITE_PASSWORD_RESET_URL?: string;
+      }
+
+      interface ViteImportMeta {
+        readonly env: ViteImportMetaEnv;
+      }
+
+      const PASSWORD_RESET_URL =
+        (import.meta as unknown as ViteImportMeta).env.VITE_PASSWORD_RESET_URL ?? '';
+
+      const result = await requestPasswordResetBusinessLogic({
+        email: forgotEmail,
+        resetUrl: PASSWORD_RESET_URL,
+      });
+
+      if (result.success === true) {
+        setForgotSuccess(true);
+      } else {
+        let errorMessage = t('auth.errorGenericLogin');
+
+        if (result.error !== null && result.error !== undefined) {
+          if (typeof result.error === 'string') {
+            errorMessage = result.error;
+          } else if (result.error instanceof Error) {
+            errorMessage = result.error.message;
+          } else if (
+            typeof result.error === 'object' &&
+            'message' in result.error &&
+            result.error.message !== undefined
+          ) {
+            errorMessage = result.error.message as string;
+          } else {
+            errorMessage = t('auth.errorGenericLogin');
+          }
+        } else {
+          errorMessage = t('auth.errorGenericLogin');
+        }
+
+        setForgotError(errorMessage);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : t('auth.errorGenericLogin');
+      setForgotError(errorMessage);
+    } finally {
+      setIsSendingReset(false);
+      dispatch(setGlobalLoading({ isLoading: false }));
+    }
+  };
+
+  // Handle back to login from forgot password
+  const handleBackFromForgotPassword = (): void => {
+    setStep('login');
+    setForgotEmail('');
+    setForgotSuccess(false);
+    setForgotError(null);
   };
 
   // Resend OTP code
@@ -426,96 +534,111 @@ export default function IndexRoute(): JSX.Element {
 
         <div className="login-form-container">
           <h1 className="login-heading">
-            {step === 'login' ? t('auth.welcome') : t('auth.otpTitle')}
+            {step === 'login'
+              ? t('auth.welcome')
+              : step === 'otp'
+                ? t('auth.otpTitle')
+                : t('auth.forgotPasswordTitle')}
           </h1>
           <p className="login-description">
-            {step === 'login' ? t('auth.welcomeSub') : `${t('auth.otpDescription')} ${otpEmail}`}
+            {step === 'login'
+              ? t('auth.welcomeSub')
+              : step === 'otp'
+                ? `${t('auth.otpDescription')} ${otpEmail}`
+                : t('auth.forgotPasswordDescription')}
           </p>
 
-          {/* Step Indicator */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 'var(--space-2)',
-              marginBottom: 'var(--space-6)',
-              alignItems: 'center',
-            }}
-          >
+          {/* Step Indicator - Only show for login and OTP steps */}
+          {step !== 'forgot-password' && (
             <div
               style={{
                 display: 'flex',
-                alignItems: 'center',
                 gap: 'var(--space-2)',
+                marginBottom: 'var(--space-6)',
+                alignItems: 'center',
               }}
             >
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  backgroundColor:
-                    step === 'login' ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
-                  color: step === 'login' ? 'white' : 'var(--color-primary-600)',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  fontSize: '14px',
+                  gap: 'var(--space-2)',
                 }}
               >
-                1
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    backgroundColor:
+                      step === 'login' ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
+                    color: step === 'login' ? 'white' : 'var(--color-primary-600)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                  }}
+                >
+                  1
+                </div>
+                <span
+                  style={{
+                    fontSize: '14px',
+                    fontWeight: step === 'login' ? '600' : '400',
+                    color:
+                      step === 'login' ? 'var(--color-neutral-900)' : 'var(--color-neutral-500)',
+                  }}
+                >
+                  {t('auth.login')}
+                </span>
               </div>
-              <span
-                style={{
-                  fontSize: '14px',
-                  fontWeight: step === 'login' ? '600' : '400',
-                  color: step === 'login' ? 'var(--color-neutral-900)' : 'var(--color-neutral-500)',
-                }}
-              >
-                {t('auth.login')}
-              </span>
-            </div>
-            <div
-              style={{ width: '24px', height: '2px', backgroundColor: 'var(--color-neutral-300)' }}
-            />
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-2)',
-              }}
-            >
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  backgroundColor:
-                    step === 'otp' ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
-                  color: step === 'otp' ? 'white' : 'var(--color-primary-600)',
+                  width: '24px',
+                  height: '2px',
+                  backgroundColor: 'var(--color-neutral-300)',
+                }}
+              />
+              <div
+                style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  fontSize: '14px',
+                  gap: 'var(--space-2)',
                 }}
               >
-                2
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    backgroundColor:
+                      step === 'otp' ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
+                    color: step === 'otp' ? 'white' : 'var(--color-primary-600)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                  }}
+                >
+                  2
+                </div>
+                <span
+                  style={{
+                    fontSize: '14px',
+                    fontWeight: step === 'otp' ? '600' : '400',
+                    color: step === 'otp' ? 'var(--color-neutral-900)' : 'var(--color-neutral-500)',
+                  }}
+                >
+                  {t('auth.otpTitle')}
+                </span>
               </div>
-              <span
-                style={{
-                  fontSize: '14px',
-                  fontWeight: step === 'otp' ? '600' : '400',
-                  color: step === 'otp' ? 'var(--color-neutral-900)' : 'var(--color-neutral-500)',
-                }}
-              >
-                {t('auth.otpTitle')}
-              </span>
             </div>
-          </div>
+          )}
 
           {/* Login Step */}
-          {step === 'login' ? (
+          {step === 'login' && (
             <form
               onSubmit={(e) => {
                 void handleLoginSubmit(e);
@@ -572,6 +695,29 @@ export default function IndexRoute(): JSX.Element {
                 </div>
               )}
 
+              <div
+                style={{
+                  textAlign: 'right',
+                  marginBottom: 'var(--space-4)',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setStep('forgot-password')}
+                  style={{
+                    color: 'var(--color-primary-600)',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('auth.forgotPassword')}
+                </button>
+              </div>
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -580,8 +726,10 @@ export default function IndexRoute(): JSX.Element {
                 {isLoading ? t('auth.loggingIn') : t('auth.login')}
               </button>
             </form>
-          ) : (
-            /* OTP Step */
+          )}
+
+          {/* OTP Step */}
+          {step === 'otp' && (
             <form
               onSubmit={(e) => {
                 void handleOtpSubmit(e);
@@ -658,6 +806,120 @@ export default function IndexRoute(): JSX.Element {
                 )}
               </div>
             </form>
+          )}
+
+          {/* Forgot Password Step */}
+          {step === 'forgot-password' && !forgotSuccess && (
+            <form
+              onSubmit={(e) => {
+                void handleForgotPassword(e);
+              }}
+              className="login-form"
+            >
+              <div className="form-field">
+                <label htmlFor="forgot-email" className="form-label">
+                  {t('auth.email')}
+                </label>
+                <input
+                  id="forgot-email"
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder={t('auth.emailPlaceholder')}
+                  disabled={isSendingReset}
+                  className="form-input"
+                  autoComplete="email"
+                />
+              </div>
+
+              {forgotError !== null && (
+                <div className="error-message">
+                  <p>{forgotError}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSendingReset}
+                className={`submit-button ${isSendingReset ? 'loading' : ''}`}
+              >
+                {isSendingReset ? t('common.loading') : t('auth.sendResetLink')}
+              </button>
+            </form>
+          )}
+
+          {/* Forgot Password Success Message */}
+          {step === 'forgot-password' && forgotSuccess && (
+            <div className="success-message">
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: 'var(--space-6)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '48px',
+                    marginBottom: 'var(--space-4)',
+                  }}
+                >
+                  ✉️
+                </div>
+                <h3
+                  style={{
+                    marginBottom: 'var(--space-2)',
+                    fontSize: '20px',
+                    fontWeight: '600',
+                  }}
+                >
+                  {t('auth.emailSent')}
+                </h3>
+                <p
+                  style={{
+                    color: 'var(--color-neutral-600)',
+                    marginBottom: 'var(--space-6)',
+                  }}
+                >
+                  {t('auth.emailSentDescription')}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleBackFromForgotPassword}
+                  className="submit-button"
+                  style={{
+                    display: 'inline-block',
+                    textAlign: 'center',
+                    width: '100%',
+                  }}
+                >
+                  {t('auth.backToLogin')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Back button for forgot password step (only show when not success) */}
+          {step === 'forgot-password' && !forgotSuccess && (
+            <button
+              type="button"
+              onClick={handleBackFromForgotPassword}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                padding: 'var(--space-2) 0',
+                backgroundColor: 'transparent',
+                color: 'var(--color-neutral-600)',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 'var(--text-sm)',
+                fontWeight: '500',
+                marginTop: 'var(--space-4)',
+              }}
+            >
+              {ArrowLeftIcon}
+              {t('common.back')}
+            </button>
           )}
 
           {/* Back button for OTP step */}

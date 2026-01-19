@@ -24,3 +24,13 @@ export interface VerifyEmailPayload {
 export interface LogoutPayload {
   token: string;
 }
+
+export interface RequestPasswordResetPayload {
+  email: string;
+  resetUrl: string;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  newPassword: string;
+}
