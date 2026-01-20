@@ -14,10 +14,15 @@ import { getCities } from '~/server/cities';
 import type { City, CitiesResponse } from '~/server/cities';
 import type { Column } from '~/components/ui/Table';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
-import { selectSelectedCountryId } from '~/store/slices/countriesSlice';
+import { selectSelectedCountry } from '~/store/slices/countriesSlice';
 import { selectCities } from '~/store/slices/citiesSlice';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
 import { useTranslation } from '~/lib/i18n/utils';
+import { Input } from '~/components/ui/Input';
+import { Dialog } from '~/components/ui/Dialog';
+
+import { createCity, uploadCityImage, type CreateCityDto } from '~/server/cities';
+import { selectAuthToken } from '~/store/slices/authSlice';
 
 export async function loader(args: LoaderFunctionArgs): Promise<null> {
   await requireAuth(args);
@@ -27,9 +32,28 @@ export async function loader(args: LoaderFunctionArgs): Promise<null> {
 export default function Cities(): JSX.Element {
   const { t, language } = useTranslation();
 
+  // Auth token for API calls
+  const token = useAppSelector(selectAuthToken);
+
   // Get cities from Redux (loaded by root.tsx loader)
   const reduxCities = useAppSelector(selectCities);
   const [cities, setCities] = useState<City[]>(reduxCities as City[]);
+
+  // Local state for modal and form
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newCity, setNewCity] = useState<CreateCityDto>({
+    name_es: '',
+    name_en: '',
+    slug: '',
+    countryId: '',
+    description_es: '',
+    description_en: '',
+    imageUrl: '',
+    isActive: true,
+  });
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -43,7 +67,8 @@ export default function Cities(): JSX.Element {
   const isInitialMount = useRef(true);
 
   // Get selected country from Redux (managed by Header)
-  const selectedCountryId = useAppSelector(selectSelectedCountryId);
+  const selectedCountry = useAppSelector(selectSelectedCountry);
+  const selectedCountryId = selectedCountry?.id;
   const dispatch = useAppDispatch();
 
   // Sync Redux cities to local state when they change (from root.tsx loader)
@@ -99,7 +124,191 @@ export default function Cities(): JSX.Element {
     };
 
     void fetchCities();
-  }, [page, statusFilter, limit, selectedCountryId, dispatch]);
+  }, [page, statusFilter, limit, selectedCountryId, dispatch, t]);
+
+  const generateSlug = (text: string) => {
+    const code =
+      selectedCountry?.code !== undefined && selectedCountry?.code !== ''
+        ? `-${selectedCountry.code.toLowerCase()}`
+        : '';
+    const baseSlug = text
+      .toString()
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-') // Replace spaces with -
+      .replace(/[^\w-]+/g, '') // Remove all non-word chars
+      .replace(/--+/g, '-') // Replace multiple - with single -
+      .replace(/^-+/, '') // Trim - from start of text
+      .replace(/-+$/, ''); // Trim - from end of text
+
+    return `${baseSlug}${code}`;
+  };
+
+  // Handle create city
+  const handleCreateCity = async () => {
+    if (token === null || token === '') {
+      console.error('No token available');
+      return;
+    }
+    if (selectedCountryId === undefined || selectedCountryId === '') {
+      console.error('No country selected');
+      return;
+    }
+
+    // Validation (Visual)
+    const newErrors: Record<string, string> = {};
+
+    if (!newCity.name_es.trim()) newErrors.name_es = t('cities.validation.required') || 'Required';
+    if (!newCity.name_en.trim()) newErrors.name_en = t('cities.validation.required') || 'Required';
+    // Slug is auto-generated, but we ensure it exists internally
+    if (!newCity.slug.trim()) newErrors.slug = 'Slug specific error';
+    if (!newCity.description_es.trim())
+      newErrors.description_es = t('cities.validation.required') || 'Required';
+    if (!newCity.description_en.trim())
+      newErrors.description_en = t('cities.validation.required') || 'Required';
+    if (!selectedImage) newErrors.image = t('cities.validation.required') || 'Required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      // Create a toast or simpler feedback if needed, but per-field errors are enough
+      return;
+    }
+
+    // Clear errors if valid
+    setErrors({});
+
+    try {
+      dispatch(
+        setGlobalLoading({ isLoading: true, message: t('cities.creating') || 'Creating...' })
+      );
+
+      // Step 1: Create City (with empty or temp image URL)
+      const cityData: CreateCityDto = {
+        ...newCity,
+        imageUrl: '', // Will be updated by upload
+        countryId: selectedCountryId,
+      };
+
+      console.warn('[CreateCity] Sending Data:', cityData, 'Language:', language);
+
+      // Ensure CreateCityDto matches expectations. The type might expect string.
+      // We assume createCity returns the created object with { success: true, data: { id: ... } } or similar
+      const result = (await createCity(cityData, token, language)) as {
+        success?: boolean;
+        message?: string;
+        data?: { id: string };
+        error?: { message?: string };
+      };
+      console.warn('[CreateCity] Response:', result);
+
+      // Check for error in result (either result.error exists or result.success is false)
+      if (result.error !== undefined || result.success === false || result.data?.id === undefined) {
+        console.error('Error creating city:', result.error ?? result);
+        dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+
+        // Extract message from backend response if available
+        // Expected Error: { success: false, message: "Error msg" }
+
+        let errorMessage = t('cities.errorCreate');
+
+        if (result.message !== undefined && result.message !== '') {
+          errorMessage = result.message;
+        } else if (result.error?.message !== undefined && result.error.message !== '') {
+          errorMessage = result.error.message;
+        }
+
+        setErrorModal({
+          isOpen: true,
+          title: t('cities.errorCreateTitle'),
+          message: errorMessage,
+        });
+        return;
+      }
+
+      const cityId = result.data.id;
+
+      // Step 2: Upload Image
+      if (selectedImage !== null && cityId !== '') {
+        dispatch(
+          setGlobalLoading({
+            isLoading: true,
+            message: t('cities.uploadingImage') || 'Uploading Image...',
+          })
+        );
+        console.warn('[UploadImage] Uploading for City ID:', cityId);
+
+        const uploadResult = (await uploadCityImage(cityId, selectedImage, token, language)) as {
+          success?: boolean;
+          message?: string;
+          error?: { message?: string };
+        };
+        console.warn('[UploadImage] Response:', uploadResult);
+
+        if (uploadResult.error !== undefined || uploadResult.success === false) {
+          console.error('Error uploading image:', uploadResult.error ?? uploadResult);
+          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+
+          let errorMessage = t('cities.cityCreatedButUploadFailed');
+
+          if (uploadResult.message !== undefined && uploadResult.message !== '') {
+            errorMessage = uploadResult.message;
+          } else if (
+            uploadResult.error?.message !== undefined &&
+            uploadResult.error.message !== ''
+          ) {
+            errorMessage = uploadResult.error.message;
+          }
+
+          setErrorModal({
+            isOpen: true,
+            title: t('cities.imageUploadFailed'),
+            message: errorMessage,
+          });
+
+          // We do not return here, we proceed to refresh to show at least the city
+        }
+      }
+
+      // Success
+      dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+      setIsCreateModalOpen(false);
+      setNewCity({
+        name_es: '',
+        name_en: '',
+        slug: '',
+        countryId: '',
+        description_es: '',
+        description_en: '',
+        imageUrl: '',
+        isActive: true,
+      });
+      setSelectedImage(null);
+
+      // Refetch
+      const params = {
+        page: 1,
+        limit,
+        countryId: selectedCountryId,
+        isActive: statusFilter === '' ? undefined : statusFilter === 'true',
+        language,
+      };
+
+      const refreshResult = (await getCities(params)) as CitiesResponse;
+      if (refreshResult.success === true && refreshResult.data !== undefined) {
+        setCities(refreshResult.data);
+        setPagination(refreshResult.pagination);
+        setPage(1);
+      }
+    } catch (error) {
+      console.error('Error creating city flow:', error);
+      dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+      setErrorModal({
+        isOpen: true,
+        title: 'Unexpected Error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
 
   // Filter cities by search term
   const filteredCities = cities.filter((city) => {
@@ -242,16 +451,34 @@ export default function Cities(): JSX.Element {
   ];
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       <Card title={t('cities.allCities')}>
         {/* Filters & Actions Toolbar */}
-        <div className="mb-6 flex flex-row items-center gap-4">
+        <div
+          style={{
+            marginBottom: 'var(--space-6)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-4)',
+          }}
+        >
           {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div style={{ flex: 1 }}>
+            <div style={{ position: 'relative' }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  paddingLeft: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
                 <svg
-                  className="h-5 w-5 text-gray-400"
+                  style={{ height: '1.25rem', width: '1.25rem', color: 'var(--color-neutral-400)' }}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -266,7 +493,8 @@ export default function Cities(): JSX.Element {
               </div>
               <input
                 type="search"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
+                className="form-input"
+                style={{ paddingLeft: '2.5rem' }}
                 placeholder={t('cities.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => {
@@ -278,7 +506,7 @@ export default function Cities(): JSX.Element {
           </div>
 
           {/* Status Filter */}
-          <div className="w-56">
+          <div style={{ width: '14rem' }}>
             <Select
               options={[
                 { value: '', label: t('cities.allStatus') },
@@ -296,7 +524,11 @@ export default function Cities(): JSX.Element {
           </div>
 
           {/* Add Button */}
-          <Button variant="primary" className="whitespace-nowrap">
+          <Button
+            variant="primary"
+            className="whitespace-nowrap"
+            onClick={() => setIsCreateModalOpen(true)}
+          >
             <span className="flex items-center gap-2">
               <svg
                 style={{ width: '20px', height: '20px' }}
@@ -398,6 +630,309 @@ export default function Cities(): JSX.Element {
           </div>
         )}
       </Card>
+
+      <Dialog
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title={t('cities.createCityTitle')}
+        size="lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setIsCreateModalOpen(false)}>
+              {t('cities.cancel')}
+            </Button>
+            <Button variant="primary" onClick={() => void handleCreateCity()}>
+              {t('cities.save')}
+            </Button>
+          </>
+        }
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: 'var(--space-6)',
+          }}
+        >
+          <Input
+            label={t('cities.nameEs')}
+            placeholder="Ej: Guadalajara"
+            value={newCity.name_es}
+            onChange={(e) => {
+              setNewCity({ ...newCity, name_es: e.target.value });
+              if (errors.name_es !== undefined && errors.name_es !== '')
+                setErrors({ ...errors, name_es: '' });
+            }}
+            error={errors.name_es}
+            required
+          />
+          <Input
+            label={t('cities.nameEn')}
+            placeholder="Ex: Guadalajara"
+            value={newCity.name_en}
+            onChange={(e) => {
+              const val = e.target.value;
+              setNewCity({ ...newCity, name_en: val, slug: generateSlug(val) });
+              if (errors.name_en !== undefined && errors.name_en !== '')
+                setErrors({ ...errors, name_en: '' });
+            }}
+            error={errors.name_en}
+            required
+          />
+          {/* Slug is hidden and auto-generated */}
+
+          <Input
+            label={t('cities.descriptionEs')}
+            placeholder="Descripción en español"
+            value={newCity.description_es}
+            onChange={(e) => {
+              setNewCity({ ...newCity, description_es: e.target.value });
+              if (errors.description_es !== undefined && errors.description_es !== '')
+                setErrors({ ...errors, description_es: '' });
+            }}
+            error={errors.description_es}
+            required
+          />
+          <Input
+            label={t('cities.descriptionEn')}
+            placeholder="Description in English"
+            value={newCity.description_en}
+            onChange={(e) => {
+              setNewCity({ ...newCity, description_en: e.target.value });
+              if (errors.description_en !== undefined && errors.description_en !== '')
+                setErrors({ ...errors, description_en: '' });
+            }}
+            error={errors.description_en}
+            required
+          />
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 'var(--space-1)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--font-weight-medium)',
+                color:
+                  errors.image !== undefined && errors.image !== ''
+                    ? 'var(--color-error-600)'
+                    : 'var(--color-neutral-700)',
+              }}
+            >
+              {t('cities.imageUrl')}
+            </label>
+            <div
+              style={{
+                border: `2px dashed ${errors.image !== undefined && errors.image !== '' ? 'var(--color-error-500)' : 'var(--color-neutral-300)'}`,
+                borderRadius: 'var(--radius-md)',
+                padding: 'var(--space-6)',
+                textAlign: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                backgroundColor:
+                  errors.image !== undefined && errors.image !== ''
+                    ? 'var(--color-error-50)'
+                    : 'var(--color-neutral-50)',
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.currentTarget.style.borderColor = 'var(--color-primary-500)';
+                e.currentTarget.style.backgroundColor = 'var(--color-primary-50)';
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                const isError = errors.image !== undefined && errors.image !== '';
+                e.currentTarget.style.borderColor = isError
+                  ? 'var(--color-error-500)'
+                  : 'var(--color-neutral-300)';
+                e.currentTarget.style.backgroundColor = isError
+                  ? 'var(--color-error-50)'
+                  : 'var(--color-neutral-50)';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.style.borderColor = 'var(--color-neutral-300)';
+                e.currentTarget.style.backgroundColor = 'var(--color-neutral-50)';
+                const files = e.dataTransfer.files;
+                if (files !== null && files.length > 0) {
+                  setSelectedImage(files[0] ?? null);
+                  if (errors.image !== undefined && errors.image !== '')
+                    setErrors({ ...errors, image: '' });
+                }
+              }}
+              onClick={() => {
+                const input = document.getElementById('image-upload');
+                if (input !== null) input.click();
+              }}
+            >
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const files = e.target.files;
+                  if (files !== null && files.length > 0) {
+                    setSelectedImage(files[0] ?? null);
+                    if (errors.image !== undefined && errors.image !== '')
+                      setErrors({ ...errors, image: '' });
+                  }
+                }}
+              />
+              {selectedImage !== null ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 'var(--space-2)',
+                  }}
+                >
+                  <svg
+                    style={{ width: 24, height: 24, color: 'var(--color-green-600)' }}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-900)' }}>
+                    {selectedImage.name}
+                  </span>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)',
+                  }}
+                >
+                  <svg
+                    style={{
+                      width: 32,
+                      height: 32,
+                      color:
+                        errors.image !== undefined && errors.image !== ''
+                          ? 'var(--color-error-400)'
+                          : 'var(--color-neutral-400)',
+                    }}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span
+                    style={{
+                      fontSize: 'var(--text-sm)',
+                      color:
+                        errors.image !== undefined && errors.image !== ''
+                          ? 'var(--color-error-600)'
+                          : 'var(--color-neutral-600)',
+                    }}
+                  >
+                    {errors.image !== undefined && errors.image !== ''
+                      ? errors.image
+                      : 'Click or drag image here'}
+                  </span>
+                </div>
+              )}
+            </div>
+            {errors.image !== undefined && errors.image !== '' && (
+              <p
+                style={{
+                  marginTop: 'var(--space-1)',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-error-500)',
+                }}
+              >
+                {errors.image}
+              </p>
+            )}
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Error Modal */}
+      <Dialog
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+        title={errorModal.title}
+        size="sm"
+        footer={
+          <Button
+            variant="primary"
+            onClick={() => {
+              setErrorModal({ ...errorModal, isOpen: false });
+              // Also close create modal if open, as per request
+              setIsCreateModalOpen(false);
+            }}
+          >
+            {t('common.accept')}
+          </Button>
+        }
+      >
+        <div style={{ padding: 'var(--space-2)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-3)',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
+            <div
+              style={{
+                padding: 'var(--space-2)',
+                backgroundColor: 'var(--color-error-50)',
+                borderRadius: 'var(--radius-full)',
+              }}
+            >
+              <svg
+                style={{ width: 24, height: 24, color: 'var(--color-error-600)' }}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <p
+              style={{
+                margin: 0,
+                fontWeight: 'var(--font-weight-medium)',
+                color: 'var(--color-neutral-900)',
+              }}
+            >
+              {t('common.errorOccurred')}
+            </p>
+          </div>
+          <p
+            style={{
+              color: 'var(--color-neutral-700)',
+              lineHeight: 'var(--leading-relaxed)',
+            }}
+          >
+            {errorModal.message}
+          </p>
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { createServiceREST } from './_index';
 
 // Type declaration for Vite environment variables
@@ -115,4 +116,78 @@ export const getCities = async (params: GetCitiesParams = {}): Promise<unknown> 
  */
 export const getCitiesByCountryId = (countryId: string, language = 'es'): Promise<unknown> => {
   return getCities({ countryId, language });
+};
+/**
+ * DTO for creating a new city
+ */
+export interface CreateCityDto {
+  name_es: string;
+  name_en: string;
+  slug: string;
+  countryId: string;
+  description_es: string;
+  description_en: string;
+  imageUrl: string;
+  isActive: boolean;
+}
+
+/**
+ * Create a new city
+ */
+export const createCity = async (
+  data: CreateCityDto,
+  token: string,
+  language = 'es'
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    throw new Error('BACKEND_URL is not configured');
+  }
+
+  const citiesEndpoint = 'cities';
+  // createServiceREST takes (url, endpoint, token). The token argument is used as the Authorization header value.
+  const citiesService = createServiceREST(BASE_URL, citiesEndpoint, `Bearer ${token}`);
+
+  const result = await citiesService.create(data, {
+    headers: {
+      'X-Language': language,
+    },
+  });
+  return result;
+};
+
+/**
+ * Upload an image for a city
+ */
+export const uploadCityImage = async (
+  cityId: string,
+  imageFile: File,
+  token: string,
+  language = 'es'
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    throw new Error('BACKEND_URL is not configured');
+  }
+
+  // We use direct axios call here because createServiceREST is optimized for JSON
+  // and we need specific multipart/form-data handling with a custom path
+  const formData = new FormData();
+  formData.append('image', imageFile);
+
+  try {
+    const response = await axios.post(`${BASE_URL}/api/cities/${cityId}/upload-image`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+        'X-Language': language,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    // Return error object consistent with other services
+    // If axios error, extract response data if available
+    if (axios.isAxiosError(error) && error.response) {
+      return { error: error.response.data as unknown };
+    }
+    return { error };
+  }
 };
