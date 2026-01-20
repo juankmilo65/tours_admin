@@ -191,3 +191,27 @@ export const uploadCityImage = async (
     return { error };
   }
 };
+
+/**
+ * Update city data
+ */
+export const updateCity = async (
+  cityId: string,
+  data: Partial<CreateCityDto>,
+  token: string,
+  language = 'es'
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    throw new Error('BACKEND_URL is not configured');
+  }
+
+  const citiesEndpoint = `cities/${cityId}`;
+  const citiesService = createServiceREST(BASE_URL, citiesEndpoint, `Bearer ${token}`);
+
+  const result = await citiesService.update(data, {
+    headers: {
+      'X-Language': language,
+    },
+  });
+  return result;
+};

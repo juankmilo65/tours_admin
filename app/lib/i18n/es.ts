@@ -310,6 +310,10 @@ export const es: Translation = {
     creating: 'Creando ciudad...',
     imageUploadFailed: 'Error al subir la imagen',
     cityCreatedButUploadFailed: 'Ciudad creada pero falló la subida de imagen.',
+    errorUpdateTitle: 'Error al Actualizar',
+    errorUpdate: 'Error al actualizar la ciudad',
+    updating: 'Actualizando ciudad...',
+    changeImage: 'Cambiar Imagen',
   },
   categories: {
     sectionTitle: 'Categorías',

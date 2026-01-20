@@ -3,6 +3,7 @@
  */
 
 import { useSelector } from 'react-redux';
+import { useCallback } from 'react';
 import { en } from './en';
 import { es } from './es';
 import type { Language, Translation } from './types';
@@ -95,13 +96,16 @@ interface TranslationHookResult {
 export function useTranslation(): TranslationHookResult {
   const language = useSelector(selectLanguage) as Language;
 
-  const translate = (key: string, params?: Record<string, string | number>): string => {
-    const translated = t(key, language);
-    if (params) {
-      return formatTranslation(translated, params);
-    }
-    return translated;
-  };
+  const translate = useCallback(
+    (key: string, params?: Record<string, string | number>): string => {
+      const translated = t(key, language);
+      if (params) {
+        return formatTranslation(translated, params);
+      }
+      return translated;
+    },
+    [language]
+  );
 
   return {
     t: translate,

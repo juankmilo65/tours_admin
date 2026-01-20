@@ -21,7 +21,7 @@ import { useTranslation } from '~/lib/i18n/utils';
 import { Input } from '~/components/ui/Input';
 import { Dialog } from '~/components/ui/Dialog';
 
-import { createCity, uploadCityImage, type CreateCityDto } from '~/server/cities';
+import { createCity, uploadCityImage, updateCity, type CreateCityDto } from '~/server/cities';
 import { selectAuthToken } from '~/store/slices/authSlice';
 
 export async function loader(args: LoaderFunctionArgs): Promise<null> {
@@ -52,6 +52,9 @@ export default function Cities(): JSX.Element {
     isActive: true,
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingCityId, setEditingCityId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
   const [searchTerm, setSearchTerm] = useState('');
@@ -126,6 +129,25 @@ export default function Cities(): JSX.Element {
     void fetchCities();
   }, [page, statusFilter, limit, selectedCountryId, dispatch, t]);
 
+  // Handle image preview
+  useEffect(() => {
+    if (selectedImage === null) {
+      if (isEditMode === false) {
+        setImagePreview(null);
+      }
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(selectedImage);
+    setImagePreview(objectUrl);
+
+    return () => {
+      if (objectUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [selectedImage, isEditMode]);
+
   const generateSlug = (text: string) => {
     const code =
       selectedCountry?.code !== undefined && selectedCountry?.code !== ''
@@ -144,8 +166,43 @@ export default function Cities(): JSX.Element {
     return `${baseSlug}${code}`;
   };
 
-  // Handle create city
-  const handleCreateCity = async () => {
+  const resetForm = () => {
+    setNewCity({
+      name_es: '',
+      name_en: '',
+      slug: '',
+      countryId: '',
+      description_es: '',
+      description_en: '',
+      imageUrl: '',
+      isActive: true,
+    });
+    setSelectedImage(null);
+    setImagePreview(null);
+    setErrors({});
+    setIsEditMode(false);
+    setEditingCityId(null);
+  };
+
+  const handleOpenEditModal = (city: City) => {
+    setNewCity({
+      name_es: city.name_es,
+      name_en: city.name_en,
+      slug: city.slug,
+      countryId: city.countryId,
+      description_es: city.description_es,
+      description_en: city.description_en,
+      imageUrl: city.imageUrl,
+      isActive: city.isActive,
+    });
+    setImagePreview(city.imageUrl);
+    setIsEditMode(true);
+    setEditingCityId(city.id);
+    setIsCreateModalOpen(true);
+  };
+
+  // Handle create or update city
+  const handleSaveCity = async () => {
     if (token === null || token === '') {
       console.error('No token available');
       return;
@@ -166,7 +223,8 @@ export default function Cities(): JSX.Element {
       newErrors.description_es = t('cities.validation.required') || 'Required';
     if (!newCity.description_en.trim())
       newErrors.description_en = t('cities.validation.required') || 'Required';
-    if (!selectedImage) newErrors.image = t('cities.validation.required') || 'Required';
+    if (selectedImage === null && isEditMode === false)
+      newErrors.image = t('cities.validation.required') || 'Required';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -179,110 +237,100 @@ export default function Cities(): JSX.Element {
 
     try {
       dispatch(
-        setGlobalLoading({ isLoading: true, message: t('cities.creating') || 'Creating...' })
+        setGlobalLoading({
+          isLoading: true,
+          message: isEditMode
+            ? t('cities.updating') || 'Updating...'
+            : t('cities.creating') || 'Creating...',
+        })
       );
 
-      // Step 1: Create City (with empty or temp image URL)
-      const cityData: CreateCityDto = {
-        ...newCity,
-        imageUrl: '', // Will be updated by upload
-        countryId: selectedCountryId,
-      };
+      let cityId = editingCityId;
 
-      console.warn('[CreateCity] Sending Data:', cityData, 'Language:', language);
+      // Step 1: Create or Update City Metadata
+      if (isEditMode === true && cityId !== null) {
+        // Update
+        const result = (await updateCity(cityId, newCity, token, language)) as {
+          success?: boolean;
+          message?: string;
+          error?: { message?: string };
+        };
 
-      // Ensure CreateCityDto matches expectations. The type might expect string.
-      // We assume createCity returns the created object with { success: true, data: { id: ... } } or similar
-      const result = (await createCity(cityData, token, language)) as {
-        success?: boolean;
-        message?: string;
-        data?: { id: string };
-        error?: { message?: string };
-      };
-      console.warn('[CreateCity] Response:', result);
-
-      // Check for error in result (either result.error exists or result.success is false)
-      if (result.error !== undefined || result.success === false || result.data?.id === undefined) {
-        console.error('Error creating city:', result.error ?? result);
-        dispatch(setGlobalLoading({ isLoading: false, message: '' }));
-
-        // Extract message from backend response if available
-        // Expected Error: { success: false, message: "Error msg" }
-
-        let errorMessage = t('cities.errorCreate');
-
-        if (result.message !== undefined && result.message !== '') {
-          errorMessage = result.message;
-        } else if (result.error?.message !== undefined && result.error.message !== '') {
-          errorMessage = result.error.message;
+        if (result.error !== undefined || result.success === false) {
+          console.error('Error updating city:', result.error ?? result);
+          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+          setErrorModal({
+            isOpen: true,
+            title: t('cities.errorUpdateTitle') || 'Error',
+            message: result.message ?? result.error?.message ?? t('cities.errorUpdate'),
+          });
+          return;
         }
+      } else {
+        // Create
+        const cityData: CreateCityDto = {
+          ...newCity,
+          imageUrl: '', // Will be updated by upload
+          countryId: selectedCountryId,
+        };
 
-        setErrorModal({
-          isOpen: true,
-          title: t('cities.errorCreateTitle'),
-          message: errorMessage,
-        });
-        return;
+        const result = (await createCity(cityData, token, language)) as {
+          success?: boolean;
+          message?: string;
+          data?: { id: string };
+          error?: { message?: string };
+        };
+
+        if (
+          result.error !== undefined ||
+          result.success === false ||
+          result.data?.id === undefined
+        ) {
+          console.error('Error creating city:', result.error ?? result);
+          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+          setErrorModal({
+            isOpen: true,
+            title: t('cities.errorCreateTitle'),
+            message: result.message ?? result.error?.message ?? t('cities.errorCreate'),
+          });
+          return;
+        }
+        cityId = result.data.id;
       }
 
-      const cityId = result.data.id;
-
-      // Step 2: Upload Image
-      if (selectedImage !== null && cityId !== '') {
+      // Step 2: Upload Image if selected
+      if (selectedImage !== null && cityId !== null && cityId !== '') {
         dispatch(
           setGlobalLoading({
             isLoading: true,
             message: t('cities.uploadingImage') || 'Uploading Image...',
           })
         );
-        console.warn('[UploadImage] Uploading for City ID:', cityId);
 
         const uploadResult = (await uploadCityImage(cityId, selectedImage, token, language)) as {
           success?: boolean;
           message?: string;
           error?: { message?: string };
         };
-        console.warn('[UploadImage] Response:', uploadResult);
 
         if (uploadResult.error !== undefined || uploadResult.success === false) {
           console.error('Error uploading image:', uploadResult.error ?? uploadResult);
           dispatch(setGlobalLoading({ isLoading: false, message: '' }));
-
-          let errorMessage = t('cities.cityCreatedButUploadFailed');
-
-          if (uploadResult.message !== undefined && uploadResult.message !== '') {
-            errorMessage = uploadResult.message;
-          } else if (
-            uploadResult.error?.message !== undefined &&
-            uploadResult.error.message !== ''
-          ) {
-            errorMessage = uploadResult.error.message;
-          }
-
           setErrorModal({
             isOpen: true,
             title: t('cities.imageUploadFailed'),
-            message: errorMessage,
+            message:
+              uploadResult.message ??
+              uploadResult.error?.message ??
+              t('cities.cityCreatedButUploadFailed'),
           });
-
-          // We do not return here, we proceed to refresh to show at least the city
         }
       }
 
       // Success
       dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       setIsCreateModalOpen(false);
-      setNewCity({
-        name_es: '',
-        name_en: '',
-        slug: '',
-        countryId: '',
-        description_es: '',
-        description_en: '',
-        imageUrl: '',
-        isActive: true,
-      });
-      setSelectedImage(null);
+      resetForm();
 
       // Refetch
       const params = {
@@ -300,7 +348,7 @@ export default function Cities(): JSX.Element {
         setPage(1);
       }
     } catch (error) {
-      console.error('Error creating city flow:', error);
+      console.error('Error in city saving flow:', error);
       dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       setErrorModal({
         isOpen: true,
@@ -395,12 +443,13 @@ export default function Cities(): JSX.Element {
     {
       key: 'id',
       label: t('cities.actions'),
-      render: () => (
+      render: (_: unknown, row: City) => (
         <div className="flex items-center gap-2">
           <button
             type="button"
             className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-all duration-200 group"
             title="Edit City"
+            onClick={() => handleOpenEditModal(row)}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -527,7 +576,10 @@ export default function Cities(): JSX.Element {
           <Button
             variant="primary"
             className="whitespace-nowrap"
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={() => {
+              resetForm();
+              setIsCreateModalOpen(true);
+            }}
           >
             <span className="flex items-center gap-2">
               <svg
@@ -633,15 +685,24 @@ export default function Cities(): JSX.Element {
 
       <Dialog
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title={t('cities.createCityTitle')}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          resetForm();
+        }}
+        title={isEditMode === true ? t('cities.editCityTitle') : t('cities.createCityTitle')}
         size="lg"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setIsCreateModalOpen(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsCreateModalOpen(false);
+                resetForm();
+              }}
+            >
               {t('cities.cancel')}
             </Button>
-            <Button variant="primary" onClick={() => void handleCreateCity()}>
+            <Button variant="primary" onClick={() => void handleSaveCity()}>
               {t('cities.save')}
             </Button>
           </>
@@ -705,6 +766,38 @@ export default function Cities(): JSX.Element {
             error={errors.description_en}
             required
           />
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              gridColumn: '1 / -1',
+            }}
+          >
+            <input
+              type="checkbox"
+              id="city-active"
+              checked={newCity.isActive}
+              onChange={(e) => setNewCity({ ...newCity, isActive: e.target.checked })}
+              style={{
+                width: '1.25rem',
+                height: '1.25rem',
+                cursor: 'pointer',
+                accentColor: 'var(--color-primary-600)',
+              }}
+            />
+            <label
+              htmlFor="city-active"
+              style={{
+                cursor: 'pointer',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--font-weight-medium)',
+                color: 'var(--color-neutral-700)',
+              }}
+            >
+              {t('cities.active')}
+            </label>
+          </div>
           <div style={{ gridColumn: '1 / -1' }}>
             <label
               style={{
@@ -778,31 +871,69 @@ export default function Cities(): JSX.Element {
                   }
                 }}
               />
-              {selectedImage !== null ? (
+              {imagePreview !== null ? (
                 <div
                   style={{
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center',
                     gap: 'var(--space-2)',
                   }}
                 >
-                  <svg
-                    style={{ width: 24, height: 24, color: 'var(--color-green-600)' }}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      maxWidth: '300px',
+                      height: '160px',
+                      borderRadius: 'var(--radius-md)',
+                      overflow: 'hidden',
+                      boxShadow: 'var(--shadow-md)',
+                    }}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
                     />
-                  </svg>
-                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-900)' }}>
-                    {selectedImage.name}
-                  </span>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: 'rgba(0,0,0,0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: 0,
+                        transition: 'opacity 0.2s',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
+                    >
+                      <span
+                        style={{
+                          color: 'white',
+                          fontSize: 'var(--text-sm)',
+                          fontWeight: 'var(--font-weight-medium)',
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          padding: 'var(--space-1) var(--space-3)',
+                          borderRadius: 'var(--radius-full)',
+                        }}
+                      >
+                        {t('cities.changeImage')}
+                      </span>
+                    </div>
+                  </div>
+                  {selectedImage !== null && (
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-neutral-500)' }}>
+                      {selectedImage.name}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div

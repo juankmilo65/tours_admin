@@ -308,6 +308,10 @@ export const en: Translation = {
     creating: 'Creating city...',
     imageUploadFailed: 'Image Upload Failed',
     cityCreatedButUploadFailed: 'City created but image upload failed.',
+    errorUpdateTitle: 'Error Updating City',
+    errorUpdate: 'Error updating the city',
+    updating: 'Updating city...',
+    changeImage: 'Change Image',
   },
   categories: {
     sectionTitle: 'Categories',
