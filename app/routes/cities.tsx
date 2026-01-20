@@ -25,7 +25,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<null> {
 }
 
 export default function Cities(): JSX.Element {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   // Get cities from Redux (loaded by root.tsx loader)
   const reduxCities = useAppSelector(selectCities);
@@ -82,7 +82,6 @@ export default function Cities(): JSX.Element {
           limit,
           countryId: selectedCountryId ?? undefined,
           isActive: statusFilter === '' ? undefined : statusFilter === 'true',
-          language: 'es',
         })) as CitiesResponse;
 
         if (result.success === true && result.data !== undefined) {
@@ -100,14 +99,17 @@ export default function Cities(): JSX.Element {
     };
 
     void fetchCities();
-  }, [page, statusFilter, limit, selectedCountryId, dispatch, t]);
+  }, [page, statusFilter, limit, selectedCountryId, dispatch]);
 
   // Filter cities by search term
   const filteredCities = cities.filter((city) => {
     const searchLower = searchTerm.toLowerCase();
-    const nameLower = city.name_es.toLowerCase();
-    const descLower = city.description_es.toLowerCase();
-    return nameLower.includes(searchLower) || descLower.includes(searchLower);
+    const name = language === 'en' ? city.name_en : city.name_es;
+    const description = language === 'en' ? city.description_en : city.description_es;
+
+    return (
+      name.toLowerCase().includes(searchLower) || description.toLowerCase().includes(searchLower)
+    );
   });
 
   const columns: Column<City>[] = [
@@ -118,7 +120,7 @@ export default function Cities(): JSX.Element {
         <div className="flex-shrink-0">
           <img
             src={value as string}
-            alt={row.name_es}
+            alt={language === 'en' ? row.name_en : row.name_es}
             className="w-16 h-16 rounded-xl object-cover shadow-md hover:shadow-lg transition-shadow duration-200"
             loading="lazy"
           />
@@ -126,20 +128,24 @@ export default function Cities(): JSX.Element {
       ),
     },
     {
-      key: 'name_es',
+      key: 'name',
       label: t('cities.city'),
-      render: (value: unknown, row: City) => (
+      render: (_: unknown, row: City) => (
         <div>
-          <div className="font-semibold text-gray-900 text-base">{value as string}</div>
+          <div className="font-semibold text-gray-900 text-base">
+            {language === 'en' ? row.name_en : row.name_es}
+          </div>
           <div className="text-sm text-gray-500 font-mono mt-0.5">{row.slug}</div>
         </div>
       ),
     },
     {
-      key: 'description_es',
+      key: 'description',
       label: t('cities.description'),
-      render: (value: unknown) => (
-        <div className="text-sm text-gray-600 line-clamp-2 max-w-xs">{value as string}</div>
+      render: (_: unknown, row: City) => (
+        <div className="text-sm text-gray-600 line-clamp-2 max-w-xs">
+          {language === 'en' ? row.description_en : row.description_es}
+        </div>
       ),
       hideOnMobile: true,
     },

@@ -77,11 +77,10 @@ export function getDefaultLanguage(): Language {
  */
 export function formatTranslation(
   template: string,
-  _params: Record<string, string | number>
+  params: Record<string, string | number>
 ): string {
-  void _params; // Intentionally unused - kept for API compatibility
-  return template.replace(/\{(\w+)\}/g, (_match, _key) => {
-    const value = _params[_key as keyof typeof _params];
+  return template.replace(/\{(\w+)\}/g, (_match, key) => {
+    const value = params[key];
     return value !== undefined ? value.toString() : _match;
   });
 }
@@ -96,8 +95,11 @@ interface TranslationHookResult {
 export function useTranslation(): TranslationHookResult {
   const language = useSelector(selectLanguage) as Language;
 
-  const translate = (_key: string): string => {
-    const translated = t(_key, language);
+  const translate = (key: string, params?: Record<string, string | number>): string => {
+    const translated = t(key, language);
+    if (params) {
+      return formatTranslation(translated, params);
+    }
     return translated;
   };
 
