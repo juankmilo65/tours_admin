@@ -129,5 +129,7 @@ export const selectCountriesError = (state: { country: CountriesState }): string
   state.country.error;
 export const selectSelectedCountry = (state: { country: CountriesState }): Country | null =>
   state.country.selectedCountry;
+export const selectSelectedCountryId = (state: { country: CountriesState }): string | null =>
+  state.country.selectedCountry?.id ?? null;
 
 export default countriesSlice.reducer;

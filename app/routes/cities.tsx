@@ -11,27 +11,20 @@ import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
 import Select from '~/components/ui/Select';
 import { getCities } from '~/server/cities';
-import { getCountries } from '~/server/countries';
 import type { City, CitiesResponse } from '~/server/cities';
 import type { Column } from '~/components/ui/Table';
+import { useAppSelector } from '~/store/hooks';
+import { selectSelectedCountryId } from '~/store/slices/countriesSlice';
 
 export async function loader(args: LoaderFunctionArgs): Promise<null> {
   await requireAuth(args);
   return null;
 }
 
-interface Country {
-  id: string;
-  name_es: string;
-  name_en: string;
-}
-
 export default function Cities(): JSX.Element {
   const [cities, setCities] = useState<City[]>([]);
-  const [countries, setCountries] = useState<Country[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [countryFilter, setCountryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
@@ -42,26 +35,10 @@ export default function Cities(): JSX.Element {
     totalPages: 0,
   });
 
-  // Fetch countries on mount
-  useEffect(() => {
-    const fetchCountries = async () => {
-      try {
-        const result = (await getCountries('es')) as {
-          success: boolean;
-          data?: Country[];
-        };
-        if (result.success === true && result.data !== undefined && result.data.length > 0) {
-          setCountries(result.data);
-        }
-      } catch (error) {
-        console.error('Error fetching countries:', error);
-      }
-    };
+  // Get selected country from Redux (managed by Header)
+  const selectedCountryId = useAppSelector(selectSelectedCountryId);
 
-    void fetchCountries();
-  }, []);
-
-  // Fetch cities when filters or pagination change
+  // Fetch cities when selected country, page, status filter, or limit changes
   useEffect(() => {
     const fetchCities = async () => {
       setLoading(true);
@@ -69,7 +46,7 @@ export default function Cities(): JSX.Element {
         const result = (await getCities({
           page,
           limit,
-          countryId: countryFilter || undefined,
+          countryId: selectedCountryId ?? undefined,
           isActive: statusFilter === '' ? undefined : statusFilter === 'true',
           language: 'es',
         })) as CitiesResponse;
@@ -86,7 +63,7 @@ export default function Cities(): JSX.Element {
     };
 
     void fetchCities();
-  }, [page, countryFilter, statusFilter, limit]);
+  }, [page, selectedCountryId, statusFilter, limit, selectedCountryId]);
 
   // Filter cities by search term
   const filteredCities = cities.filter((city) => {
@@ -237,24 +214,6 @@ export default function Cities(): JSX.Element {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <div className="sm:w-48">
-            <Select
-              options={[
-                { value: '', label: 'All Countries' },
-                ...countries.map((country) => ({
-                  value: country.id,
-                  label: country.name_es,
-                })),
-              ]}
-              value={countryFilter}
-              onChange={(v: string) => {
-                setCountryFilter(v);
-                setPage(1);
-              }}
-              placeholder="All Countries"
-              className="w-full"
-            />
-          </div>
           <div className="sm:w-40">
             <Select
               options={[
@@ -359,7 +318,7 @@ export default function Cities(): JSX.Element {
 
       {/* Statistics Cards */}
       <Card title="Cities Statistics">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <StatCard
             title="Total Cities"
             value={pagination.total.toString()}
@@ -405,26 +364,11 @@ export default function Cities(): JSX.Element {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
             }
             color="red"
-          />
-          <StatCard
-            title="Countries"
-            value={countries.length.toString()}
-            icon={
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            }
-            color="purple"
           />
         </div>
       </Card>
