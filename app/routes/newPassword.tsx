@@ -5,7 +5,7 @@
 
 import type { JSX, FormEvent, MouseEvent } from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams, Link, type MetaFunction } from '@remix-run/react';
+import { useSearchParams, Link, type MetaFunction } from '@remix-run/react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { jwtDecode } from 'jwt-decode';
 import { resetPasswordBusinessLogic } from '~/server/businessLogic/authBusinessLogic';
@@ -67,7 +67,9 @@ function decodeJWT(token: string): {
   }
 }
 
-export function loader(args: LoaderFunctionArgs): Promise<null> {
+import { redirect } from '@remix-run/node';
+
+export function loader(args: LoaderFunctionArgs): Response | Promise<null> {
   const request = args.request;
   const url = new URL(request.url);
   const token = url.searchParams.get('token');
@@ -77,11 +79,13 @@ export function loader(args: LoaderFunctionArgs): Promise<null> {
 
   console.log('🔑 [NEW PASSWORD LOADER] Token from URL:', tokenPreview);
 
-  console.log('🔑 [NEW PASSWORD LOADER] Allowing access to /newPassword');
-  console.log('🔑 [NEW PASSWORD LOADER] Component will validate token and redirect if needed');
+  // Validate token in loader and redirect if missing
+  if (token === null || token === undefined || token === '') {
+    console.log('🔑 [NEW PASSWORD LOADER] No token provided, redirecting to login...');
+    return redirect('/');
+  }
 
-  // Always allow access to this route
-  // The component will validate token and redirect if needed
+  console.log('🔑 [NEW PASSWORD LOADER] Token valid, allowing access');
   return Promise.resolve(null);
 }
 
@@ -91,7 +95,6 @@ const LANGUAGES = [
 ];
 
 export default function NewPasswordRoute(): JSX.Element {
-  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { t, language: currentLang } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -214,23 +217,6 @@ export default function NewPasswordRoute(): JSX.Element {
       <line x1="1" y1="1" x2="23" y2="23" />
     </svg>
   );
-
-  // Redirect to login if no token is provided
-  useEffect(() => {
-    const tokenPreview =
-      safeToken !== null && safeToken !== undefined && safeToken !== ''
-        ? `${safeToken.substring(0, 20)}...`
-        : 'null';
-
-    console.log('🔑 [NEW PASSWORD COMPONENT] Token from searchParams:', tokenPreview);
-
-    if (safeToken === null) {
-      console.log('🔑 [NEW PASSWORD COMPONENT] No token, redirecting to login...');
-      navigate('/');
-    } else {
-      console.log('🔑 [NEW PASSWORD COMPONENT] Token valid, showing reset password form');
-    }
-  }, [safeToken, navigate]);
 
   const handleLanguageChange = (value: string): void => {
     dispatch(setLanguage(value as Language));

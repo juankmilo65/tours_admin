@@ -213,7 +213,9 @@ function ClientOnlyGlobalLoader(): ReactNode {
   }, []);
 
   if (!isClient) {
-    return null;
+    return (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'white', zIndex: 9999 }}></div>
+    );
   }
 
   return <GlobalLoader />;
@@ -287,18 +289,24 @@ export function Layout({ children }: { children: ReactNode }): ReactNode {
         <Meta />
         <Links />
       </head>
-      <body style={{ backgroundColor: 'var(--color-neutral-50)' }}>
+      <body style={{ backgroundColor: 'var(--color-neutral-50)', position: 'relative' }}>
         <Provider store={store}>
           {isClient && persistor ? (
             <PersistGate loading={null} persistor={persistor}>
               {children}
+              <ClientOnlyGlobalLoader />
+              <ScrollRestoration />
+              <Scripts />
             </PersistGate>
           ) : (
-            children
+            <>
+              {children}
+              <ClientOnlyGlobalLoader />
+              <ScrollRestoration />
+              <Scripts />
+            </>
           )}
         </Provider>
-        <ScrollRestoration />
-        <Scripts />
       </body>
     </html>
   );
@@ -575,60 +583,61 @@ export default function App(): React.JSX.Element {
     location.pathname === '/forgot-password';
 
   return (
-    <CitiesContext.Provider value={contextValue}>
-      {isClient && (
-        <DataSyncDispatcher
-          cities={cities}
-          countries={countries}
-          selectedCountryCode={selectedCountryCode}
-          isAuthenticated={isAuthenticated}
-          authToken={dataOrLoader?.authToken ?? null}
-        />
-      )}
-      <ClientOnlyGlobalLoader />
+    <>
       <ClientOnlyLogoutModal />
       <ClientOnlyModal />
-
-      {isAuthPage ? (
-        <Outlet />
-      ) : (
-        <div style={{ minHeight: '100vh' }}>
-          <ClientOnlySidebar
-            isOpen={isSidebarOpen}
-            isCollapsed={isSidebarCollapsed}
-            onToggle={toggleSidebar}
+      <CitiesContext.Provider value={contextValue}>
+        {isClient && (
+          <DataSyncDispatcher
+            cities={cities}
+            countries={countries}
+            selectedCountryCode={selectedCountryCode}
+            isAuthenticated={isAuthenticated}
+            authToken={dataOrLoader?.authToken ?? null}
           />
-          <div
-            style={{
-              marginLeft: isMobile ? 0 : isSidebarCollapsed ? '80px' : '280px',
-              transition: 'margin-left var(--transition-base)',
-            }}
-          >
-            <ClientOnlyHeader
-              title={pageTitle}
-              isSidebarOpen={isSidebarOpen}
-              isSidebarCollapsed={isSidebarCollapsed}
-              onToggleSidebar={toggleSidebar}
-              onToggleSidebarCollapse={toggleSidebarCollapse}
-              countries={countries}
-              selectedCountryCode={selectedCountryCode}
+        )}
+
+        {isAuthPage ? (
+          <Outlet />
+        ) : (
+          <div style={{ minHeight: '100vh' }}>
+            <ClientOnlySidebar
+              isOpen={isSidebarOpen}
+              isCollapsed={isSidebarCollapsed}
+              onToggle={toggleSidebar}
             />
-            <AuthGuard>
-              <main
-                style={{
-                  paddingTop: 'var(--header-height)',
-                  paddingBottom: '80px',
-                  paddingLeft: 'var(--space-6)',
-                  paddingRight: 'var(--space-6)',
-                }}
-              >
-                <Outlet />
-              </main>
-            </AuthGuard>
-            <ClientOnlyFooter />
+            <div
+              style={{
+                marginLeft: isMobile ? 0 : isSidebarCollapsed ? '80px' : '280px',
+                transition: 'margin-left var(--transition-base)',
+              }}
+            >
+              <ClientOnlyHeader
+                title={pageTitle}
+                isSidebarOpen={isSidebarOpen}
+                isSidebarCollapsed={isSidebarCollapsed}
+                onToggleSidebar={toggleSidebar}
+                onToggleSidebarCollapse={toggleSidebarCollapse}
+                countries={countries}
+                selectedCountryCode={selectedCountryCode}
+              />
+              <AuthGuard>
+                <main
+                  style={{
+                    paddingTop: 'var(--header-height)',
+                    paddingBottom: '80px',
+                    paddingLeft: 'var(--space-6)',
+                    paddingRight: 'var(--space-6)',
+                  }}
+                >
+                  <Outlet />
+                </main>
+              </AuthGuard>
+              <ClientOnlyFooter />
+            </div>
           </div>
-        </div>
-      )}
-    </CitiesContext.Provider>
+        )}
+      </CitiesContext.Provider>
+    </>
   );
 }
