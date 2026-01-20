@@ -299,7 +299,7 @@ export default function Cities(): JSX.Element {
         )}
 
         {/* Pagination */}
-        {pagination.totalPages > 1 && (
+        {pagination.total > 0 && (
           <div className="mt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="text-sm text-gray-600">
               {t('cities.showing')} <span className="font-medium">{(page - 1) * limit + 1}</span>{' '}
