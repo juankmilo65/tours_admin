@@ -703,7 +703,7 @@ export default function Cities(): JSX.Element {
               {t('cities.cancel')}
             </Button>
             <Button variant="primary" onClick={() => void handleSaveCity()}>
-              {t('cities.save')}
+              {isEditMode === true ? t('common.save') : t('cities.save')}
             </Button>
           </>
         }
