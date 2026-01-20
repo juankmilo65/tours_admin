@@ -5,7 +5,7 @@
 import type { JSX } from 'react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { requireAuth } from '~/utilities/auth.loader';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
@@ -13,8 +13,11 @@ import Select from '~/components/ui/Select';
 import { getCities } from '~/server/cities';
 import type { City, CitiesResponse } from '~/server/cities';
 import type { Column } from '~/components/ui/Table';
-import { useAppSelector } from '~/store/hooks';
+import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectSelectedCountryId } from '~/store/slices/countriesSlice';
+import { selectCities } from '~/store/slices/citiesSlice';
+import { setGlobalLoading } from '~/store/slices/uiSlice';
+import { useTranslation } from '~/lib/i18n/utils';
 
 export async function loader(args: LoaderFunctionArgs): Promise<null> {
   await requireAuth(args);
@@ -22,8 +25,11 @@ export async function loader(args: LoaderFunctionArgs): Promise<null> {
 }
 
 export default function Cities(): JSX.Element {
-  const [cities, setCities] = useState<City[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
+
+  // Get cities from Redux (loaded by root.tsx loader)
+  const reduxCities = useAppSelector(selectCities);
+  const [cities, setCities] = useState<City[]>(reduxCities as City[]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -34,14 +40,42 @@ export default function Cities(): JSX.Element {
     total: 0,
     totalPages: 0,
   });
+  const isInitialMount = useRef(true);
 
   // Get selected country from Redux (managed by Header)
   const selectedCountryId = useAppSelector(selectSelectedCountryId);
+  const dispatch = useAppDispatch();
 
-  // Fetch cities when selected country, page, status filter, or limit changes
+  // Sync Redux cities to local state when they change (from root.tsx loader)
   useEffect(() => {
+    setCities(reduxCities as City[]);
+    // Update pagination total based on Redux cities
+    setPagination((prev) => ({
+      ...prev,
+      total: reduxCities.length,
+      totalPages: Math.ceil(reduxCities.length / limit),
+    }));
+  }, [reduxCities, limit]);
+
+  // Fetch cities when filters or pagination change (but not on initial mount)
+  useEffect(() => {
+    // Skip fetch on initial mount - use Redux cities from loader
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Don't fetch if there's no selected country
+    if (selectedCountryId === null || selectedCountryId === undefined || selectedCountryId === '') {
+      setCities([]);
+      setPagination({ page: 1, limit: 10, total: 0, totalPages: 0 });
+      return;
+    }
+
     const fetchCities = async () => {
-      setLoading(true);
+      // Show global loader when fetching starts
+      dispatch(setGlobalLoading({ isLoading: true, message: t('common.loading') }));
+
       try {
         const result = (await getCities({
           page,
@@ -51,19 +85,22 @@ export default function Cities(): JSX.Element {
           language: 'es',
         })) as CitiesResponse;
 
-        if (result.success === true && result.data !== undefined && result.data.length > 0) {
+        if (result.success === true && result.data !== undefined) {
           setCities(result.data);
           setPagination(result.pagination);
         }
       } catch (error) {
         console.error('Error fetching cities:', error);
+        setCities([]);
+        setPagination({ page: 1, limit: 10, total: 0, totalPages: 0 });
       } finally {
-        setLoading(false);
+        // Hide global loader when fetching ends
+        dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       }
     };
 
     void fetchCities();
-  }, [page, selectedCountryId, statusFilter, limit, selectedCountryId]);
+  }, [page, statusFilter, limit, selectedCountryId, dispatch, t]);
 
   // Filter cities by search term
   const filteredCities = cities.filter((city) => {
@@ -76,7 +113,7 @@ export default function Cities(): JSX.Element {
   const columns: Column<City>[] = [
     {
       key: 'imageUrl',
-      label: 'Image',
+      label: t('cities.image'),
       render: (value: unknown, row: City) => (
         <div className="flex-shrink-0">
           <img
@@ -90,7 +127,7 @@ export default function Cities(): JSX.Element {
     },
     {
       key: 'name_es',
-      label: 'City',
+      label: t('cities.city'),
       render: (value: unknown, row: City) => (
         <div>
           <div className="font-semibold text-gray-900 text-base">{value as string}</div>
@@ -100,7 +137,7 @@ export default function Cities(): JSX.Element {
     },
     {
       key: 'description_es',
-      label: 'Description',
+      label: t('cities.description'),
       render: (value: unknown) => (
         <div className="text-sm text-gray-600 line-clamp-2 max-w-xs">{value as string}</div>
       ),
@@ -108,7 +145,7 @@ export default function Cities(): JSX.Element {
     },
     {
       key: 'isActive',
-      label: 'Status',
+      label: t('cities.status'),
       render: (value: unknown) => (
         <span
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
@@ -122,13 +159,13 @@ export default function Cities(): JSX.Element {
               (value as boolean) ? 'bg-green-600' : 'bg-red-600'
             }`}
           />
-          {(value as boolean) ? 'Active' : 'Inactive'}
+          {(value as boolean) ? t('cities.active') : t('cities.inactive')}
         </span>
       ),
     },
     {
       key: 'createdAt',
-      label: 'Created',
+      label: t('cities.created'),
       render: (value: unknown) => (
         <div className="text-sm text-gray-600">
           {new Date(value as string).toLocaleDateString('es-ES', {
@@ -142,7 +179,7 @@ export default function Cities(): JSX.Element {
     },
     {
       key: 'id',
-      label: 'Actions',
+      label: t('cities.actions'),
       render: () => (
         <div className="flex items-center gap-2">
           <button
@@ -200,13 +237,16 @@ export default function Cities(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <Card title="All Cities" actions={<Button variant="primary">Add New City</Button>}>
+      <Card
+        title={t('cities.allCities')}
+        actions={<Button variant="primary">{t('cities.addNewCity')}</Button>}
+      >
         {/* Filters */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row">
           <div className="flex-1">
             <input
               type="search"
-              placeholder="Search cities..."
+              placeholder={t('cities.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -217,9 +257,9 @@ export default function Cities(): JSX.Element {
           <div className="sm:w-40">
             <Select
               options={[
-                { value: '', label: 'All Status' },
-                { value: 'true', label: 'Active' },
-                { value: 'false', label: 'Inactive' },
+                { value: '', label: t('cities.allStatus') },
+                { value: 'true', label: t('cities.active') },
+                { value: 'false', label: t('cities.inactive') },
               ]}
               value={statusFilter}
               onChange={(v: string) => {
@@ -233,11 +273,7 @@ export default function Cities(): JSX.Element {
         </div>
 
         {/* Table */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-          </div>
-        ) : filteredCities.length === 0 ? (
+        {cities.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <svg className="w-12 h-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -247,8 +283,8 @@ export default function Cities(): JSX.Element {
                 d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
               />
             </svg>
-            <p className="text-lg font-medium">No cities found</p>
-            <p className="text-sm">Try adjusting your filters or add a new city</p>
+            <p className="text-lg font-medium">{t('cities.noCitiesFound')}</p>
+            <p className="text-sm">{t('cities.noCitiesDescription')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -260,9 +296,11 @@ export default function Cities(): JSX.Element {
         {pagination.totalPages > 1 && (
           <div className="mt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="text-sm text-gray-600">
-              Showing <span className="font-medium">{(page - 1) * limit + 1}</span> to{' '}
-              <span className="font-medium">{Math.min(page * limit, pagination.total)}</span> of{' '}
-              <span className="font-medium">{pagination.total}</span> results
+              {t('cities.showing')} <span className="font-medium">{(page - 1) * limit + 1}</span>{' '}
+              {t('cities.to')}{' '}
+              <span className="font-medium">{Math.min(page * limit, pagination.total)}</span>{' '}
+              {t('cities.of')} <span className="font-medium">{pagination.total}</span>{' '}
+              {t('cities.results')}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -273,7 +311,7 @@ export default function Cities(): JSX.Element {
                   setPage((p) => Math.max(1, p - 1));
                 }}
               >
-                Previous
+                {t('cities.previous')}
               </Button>
               <div className="flex items-center gap-1">
                 {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
@@ -309,100 +347,12 @@ export default function Cities(): JSX.Element {
                   setPage((p) => Math.min(pagination.totalPages, p + 1));
                 }}
               >
-                Next
+                {t('cities.next')}
               </Button>
             </div>
           </div>
         )}
       </Card>
-
-      {/* Statistics Cards */}
-      <Card title="Cities Statistics">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <StatCard
-            title="Total Cities"
-            value={pagination.total.toString()}
-            icon={
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            }
-            color="blue"
-          />
-          <StatCard
-            title="Active Cities"
-            value={cities.filter((c) => c.isActive).length.toString()}
-            icon={
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            }
-            color="green"
-          />
-          <StatCard
-            title="Inactive Cities"
-            value={cities.filter((c) => !c.isActive).length.toString()}
-            icon={
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            }
-            color="red"
-          />
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  icon,
-  color,
-}: {
-  title: string;
-  value: string;
-  icon: JSX.Element;
-  color: 'blue' | 'green' | 'red' | 'purple';
-}): JSX.Element {
-  const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-green-50 text-green-600',
-    red: 'bg-red-50 text-red-600',
-    purple: 'bg-purple-50 text-purple-600',
-  };
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-          <p className="text-3xl font-bold text-gray-900">{value}</p>
-        </div>
-        <div className={`p-3 rounded-full ${colorClasses[color]}`}>{icon}</div>
-      </div>
     </div>
   );
 }

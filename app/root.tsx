@@ -57,15 +57,11 @@ function DataSyncDispatcher({
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    // Sync countries to Redux
-    if (countries.length > 0) {
-      dispatch(fetchCountriesSuccess(countries));
-    }
+    // Sync countries to Redux - always sync, even if empty
+    dispatch(fetchCountriesSuccess(countries));
 
-    // Sync cities to Redux
-    if (cities.length > 0) {
-      dispatch(fetchCitiesSuccess(cities));
-    }
+    // Sync cities to Redux - always sync, even if empty
+    dispatch(fetchCitiesSuccess(cities));
 
     // Set selected country
     if (
@@ -382,14 +378,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
   const authToken = session.get('authToken') as string | undefined;
   const hasToken = (authToken?.trim() ?? '') !== '';
 
-  console.log('root.tsx loader - pathname:', pathname);
-  console.log('root.tsx loader - isPublicRoute:', isPublicRoute);
-  console.log('root.tsx loader - authToken from session:', authToken);
-  console.log('root.tsx loader - hasToken:', hasToken);
-
   // Si no es una ruta pública y no hay token, redirigir al login
   if (!isPublicRoute && !hasToken) {
-    console.log('root.tsx loader - Redirecting to login (no token)');
     throw redirect('/');
   }
 

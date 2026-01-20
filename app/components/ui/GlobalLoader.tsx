@@ -14,6 +14,7 @@ export function GlobalLoader(): JSX.Element | null {
   const message = useAppSelector(selectGlobalLoadingMessage);
   const { t } = useTranslation();
 
+  // Only show loader when Redux state is true
   if (!isLoading) return null;
 
   return (
