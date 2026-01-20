@@ -4,7 +4,17 @@
 
 import { createServiceREST } from './_index';
 
-const BASE_URL = process.env.BACKEND_URL ?? '';
+// Type declaration for Vite environment variables
+interface ViteImportMetaEnv {
+  readonly VITE_BACKEND_URL?: string;
+}
+
+interface ViteImportMeta {
+  readonly env: ViteImportMetaEnv;
+}
+
+const BASE_URL =
+  (import.meta as unknown as ViteImportMeta).env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
 export interface PriceRangeResponse {
   minPrice: number;

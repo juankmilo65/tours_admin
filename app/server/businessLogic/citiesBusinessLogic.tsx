@@ -6,7 +6,12 @@ interface CitiesPayload {
   token?: string;
   action: string;
   filters?: {
-    countryId: string;
+    countryId?: string;
+    isActive?: boolean | string;
+  };
+  pagination?: {
+    page?: number;
+    limit?: number;
   };
   language?: string;
 }
@@ -17,6 +22,7 @@ interface CitiesPayload {
 const generatePayload = (formData: FormData, token = ''): CitiesPayload => {
   const action = formData.get('action');
   const filters = formData.get('filters');
+  const pagination = formData.get('pagination');
   const language = formData.get('language');
 
   return {
@@ -24,7 +30,13 @@ const generatePayload = (formData: FormData, token = ''): CitiesPayload => {
     action: action !== null ? action.toString() : '',
     language: language !== null ? language.toString() : 'es',
     filters:
-      filters !== null ? (JSON.parse(filters.toString()) as { countryId: string }) : undefined,
+      filters !== null
+        ? (JSON.parse(filters.toString()) as { countryId?: string; isActive?: boolean | string })
+        : undefined,
+    pagination:
+      pagination !== null
+        ? (JSON.parse(pagination.toString()) as { page?: number; limit?: number })
+        : undefined,
   };
 };
 
@@ -42,12 +54,18 @@ const getCountriesBusiness = async (data: CitiesPayload): Promise<ServiceResult<
 };
 
 /**
- * Business logic for getting all cities
+ * Business logic for getting all cities with pagination and filters
  */
 const getCitiesBusiness = async (data: CitiesPayload): Promise<ServiceResult<unknown>> => {
   try {
-    const { language } = data;
-    const result = await getCities(language);
+    const { language, filters, pagination } = data;
+    const result = await getCities({
+      language,
+      countryId: filters?.countryId,
+      isActive: filters?.isActive,
+      page: pagination?.page,
+      limit: pagination?.limit,
+    });
     return result;
   } catch (error) {
     console.error('Error in getCitiesBusiness:', error);
@@ -56,7 +74,7 @@ const getCitiesBusiness = async (data: CitiesPayload): Promise<ServiceResult<unk
 };
 
 /**
- * Business logic for getting cities by countryId
+ * Business logic for getting cities by countryId (legacy)
  */
 const getCitiesByCountryIdBusiness = async (
   data: CitiesPayload
@@ -81,22 +99,22 @@ const getCitiesByCountryIdBusiness = async (
  */
 const citiesBusinessLogic = (
   action: string,
-  data: CitiesPayload
+  payload: CitiesPayload
 ): Promise<ServiceResult<unknown>> => {
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
-    getCountriesBusiness: () => getCountriesBusiness(data),
-    getCitiesBusiness: () => getCitiesBusiness(data),
-    getCitiesByCountryIdBusiness: () => getCitiesByCountryIdBusiness(data),
+    getCountriesBusiness: () => getCountriesBusiness(payload),
+    getCitiesBusiness: () => getCitiesBusiness(payload),
+    getCitiesByCountryIdBusiness: () => getCitiesByCountryIdBusiness(payload),
   };
 
   const handler = ACTIONS[action];
   if (!handler) {
-    return {
+    return Promise.resolve({
       error: {
         status: 400,
         message: 'Invalid action',
       },
-    };
+    });
   }
 
   return handler();
@@ -105,14 +123,14 @@ const citiesBusinessLogic = (
 /**
  * Main export function
  */
-const cities = async (formData: FormData, token = ''): Promise<ServiceResult<unknown>> => {
+const cities = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> => {
   try {
     const payload = generatePayload(formData, token);
     const { action } = payload;
-    return await citiesBusinessLogic(action, payload);
+    return citiesBusinessLogic(action, payload);
   } catch (error) {
     console.error('Error in cities business logic:', error);
-    return { error };
+    return Promise.resolve({ error });
   }
 };
 
