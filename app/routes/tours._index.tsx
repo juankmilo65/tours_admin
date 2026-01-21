@@ -15,16 +15,23 @@ import {
   type Category,
 } from '~/store/slices/categoriesSlice';
 import { selectLanguage, setGlobalLoading, openModal } from '~/store/slices/uiSlice';
+import type { City } from '~/server/cities';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
+import citiesBL from '~/server/businessLogic/citiesBusinessLogic';
 import { useTranslation } from '~/lib/i18n/utils';
+import { getSession } from '~/utilities/sessions';
 import Select from '~/components/ui/Select';
 
 // Loader function - runs on server
 export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeof data>> {
   // Verificar autenticación
   await requireAuth(args);
+
+  // Load session to get selected countryId
+  const session = await getSession(args.request.headers.get('Cookie'));
+  const selectedCountryId = session.get('selectedCountryId') as string | undefined;
 
   const url = new URL(args.request.url);
   const cityId = url.searchParams.get('cityId') ?? null;
@@ -55,6 +62,24 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
       ? categoriesResult.data
       : [];
 
+  // Fetch active cities
+  const citiesFormData = new FormData();
+  citiesFormData.append('action', 'getCitiesBusiness');
+  citiesFormData.append(
+    'filters',
+    JSON.stringify({ isActive: true, countryId: selectedCountryId ?? '' })
+  );
+  citiesFormData.append('language', 'es');
+  const citiesResult = await citiesBL(citiesFormData);
+
+  const isCitiesResult = (result: unknown): result is { success: boolean; data: City[] | null } =>
+    typeof result === 'object' && result !== null && 'success' in result && 'data' in result;
+
+  const activeCities: City[] =
+    isCitiesResult(citiesResult) && citiesResult.success === true && citiesResult.data !== null
+      ? citiesResult.data
+      : [];
+
   // Fetch price range (based on current filters)
   const priceRangeFormData = new FormData();
   priceRangeFormData.append('action', 'getPriceRangeBusiness');
@@ -75,6 +100,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     return data({
       cityId: null,
       categories,
+      activeCities,
       priceRange,
       tours: {
         data: [],
@@ -136,6 +162,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     return data({
       cityId: cityId,
       categories,
+      activeCities,
       priceRange,
       tours: {
         data: result.data ?? [],
@@ -153,6 +180,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   return data({
     cityId,
     categories,
+    activeCities,
     priceRange,
     tours: {
       data: [],
@@ -178,6 +206,7 @@ interface PriceRange {
 function extractLoaderData(loaderData: unknown): {
   cityId: string | null;
   categories: Category[];
+  activeCities: City[];
   priceRange: PriceRange | null;
   tours: { data: Tour[]; pagination: unknown };
 } {
@@ -186,23 +215,23 @@ function extractLoaderData(loaderData: unknown): {
     data?: {
       cityId?: string | null;
       categories?: Category[];
+      activeCities?: City[];
       priceRange?: PriceRange | null;
       tours?: { data: Tour[]; pagination: unknown };
     };
     cityId?: string | null;
     categories?: Category[];
+    activeCities?: City[];
     priceRange?: PriceRange | null;
     tours?: { data: Tour[]; pagination: unknown };
   };
 
-  // Handle different response structures from Remix data()
-  // Structure can be: { type: "DataWithResponseInit", data: {...}, init: null }
-  // or direct: { cityId: ..., categories: ..., priceRange: ..., tours: ... }
   const innerData = raw?.type === 'DataWithResponseInit' ? raw?.data : raw;
 
   return {
     cityId: innerData?.cityId ?? null,
     categories: innerData?.categories ?? [],
+    activeCities: innerData?.activeCities ?? [],
     priceRange: innerData?.priceRange ?? null,
     tours: innerData?.tours ?? {
       data: [],
@@ -257,10 +286,10 @@ function ToursClient(): JSX.Element {
   const currentLanguage = useAppSelector(selectLanguage) as Language;
   const { t } = useTranslation();
 
-  // Translated cities - computed from rawCities based on language
+  // Translated active cities from loader
   const translatedCities = useMemo(() => {
-    return translateCities(rawCities, currentLanguage);
-  }, [rawCities, currentLanguage]);
+    return translateCities(loaderData.activeCities, currentLanguage);
+  }, [loaderData.activeCities, currentLanguage]);
 
   // Translated categories - computed from categories based on language
   const translatedCategories = useMemo(() => {
@@ -426,14 +455,19 @@ function ToursClient(): JSX.Element {
       }
     }
     // also ensure rawTours is initialized from loader if empty
+    let timeoutId: number | undefined;
     if ((loaderData.tours?.data ?? []).length > 0 && rawTours.length === 0) {
-      const timeoutId = window.setTimeout(() => {
+      timeoutId = window.setTimeout(() => {
         if (loaderData.tours?.data !== undefined && loaderData.tours.data !== null) {
           setRawTours(loaderData.tours.data);
         }
       }, 0);
-      return () => window.clearTimeout(timeoutId);
     }
+    return () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
   }, [loaderData.cityId, loaderData.tours?.data, rawTours.length, searchParams, setSearchParams]);
 
   // Check if navigation is loading

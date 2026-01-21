@@ -81,7 +81,10 @@ export function TourEditForm({
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector(selectLanguage) as Language;
   const rawCities = useAppSelector(selectCities);
-  const cities = translateCities(rawCities, currentLanguage);
+  const cities = translateCities(
+    rawCities.filter((city) => city.isActive === true),
+    currentLanguage
+  );
   const categories = useAppSelector(selectCategories);
 
   // State for tour data
