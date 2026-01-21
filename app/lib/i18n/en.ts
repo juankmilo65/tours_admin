@@ -291,6 +291,7 @@ export const en: Translation = {
     errorCreate: 'Error creating city',
     validation: {
       required: 'Required',
+      invalidFormat: 'Invalid format (only JPG, PNG, WEBP)',
     },
     noCitiesFound: 'No cities found',
     noCitiesDescription: 'Try adjusting your filters or add a new city',

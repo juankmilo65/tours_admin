@@ -293,6 +293,7 @@ export const es: Translation = {
     errorCreate: 'Error al crear la ciudad',
     validation: {
       required: 'Requerido',
+      invalidFormat: 'Formato no válido (solo JPG, PNG, WEBP)',
     },
     noCitiesFound: 'No se encontraron ciudades',
     noCitiesDescription: 'Intenta ajustar tus filtros o agrega una nueva ciudad',

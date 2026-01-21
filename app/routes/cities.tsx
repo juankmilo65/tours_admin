@@ -847,9 +847,20 @@ export default function Cities(): JSX.Element {
                 e.currentTarget.style.backgroundColor = 'var(--color-neutral-50)';
                 const files = e.dataTransfer.files;
                 if (files !== null && files.length > 0) {
-                  setSelectedImage(files[0] ?? null);
-                  if (errors.image !== undefined && errors.image !== '')
-                    setErrors({ ...errors, image: '' });
+                  const file = files[0];
+                  if (file !== undefined && file !== null) {
+                    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                    if (!validTypes.includes(file.type)) {
+                      setErrors({
+                        ...errors,
+                        image: t('cities.validation.invalidFormat') || 'Invalid format',
+                      });
+                      return;
+                    }
+                    setSelectedImage(file);
+                    if (errors.image !== undefined && errors.image !== '')
+                      setErrors({ ...errors, image: '' });
+                  }
                 }
               }}
               onClick={() => {
@@ -860,14 +871,25 @@ export default function Cities(): JSX.Element {
               <input
                 id="image-upload"
                 type="file"
-                accept="image/*"
+                accept=".jpg,.jpeg,.png,.webp"
                 style={{ display: 'none' }}
                 onChange={(e) => {
                   const files = e.target.files;
                   if (files !== null && files.length > 0) {
-                    setSelectedImage(files[0] ?? null);
-                    if (errors.image !== undefined && errors.image !== '')
-                      setErrors({ ...errors, image: '' });
+                    const file = files[0];
+                    if (file !== undefined && file !== null) {
+                      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                      if (!validTypes.includes(file.type)) {
+                        setErrors({
+                          ...errors,
+                          image: t('cities.validation.invalidFormat') || 'Invalid format',
+                        });
+                        return;
+                      }
+                      setSelectedImage(file);
+                      if (errors.image !== undefined && errors.image !== '')
+                        setErrors({ ...errors, image: '' });
+                    }
                   }
                 }}
               />
