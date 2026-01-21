@@ -201,6 +201,40 @@ export default function Cities(): JSX.Element {
     setIsCreateModalOpen(true);
   };
 
+  // Handle status toggle
+  const handleToggleStatus = async (city: City) => {
+    if (token === null || token === '') return;
+
+    try {
+      dispatch(
+        setGlobalLoading({
+          isLoading: true,
+          message: t('cities.updating') || 'Updating...',
+        })
+      );
+
+      const result = (await updateCity(city.id, { isActive: !city.isActive }, token, language)) as {
+        success?: boolean;
+        message?: string;
+        error?: { message?: string };
+      };
+
+      if (result.success === true) {
+        setCities(cities.map((c) => (c.id === city.id ? { ...c, isActive: !c.isActive } : c)));
+      } else {
+        setErrorModal({
+          isOpen: true,
+          title: t('cities.errorUpdateTitle'),
+          message: result.message ?? result.error?.message ?? t('cities.errorUpdate'),
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling city status:', error);
+    } finally {
+      dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+    }
+  };
+
   // Handle create or update city
   const handleSaveCity = async () => {
     if (token === null || token === '') {
@@ -444,14 +478,39 @@ export default function Cities(): JSX.Element {
       key: 'id',
       label: t('cities.actions'),
       render: (_: unknown, row: City) => (
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          {/* Edit Button with restored premium style */}
           <button
             type="button"
-            className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-all duration-200 group"
-            title="Edit City"
             onClick={() => handleOpenEditModal(row)}
+            style={{
+              padding: '10px',
+              borderRadius: '12px',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              color: '#2563eb',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+            title="Edit City"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              style={{ width: '20px', height: '20px' }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -460,40 +519,49 @@ export default function Cities(): JSX.Element {
               />
             </svg>
           </button>
-          <button
-            type="button"
-            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition-all duration-200 group"
-            title="Delete City"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+
+          {/* Premium iOS-style Toggle Switch */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              onClick={() => void handleToggleStatus(row)}
+              style={{
+                position: 'relative',
+                width: '48px',
+                height: '24px',
+                backgroundColor: row.isActive ? '#10b981' : '#e5e7eb',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: row.isActive ? '0 0 10px rgba(16, 185, 129, 0.2)' : 'none',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  left: row.isActive ? '26px' : '2px',
+                  width: '20px',
+                  height: '20px',
+                  backgroundColor: 'white',
+                  borderRadius: '50%',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                }}
               />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="p-2 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 hover:text-purple-700 transition-all duration-200 group"
-            title="View Details"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-              />
-            </svg>
-          </button>
+            </div>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: '700',
+                letterSpacing: '0.05em',
+                color: row.isActive ? '#047857' : '#6b7280',
+                textTransform: 'uppercase',
+                minWidth: '60px',
+              }}
+            >
+              {row.isActive ? t('cities.active') : t('cities.inactive')}
+            </span>
+          </div>
         </div>
       ),
     },
