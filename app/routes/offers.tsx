@@ -186,6 +186,17 @@ export default function Offers(): JSX.Element {
   };
 
   const handleOpenEditModal = (offer: Offer) => {
+    // Format dates for datetime-local input (YYYY-MM-DDTHH:mm)
+    const formatDateTimeForInput = (dateString: string): string => {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
     setNewOffer({
       tourId: offer.tourId,
       title_es: offer.title_es,
@@ -193,8 +204,8 @@ export default function Offers(): JSX.Element {
       description_es: offer.description_es,
       description_en: offer.description_en,
       discountPercentage: offer.discountPercentage,
-      validFrom: offer.validFrom,
-      validTo: offer.validTo,
+      validFrom: formatDateTimeForInput(offer.validFrom),
+      validTo: formatDateTimeForInput(offer.validTo),
       maxUses: offer.maxUses,
       isActive: offer.isActive,
     });
