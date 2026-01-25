@@ -76,6 +76,75 @@ export const getTourById = async (
 /**
  * Get tours from backend API with filters
  */
+/**
+ * Get tours for dropdown (optimized endpoint)
+ * Public endpoint - does not require authentication
+ */
+export const getToursDropdown = async (
+  countryId: string | null = null,
+  language = 'es'
+): Promise<unknown> => {
+  console.warn('🎯 [GET TOURS DROPDOWN] Starting with params:', {
+    countryId,
+    language,
+    BASE_URL,
+  });
+
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('⚠️ [GET TOURS DROPDOWN] BACKEND_URL is not configured, returning empty');
+    return { success: false, data: [] };
+  }
+
+  try {
+    const toursEndpoint = 'tours/dropdown';
+    const fullUrl = `${BASE_URL}/${toursEndpoint}`;
+    console.warn('🌐 [GET TOURS DROPDOWN] Full URL to call:', fullUrl);
+
+    // Build query params
+    const params: Record<string, string> = {};
+    if (countryId !== null && countryId !== '') {
+      params.countryId = countryId;
+    }
+
+    // No token needed - public endpoint
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, '');
+    console.warn('📡 [GET TOURS DROPDOWN] Calling backend with headers:', {
+      'X-Language': language,
+      params,
+    });
+
+    const result = await toursService.get({
+      params,
+      headers: {
+        'X-Language': language,
+      },
+    });
+
+    console.warn('✅ [GET TOURS DROPDOWN] Success! Result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    // Handle network errors gracefully (ECONNREFUSED, etc.)
+    console.error('❌ [GET TOURS DROPDOWN] Error caught:', error);
+    if (error instanceof Error) {
+      console.error('❌ [GET TOURS DROPDOWN] Error message:', error.message);
+      console.error('❌ [GET TOURS DROPDOWN] Error stack:', error.stack);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          '⚠️ [GET TOURS DROPDOWN] Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('❌ [GET TOURS DROPDOWN] Unknown error:', error);
+    }
+    return { error, success: false, data: [] };
+  }
+};
+
+/**
+ * Get tours from backend API with filters
+ */
 export const getTours = async (payload: ServicePayload): Promise<unknown> => {
   // Check if backend URL is configured
   if (BASE_URL === '' || BASE_URL === undefined) {

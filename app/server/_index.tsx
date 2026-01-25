@@ -70,7 +70,7 @@ function createServiceREST<T = unknown>(url: string, endpoint: string, token: st
   return {
     get: (config?: AxiosRequestConfig): Promise<ServiceResult<T>> =>
       service(token, config)
-        .get<T>(`/${endpoint}`)
+        .get<T>(`/${endpoint}`, config)
         .then((response: import('axios').AxiosResponse<T>) => response.data)
         .catch((error: unknown) => ({ error })),
 
@@ -88,7 +88,7 @@ function createServiceREST<T = unknown>(url: string, endpoint: string, token: st
 
     update: (payload: unknown, config?: AxiosRequestConfig): Promise<ServiceResult<T>> =>
       service(token, config)
-        .put<T>(`/${endpoint}`, payload)
+        .patch<T>(config?.url ?? `/${endpoint}`, payload, config)
         .then((response: import('axios').AxiosResponse<T>) => response.data)
         .catch((error: unknown) => ({ error })),
 

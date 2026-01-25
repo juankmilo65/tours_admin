@@ -1,4 +1,4 @@
-import { getTours } from '../tours';
+import { getTours, getToursDropdown } from '../tours';
 import type { ToursPayload } from '../../types/PayloadTourDataProps';
 import type { ServiceResult } from '../_index';
 
@@ -51,6 +51,23 @@ const getToursBusiness = async (data: ToursPayload): Promise<ServiceResult<unkno
 };
 
 /**
+ * Business logic for getting tours for dropdown
+ * Public endpoint - does not require authentication
+ */
+const getToursDropdownBusiness = async (
+  countryId: string | null = null,
+  language = 'es'
+): Promise<ServiceResult<unknown>> => {
+  try {
+    const result = await getToursDropdown(countryId, language);
+    return result;
+  } catch (error) {
+    console.error('Error in getToursDropdownBusiness:', error);
+    return Promise.resolve({ error });
+  }
+};
+
+/**
  * Main business logic router
  */
 const toursBusinessLogic = (
@@ -59,6 +76,7 @@ const toursBusinessLogic = (
 ): Promise<ServiceResult<unknown>> => {
   const ACTIONS: Record<string, () => Promise<ServiceResult<unknown>>> = {
     getToursBusiness: () => getToursBusiness(data),
+    getToursDropdownBusiness: () => getToursDropdownBusiness(data.countryId ?? null, data.language),
   };
 
   const handler = ACTIONS[action];
@@ -88,4 +106,5 @@ const tours = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> 
   }
 };
 
+export { getToursDropdownBusiness };
 export default tours;

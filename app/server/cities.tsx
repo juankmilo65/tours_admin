@@ -13,6 +13,15 @@ interface ViteImportMeta {
 const BASE_URL =
   (import.meta as unknown as ViteImportMeta).env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
+// Simple cache implementation to avoid rate limiting
+interface CacheEntry {
+  data: CitiesResponse;
+  timestamp: number;
+}
+
+const citiesCache = new Map<string, CacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+
 export interface City {
   id: string;
   slug: string;
@@ -47,6 +56,20 @@ export interface GetCitiesParams {
 }
 
 /**
+ * Generate cache key from params
+ */
+function getCacheKey(params: GetCitiesParams): string {
+  const parts = [
+    String(params.page ?? 1),
+    String(params.limit ?? 10),
+    params.countryId ?? '',
+    String(params.isActive ?? ''),
+    params.language ?? 'es',
+  ];
+  return parts.join('|');
+}
+
+/**
  * Get cities from backend API with pagination and filters
  */
 export const getCities = async (params: GetCitiesParams = {}): Promise<unknown> => {
@@ -58,6 +81,20 @@ export const getCities = async (params: GetCitiesParams = {}): Promise<unknown> 
       data: [],
       pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
     };
+  }
+
+  // Check cache first to avoid rate limiting
+  const cacheKey = getCacheKey(params);
+  const cachedEntry = citiesCache.get(cacheKey);
+  const now = Date.now();
+
+  if (cachedEntry !== undefined && now - cachedEntry.timestamp < CACHE_TTL) {
+    console.log(
+      '✅ [CITIES] Using cached data (cache age:',
+      Math.floor((now - cachedEntry.timestamp) / 1000),
+      'seconds)'
+    );
+    return cachedEntry.data;
   }
 
   try {
@@ -87,11 +124,38 @@ export const getCities = async (params: GetCitiesParams = {}): Promise<unknown> 
       },
     });
 
+    // Store in cache if successful
+    const typedResult = result as CitiesResponse | { error: unknown };
+    if (typedResult !== null && typeof typedResult === 'object' && !('error' in typedResult)) {
+      citiesCache.set(cacheKey, {
+        data: typedResult,
+        timestamp: Date.now(),
+      });
+      console.log('✅ [CITIES] Data cached successfully');
+    }
+
     return result;
   } catch (error) {
     // Handle network errors gracefully (ECONNREFUSED, etc.)
     if (error instanceof Error) {
       console.error('Error in getCities service:', error.message);
+
+      // Check for 429 Too Many Requests error
+      if (error.message.includes('status code 429')) {
+        console.warn('Rate limit exceeded (429) for cities. Please wait before retrying.');
+        // Return cached data if available, even if expired
+        if (cachedEntry !== undefined) {
+          console.log('⚠️ [CITIES] Using stale cached data due to rate limit');
+          return cachedEntry.data;
+        }
+        return {
+          error: 'Rate limit exceeded. Please wait before retrying.',
+          success: false,
+          data: [],
+          pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+        };
+      }
+
       if (error.message.includes('ECONNREFUSED')) {
         console.warn(
           'Backend API is not available. Please ensure that backend server is running at:',
@@ -206,12 +270,13 @@ export const updateCity = async (
   }
 
   const citiesEndpoint = `cities/${cityId}`;
-  const citiesService = createServiceREST(BASE_URL, citiesEndpoint, `Bearer ${token}`);
+  const citiesService = createServiceREST(BASE_URL, 'cities', `Bearer ${token}`);
 
   const result = await citiesService.update(data, {
     headers: {
       'X-Language': language,
     },
+    url: `/${citiesEndpoint}`,
   });
   return result;
 };

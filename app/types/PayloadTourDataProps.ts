@@ -235,6 +235,7 @@ export interface ToursPayload {
   token: string;
   action: string;
   language: string;
+  countryId?: string;
   filters?: TourFilters;
 }
 

@@ -16,6 +16,15 @@ interface ViteImportMeta {
 const BASE_URL =
   (import.meta as unknown as ViteImportMeta).env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
+// Simple cache implementation to avoid rate limiting
+interface CacheEntry {
+  data: PriceRangeResponse;
+  timestamp: number;
+}
+
+const priceRangeCache = new Map<string, CacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+
 export interface PriceRangeResponse {
   minPrice: number;
   maxPrice: number;
@@ -27,6 +36,20 @@ export interface PriceRangeFilters {
   country?: string | null;
   city?: string | null;
   category?: string | null;
+}
+
+/**
+ * Generate cache key from filters
+ */
+function getCacheKey(filters: PriceRangeFilters, language: string, currency: string): string {
+  const parts = [
+    language,
+    currency,
+    filters.country ?? '',
+    filters.city ?? '',
+    filters.category ?? '',
+  ];
+  return parts.join('|');
 }
 
 /**
@@ -46,6 +69,20 @@ export async function getPriceRange(
   const safeLanguage = language ?? 'es';
   const safeCurrency = currency ?? 'MXN';
   const safeFilters = filters ?? {};
+
+  // Check cache first to avoid rate limiting
+  const cacheKey = getCacheKey(safeFilters, safeLanguage, safeCurrency);
+  const cachedEntry = priceRangeCache.get(cacheKey);
+  const now = Date.now();
+
+  if (cachedEntry !== undefined && now - cachedEntry.timestamp < CACHE_TTL) {
+    console.log(
+      '✅ [PRICE RANGE] Using cached data (cache age:',
+      Math.floor((now - cachedEntry.timestamp) / 1000),
+      'seconds)'
+    );
+    return cachedEntry.data;
+  }
 
   try {
     const params: Record<string, string> = {};
@@ -93,6 +130,12 @@ export async function getPriceRange(
     const typedResult = result as { success?: boolean; data?: PriceRangeResponse };
 
     if (typedResult.success === true && typedResult.data !== undefined) {
+      // Store in cache
+      priceRangeCache.set(cacheKey, {
+        data: typedResult.data,
+        timestamp: Date.now(),
+      });
+      console.log('✅ [PRICE RANGE] Data cached successfully');
       return typedResult.data;
     }
 
@@ -101,10 +144,17 @@ export async function getPriceRange(
     // Handle network errors gracefully (ECONNREFUSED, etc.)
     if (error instanceof Error) {
       console.error('Error fetching price range:', error.message);
+
+      // Check for 429 Too Many Requests error
+      if (error.message.includes('status code 429')) {
+        console.warn('Rate limit exceeded (429). Please wait before retrying.');
+        return null; // Return null, UI will handle gracefully
+      }
+
       // If it's a connection error, log a helpful message
       if (error.message.includes('ECONNREFUSED')) {
         console.warn(
-          'Backend API is not available. Please ensure the backend server is running at:',
+          'Backend API is not available. Please ensure that backend server is running at:',
           BASE_URL
         );
       }

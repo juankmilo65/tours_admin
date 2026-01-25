@@ -229,12 +229,13 @@ export const updateCategory = async (
   }
 
   const categoriesEndpoint = `categories/${categoryId}`;
-  const categoriesService = createServiceREST(BASE_URL, categoriesEndpoint, `Bearer ${token}`);
+  const categoriesService = createServiceREST(BASE_URL, 'categories', `Bearer ${token}`);
 
   const result = await categoriesService.update(data, {
     headers: {
       'X-Language': language,
     },
+    url: `/${categoriesEndpoint}`,
   });
   return result;
 };
@@ -252,7 +253,7 @@ export const toggleCategoryStatus = async (
   }
 
   const categoriesEndpoint = `categories/${categoryId}/toggle-status`;
-  const categoriesService = createServiceREST(BASE_URL, categoriesEndpoint, `Bearer ${token}`);
+  const categoriesService = createServiceREST(BASE_URL, 'categories', `Bearer ${token}`);
 
   const result = await categoriesService.update(
     {},
@@ -260,6 +261,7 @@ export const toggleCategoryStatus = async (
       headers: {
         'X-Language': language,
       },
+      url: `/${categoriesEndpoint}`,
     }
   );
   return result;
