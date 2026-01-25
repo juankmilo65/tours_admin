@@ -104,15 +104,11 @@ export default function NewsRoute(): JSX.Element {
         if (result.success === true && result.data !== undefined) {
           setNews(result.data);
           setPagination(result.pagination);
-          // Hide loader after React finishes rendering
-          window.requestAnimationFrame(() => {
-            dispatch(setGlobalLoading({ isLoading: false, message: '' }));
-          });
+          // Hide loader after state is updated (React will render before this)
+          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
         } else {
-          // Hide loader if no success after React renders
-          window.requestAnimationFrame(() => {
-            dispatch(setGlobalLoading({ isLoading: false, message: '' }));
-          });
+          // Hide loader if no success
+          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
         }
       } catch (error) {
         console.error('Error fetching news:', error);
