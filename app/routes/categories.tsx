@@ -5,7 +5,7 @@
 import type { JSX } from 'react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { requireAuth } from '~/utilities/auth.loader';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table } from '~/components/ui/Table';
@@ -54,7 +54,7 @@ export default function Categories(): JSX.Element {
     isActive: true,
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -95,13 +95,17 @@ export default function Categories(): JSX.Element {
         if (result.success === true && result.data !== undefined) {
           setCategories(result.data);
           setPagination(result.pagination);
+          // Hide loader after state is updated (React will render before this)
+          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+        } else {
+          // Hide loader if no success
+          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
         }
       } catch (error) {
         console.error('Error fetching categories:', error);
         setCategories([]);
         setPagination({ page: 1, limit: 10, total: 0, totalPages: 0 });
-      } finally {
-        // Hide global loader when fetching ends
+        // Hide loader on error
         dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       }
     };
@@ -109,24 +113,17 @@ export default function Categories(): JSX.Element {
     void fetchCategories();
   }, [page, statusFilter, limit, language, dispatch, t]);
 
-  // Handle image preview
-  useEffect(() => {
-    if (selectedImage === null) {
-      if (isEditMode === false) {
-        setImagePreview(null);
-      }
-      return;
+  // Handle image preview using useMemo for derived state
+  const imagePreview = useMemo(() => {
+    if (selectedImage !== null) {
+      return URL.createObjectURL(selectedImage);
     }
-
-    const objectUrl = URL.createObjectURL(selectedImage);
-    setImagePreview(objectUrl);
-
-    return () => {
-      if (objectUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [selectedImage, isEditMode]);
+    // If editing mode and no new image selected, show existing image
+    if (isEditMode === true) {
+      return existingImageUrl;
+    }
+    return null;
+  }, [selectedImage, isEditMode, existingImageUrl]);
 
   const generateSlug = (text: string) => {
     const baseSlug = text
@@ -153,7 +150,7 @@ export default function Categories(): JSX.Element {
       isActive: true,
     });
     setSelectedImage(null);
-    setImagePreview(null);
+    setExistingImageUrl(null);
     setErrors({});
     setIsEditMode(false);
     setEditingCategoryId(null);
@@ -169,7 +166,7 @@ export default function Categories(): JSX.Element {
       imageUrl: category.imageUrl ?? '',
       isActive: category.isActive,
     });
-    setImagePreview(category.imageUrl ?? null);
+    setExistingImageUrl(category.imageUrl ?? null);
     setIsEditMode(true);
     setEditingCategoryId(category.id);
     setIsCreateModalOpen(true);
@@ -202,16 +199,20 @@ export default function Categories(): JSX.Element {
         setCategories(
           categories.map((c) => (c.id === category.id ? { ...c, isActive: !c.isActive } : c))
         );
+        // Hide loader after state is updated and UI is ready
+        dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       } else {
         setErrorModal({
           isOpen: true,
           title: t('categories.errorUpdateTitle'),
           message: result.message ?? result.error?.message ?? t('categories.errorUpdate'),
         });
+        // Hide loader on error
+        dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       }
     } catch (error) {
       console.error('Error toggling category status:', error);
-    } finally {
+      // Hide loader on exception
       dispatch(setGlobalLoading({ isLoading: false, message: '' }));
     }
   };
@@ -343,8 +344,7 @@ export default function Categories(): JSX.Element {
         }
       }
 
-      // Success
-      dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+      // Success - Keep loader open while refetching
       setIsCreateModalOpen(false);
       resetForm();
 
@@ -361,6 +361,11 @@ export default function Categories(): JSX.Element {
         setCategories(refreshResult.data);
         setPagination(refreshResult.pagination);
         setPage(1);
+        // Hide loader after state is updated and UI is ready
+        dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+      } else {
+        // Hide loader even if refetch fails
+        dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       }
     } catch (error) {
       console.error('Error in category saving flow:', error);
