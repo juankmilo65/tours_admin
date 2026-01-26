@@ -239,3 +239,34 @@ export const deleteUserAvatarBusiness = async (
     };
   }
 };
+
+/**
+ * Get users for dropdown (simplified format for filters)
+ */
+export const getUsersDropdownBusiness = async (
+  token: string | undefined,
+  language = 'es'
+): Promise<{ success: boolean; data?: Array<{ id: string; name: string; email: string }> }> => {
+  try {
+    const result = await getAllUsersBusiness({
+      limit: 1000,
+      isActive: true,
+      token,
+      language,
+    });
+
+    if (result.success === true && result.data?.users !== undefined) {
+      const users = result.data.users.map((user) => ({
+        id: user.id,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+      }));
+      return { success: true, data: users };
+    }
+
+    return { success: false };
+  } catch (error) {
+    console.error('Error in getUsersDropdownBusiness:', error);
+    return { success: false };
+  }
+};

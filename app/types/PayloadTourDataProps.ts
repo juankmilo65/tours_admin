@@ -95,6 +95,7 @@ export interface Tour {
   id: string;
   categoryId: string;
   cityId: string;
+  userId?: string;
   slug: string;
   // Translated fields
   title_es: string;
@@ -118,6 +119,11 @@ export interface Tour {
   // Related entities (with translations)
   category: Category;
   city: City;
+  owners: Array<{
+    id: string;
+    name: string;
+    email: string;
+  }>;
   offers: Offer[];
   activities: TourActivity[];
   amenities: TourAmenity[];
@@ -209,6 +215,7 @@ export interface Pagination {
 // Tour Filters
 export interface TourFilters {
   cityId?: string;
+  userId?: string;
   category?: string;
   difficulty?: string;
   minPrice?: string;
@@ -255,6 +262,7 @@ export interface ServicePayload {
   difficulty?: string;
   minPrice?: number;
   maxPrice?: number;
+  userId?: string;
   language?: string;
   currency?: string;
 }

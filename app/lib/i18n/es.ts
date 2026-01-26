@@ -43,6 +43,7 @@ export const es: Translation = {
     clear: 'Limpiar',
     clearFilters: 'Limpiar Filtros',
     select: 'Seleccionar',
+    selectProvider: 'Seleccionar proveedor',
     selectCity: 'Selecciona una ciudad',
     selectCountry: 'Selecciona un país',
     all: 'Todos',
@@ -220,6 +221,7 @@ export const es: Translation = {
     tourDetails: 'Detalles del Tour',
     title: 'Título',
     description: 'Descripción',
+    provider: 'Proveedor',
     category: 'Categoría',
     city: 'Ciudad',
     cityRequired: 'Ciudad *',
@@ -245,6 +247,7 @@ export const es: Translation = {
     noToursFound: 'No se encontraron tours',
     adjustFilters: 'Intenta ajustar los filtros para ver más resultados.',
     selectCityFirst: 'Selecciona una ciudad',
+    selectProviderFirst: 'Seleccionar proveedor primero',
     selectCityDescription: 'Elige una ciudad para ver los tours disponibles.',
     readyToSearch: '¡Listo para buscar!',
     readyToSearchDescription:

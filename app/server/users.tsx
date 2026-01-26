@@ -325,3 +325,77 @@ export const deleteUserAvatar = async (
     return { error };
   }
 };
+
+/**
+ * Get users dropdown - for admin to select tour owner
+ */
+export const getUsersDropdown = async (
+  role: string | null = null,
+  isActive: string | null = null,
+  token: string | undefined = undefined,
+  language = 'es'
+): Promise<unknown> => {
+  console.warn('🎯 [GET USERS DROPDOWN] Starting with params:', {
+    role,
+    isActive,
+    language,
+    BASE_URL,
+  });
+
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('⚠️ [GET USERS DROPDOWN] BACKEND_URL is not configured, returning empty');
+    return { success: false, data: [] };
+  }
+
+  try {
+    const usersEndpoint = 'users/dropdown';
+    const fullUrl = `${BASE_URL}/${usersEndpoint}`;
+    console.warn('🌐 [GET USERS DROPDOWN] Full URL to call:', fullUrl);
+
+    // Build query params
+    const params: Record<string, string> = {};
+    if (role !== null && role !== '') {
+      params.role = role;
+    }
+    if (isActive !== null && isActive !== '') {
+      params.isActive = isActive;
+    }
+
+    const usersService = createServiceREST(
+      BASE_URL,
+      usersEndpoint,
+      token !== undefined && token !== '' ? 'Bearer' : ''
+    );
+    console.warn('📡 [GET USERS DROPDOWN] Calling backend with headers:', {
+      'X-Language': language,
+      params,
+    });
+
+    const result = await usersService.get({
+      params,
+      headers: {
+        'X-Language': language,
+      },
+    });
+
+    console.warn('✅ [GET USERS DROPDOWN] Success! Result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    // Handle network errors gracefully (ECONNREFUSED, etc.)
+    console.error('❌ [GET USERS DROPDOWN] Error caught:', error);
+    if (error instanceof Error) {
+      console.error('❌ [GET USERS DROPDOWN] Error message:', error.message);
+      console.error('❌ [GET USERS DROPDOWN] Error stack:', error.stack);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          '⚠️ [GET USERS DROPDOWN] Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('❌ [GET USERS DROPDOWN] Unknown error:', error);
+    }
+    return { error, success: false, data: [] };
+  }
+};

@@ -20,6 +20,7 @@ import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
 import citiesBL from '~/server/businessLogic/citiesBusinessLogic';
+import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import { useTranslation } from '~/lib/i18n/utils';
 import { getSession } from '~/utilities/sessions';
 import Select from '~/components/ui/Select';
@@ -34,6 +35,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   const selectedCountryId = session.get('selectedCountryId') as string | undefined;
 
   const url = new URL(args.request.url);
+  const userId = url.searchParams.get('userId') ?? null;
   const cityId = url.searchParams.get('cityId') ?? null;
   const page = url.searchParams.get('page') ?? '1';
   const category = url.searchParams.get('category') ?? '';
@@ -80,6 +82,14 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
       ? citiesResult.data
       : [];
 
+  // Fetch users for dropdown
+  const usersResult = await getUsersDropdownBusiness(
+    session.get('authToken') as string | undefined,
+    'es'
+  );
+  const users =
+    usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
+
   // Fetch price range (based on current filters)
   const priceRangeFormData = new FormData();
   priceRangeFormData.append('action', 'getPriceRangeBusiness');
@@ -101,6 +111,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
       cityId: null,
       categories,
       activeCities,
+      users,
       priceRange,
       tours: {
         data: [],
@@ -120,6 +131,9 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     page: parseInt(page, 10),
   };
 
+  if (userId !== null && userId !== undefined && userId !== '') {
+    filters.userId = userId;
+  }
   if (category !== null && category !== undefined && category !== '') {
     filters.category = category;
   }
@@ -163,6 +177,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
       cityId: cityId,
       categories,
       activeCities,
+      users,
       priceRange,
       tours: {
         data: result.data ?? [],
@@ -181,6 +196,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     cityId,
     categories,
     activeCities,
+    users,
     priceRange,
     tours: {
       data: [],
@@ -207,6 +223,7 @@ function extractLoaderData(loaderData: unknown): {
   cityId: string | null;
   categories: Category[];
   activeCities: City[];
+  users: Array<{ id: string; name: string; email: string }>;
   priceRange: PriceRange | null;
   tours: { data: Tour[]; pagination: unknown };
 } {
@@ -216,12 +233,14 @@ function extractLoaderData(loaderData: unknown): {
       cityId?: string | null;
       categories?: Category[];
       activeCities?: City[];
+      users?: Array<{ id: string; name: string; email: string }>;
       priceRange?: PriceRange | null;
       tours?: { data: Tour[]; pagination: unknown };
     };
     cityId?: string | null;
     categories?: Category[];
     activeCities?: City[];
+    users?: Array<{ id: string; name: string; email: string }>;
     priceRange?: PriceRange | null;
     tours?: { data: Tour[]; pagination: unknown };
   };
@@ -232,6 +251,7 @@ function extractLoaderData(loaderData: unknown): {
     cityId: innerData?.cityId ?? null,
     categories: innerData?.categories ?? [],
     activeCities: innerData?.activeCities ?? [],
+    users: innerData?.users ?? [],
     priceRange: innerData?.priceRange ?? null,
     tours: innerData?.tours ?? {
       data: [],
@@ -300,6 +320,7 @@ function ToursClient(): JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // State for selected filters (only sent on "Filtrar" click)
+  const [selectedUserId, setSelectedUserId] = useState<string>(searchParams.get('userId') ?? '');
   const [selectedCityId, setSelectedCityId] = useState<string>(
     searchParams.get('cityId') !== null && searchParams.get('cityId') !== ''
       ? (searchParams.get('cityId') ?? '')
@@ -353,8 +374,22 @@ function ToursClient(): JSX.Element {
       : (loaderData.priceRange?.maxPrice ?? 10000)
   );
 
-  // Check if price filter should be enabled (has tours and at least city filter is applied)
-  const isPriceFilterEnabled = priceRange !== null && priceRange.count > 0 && selectedCityId !== '';
+  // Cascading logic: filters only enabled when tours have been loaded
+  const hasLoadedTours = rawTours.length > 0;
+
+  // City filter: enabled only if provider selected AND tours have been loaded
+  const isCityFilterEnabled = selectedUserId !== '' && hasLoadedTours;
+
+  // Category filter: enabled only if provider AND city selected AND tours have been loaded
+  const isCategoryFilterEnabled = selectedUserId !== '' && selectedCityId !== '' && hasLoadedTours;
+
+  // Price filter: enabled only if provider AND city selected AND tours loaded AND price range exists
+  const isPriceFilterEnabled =
+    selectedUserId !== '' &&
+    selectedCityId !== '' &&
+    hasLoadedTours &&
+    priceRange !== null &&
+    priceRange.count > 0;
 
   // Activate global loading on component mount, deactivate when data is ready
   useEffect(() => {
@@ -475,14 +510,17 @@ function ToursClient(): JSX.Element {
 
   // Handle filter button click - update URL with all selected filters
   const handleFilter = (): void => {
-    if (selectedCityId === '') {
+    if (selectedUserId === '') {
       dispatch(
         openModal({
-          id: 'validation-select-city',
+          id: 'validation-select-provider',
           type: 'confirm',
-          title: t('validation.selectCityTitle') || t('common.notice'),
+          title: t('common.notice'),
           isOpen: true,
-          data: { message: t('validation.selectCity'), icon: 'alert' },
+          data: {
+            message: t('tours.selectProviderFirst') || 'Por favor seleccionar un proveedor',
+            icon: 'alert',
+          },
         })
       );
       return;
@@ -493,6 +531,11 @@ function ToursClient(): JSX.Element {
       page: '1',
       category: selectedCategory,
     };
+
+    // Include userId if selected
+    if (selectedUserId !== '') {
+      params.userId = selectedUserId;
+    }
 
     // Only include price filters if they differ from default range
     if (priceRange !== null) {
@@ -517,6 +560,7 @@ function ToursClient(): JSX.Element {
 
   // Clear all filters
   const handleClearFilters = (): void => {
+    setSelectedUserId('');
     setSelectedCityId('');
     setSelectedCategory('');
     // Reset price to default range
@@ -525,6 +569,7 @@ function ToursClient(): JSX.Element {
       setSelectedMaxPrice(priceRange.maxPrice);
     }
     setSearchParams({
+      userId: '',
       cityId: '',
       page: '1',
       category: '',
@@ -580,7 +625,7 @@ function ToursClient(): JSX.Element {
               alignItems: 'center',
             }}
           >
-            {/* City Filter - Required */}
+            {/* User Filter - Cascading: enables city filter after selection + filter click */}
             <div>
               <label
                 style={{
@@ -591,7 +636,40 @@ function ToursClient(): JSX.Element {
                   marginBottom: 'var(--space-1)',
                 }}
               >
+                {t('tours.provider')}
+              </label>
+              <Select
+                options={[
+                  { value: '', label: t('common.selectProvider') || 'Seleccionar proveedor' },
+                ].concat(loaderData.users.map((u) => ({ value: u.id, label: u.name })))}
+                value={selectedUserId}
+                onChange={(v: string) => setSelectedUserId(v)}
+                placeholder={t('common.selectProvider') || 'Seleccionar proveedor'}
+                id="select-provider"
+              />
+            </div>
+
+            {/* City Filter - Required, disabled until user is selected and filter is clicked */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: isCityFilterEnabled
+                    ? 'var(--color-neutral-700)'
+                    : 'var(--color-neutral-400)',
+                  marginBottom: 'var(--space-1)',
+                }}
+              >
                 {t('tours.cityRequired')}
+                {!isCityFilterEnabled && (
+                  <span
+                    style={{ fontWeight: 'normal', marginLeft: 'var(--space-1)', fontSize: '10px' }}
+                  >
+                    ({t('tours.selectProviderFirst') || 'Seleccionar proveedor primero'})
+                  </span>
+                )}
               </label>
               <Select
                 options={[{ value: '', label: t('common.selectCity') }].concat(
@@ -599,23 +677,43 @@ function ToursClient(): JSX.Element {
                 )}
                 value={selectedCityId ?? ''}
                 onChange={(v: string): void => handleCityChange(v)}
-                placeholder={t('common.selectCity')}
+                placeholder={
+                  isCityFilterEnabled
+                    ? t('common.selectCity')
+                    : t('tours.selectProviderFirst') || 'Seleccione proveedor'
+                }
                 id="select-city"
+                disabled={!isCityFilterEnabled}
               />
             </div>
 
-            {/* Category Filter */}
+            {/* Category Filter - Enabled only if provider AND city selected AND tours loaded */}
             <div>
               <label
                 style={{
                   display: 'block',
                   fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--font-weight-medium)',
-                  color: 'var(--color-neutral-700)',
+                  color: isCategoryFilterEnabled
+                    ? 'var(--color-neutral-700)'
+                    : 'var(--color-neutral-400)',
                   marginBottom: 'var(--space-1)',
                 }}
               >
                 {t('tours.category')}
+                {!isCategoryFilterEnabled && (
+                  <span
+                    style={{ fontWeight: 'normal', marginLeft: 'var(--space-1)', fontSize: '10px' }}
+                  >
+                    (
+                    {selectedUserId === '' && selectedCityId === ''
+                      ? t('tours.selectProviderFirst')
+                      : selectedUserId === ''
+                        ? t('tours.selectProviderFirst')
+                        : t('tours.selectCityFirst')}
+                    )
+                  </span>
+                )}
               </label>
               <Select
                 options={[{ value: '', label: t('common.allCategories') }].concat(
@@ -623,8 +721,13 @@ function ToursClient(): JSX.Element {
                 )}
                 value={selectedCategory ?? ''}
                 onChange={(v: string) => setSelectedCategory(v)}
-                placeholder={t('common.allCategories')}
+                placeholder={
+                  isCategoryFilterEnabled
+                    ? t('common.allCategories')
+                    : t('tours.selectCityFirst') || 'Seleccione ciudad'
+                }
                 id="select-category"
+                disabled={!isCategoryFilterEnabled}
               />
             </div>
 

@@ -164,16 +164,21 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
       difficulty,
       minPrice,
       maxPrice,
+      userId,
       language = 'es',
       currency = 'MXN',
     } = payload;
 
-    if (cityId === null || cityId === undefined || cityId === '') {
+    // cityId is required UNLESS userId is provided (to filter by provider)
+    if (
+      (cityId === null || cityId === undefined || cityId === '') &&
+      (userId === null || userId === undefined || userId === '')
+    ) {
       return {
         success: false,
         data: [],
         pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
-        error: 'cityId is required',
+        error: 'Either cityId or userId is required',
       };
     }
 
@@ -181,9 +186,16 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
     const params: Record<string, string | number> = {
       page,
       limit: 10,
-      cityId: cityId, // Backend expects 'cityId'
     };
 
+    // Only add cityId if it's provided
+    if (cityId !== null && cityId !== undefined && cityId !== '') {
+      params.cityId = cityId;
+    }
+
+    if (userId !== null && userId !== undefined && userId !== '') {
+      params.userId = userId;
+    }
     if (category !== null && category !== undefined && category !== '') {
       params.category = category;
     }

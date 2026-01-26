@@ -27,10 +27,11 @@ const generatePayload = (formData: FormData, token = ''): ToursPayload => {
 const getToursBusiness = async (data: ToursPayload): Promise<ServiceResult<unknown>> => {
   try {
     const { filters = {}, token, language = 'es' } = data;
-    const { cityId, page = 1, category, difficulty, minPrice, maxPrice } = filters;
+    const { cityId, page = 1, category, difficulty, minPrice, maxPrice, userId } = filters;
 
     const payload = {
       cityId,
+      userId,
       page: typeof page === 'string' ? Number.parseInt(page, 10) : page,
       category,
       difficulty,
