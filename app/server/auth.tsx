@@ -120,7 +120,7 @@ export const login = async (payload: {
   password: string;
 }): Promise<LoginResponse> => {
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/login', '');
+    const authService = createServiceREST(BASE_URL, 'users/login', '');
 
     const result = await authService.create(payload);
 
@@ -157,7 +157,7 @@ export const requestEmailVerification = async (payload: {
   email: string;
 }): Promise<RequestEmailVerificationResponse> => {
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/request-email-verification', '');
+    const authService = createServiceREST(BASE_URL, 'users/request-email-verification', '');
 
     const result = await authService.create(payload);
 
@@ -178,24 +178,13 @@ export const verifyEmail = async (
   payload: { otp: string; email: string },
   token: string
 ): Promise<VerifyEmailResponse> => {
-  console.log('verifyEmail payload:', payload);
-  console.log('verifyEmail token length:', token.length);
-  console.log('verifyEmail token:', token);
-  console.log('verifyEmail BASE_URL:', BASE_URL);
-
   try {
     const authService = createServiceREST(BASE_URL, 'auth/verify-email', `Bearer ${token}`);
 
     const result = await authService.create(payload);
 
-    console.log('verifyEmail result:', result);
     return result as VerifyEmailResponse;
   } catch (error: unknown) {
-    console.error('Error in verifyEmail service:', error);
-    const axiosError = error as { response?: { data?: unknown }; status?: number };
-    if (axiosError.response?.data !== undefined) {
-      console.error('Backend response data:', axiosError.response.data);
-    }
     return {
       error: error instanceof Error ? error.message : 'Internal server error',
       success: false,
@@ -210,7 +199,7 @@ export const requestPasswordReset = async (
   payload: RequestPasswordResetPayload
 ): Promise<RequestPasswordResetResponse> => {
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/request-password-reset', '');
+    const authService = createServiceREST(BASE_URL, 'users/request-password-reset', '');
 
     const result = await authService.create(payload, {
       headers: {
@@ -253,7 +242,7 @@ export const resetPassword = async (payload: {
   loginUrl: string;
 }): Promise<ResetPasswordResponse> => {
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/reset-password', '');
+    const authService = createServiceREST(BASE_URL, 'users/reset-password', '');
 
     const result = await authService.create(payload, {
       headers: {
@@ -291,22 +280,13 @@ export const resetPassword = async (payload: {
  * Logout user service
  */
 export const logout = async (payload: { token: string }): Promise<LogoutResponse> => {
-  console.log('logout payload token length:', payload.token.length);
-  console.log('logout payload token:', payload.token);
-
   try {
     const authService = createServiceREST(BASE_URL, 'auth/logout', `Bearer ${payload.token}`);
 
     const result = await authService.create({}); // Empty payload for logout
 
-    console.log('logout result:', result);
     return result as LogoutResponse;
   } catch (error: unknown) {
-    console.error('Error in logout service:', error);
-    const axiosError = error as { response?: { data?: unknown }; status?: number };
-    if (axiosError.response?.data !== undefined) {
-      console.error('Backend response data:', axiosError.response.data);
-    }
     return {
       error: error instanceof Error ? error.message : 'Internal server error',
       success: false,

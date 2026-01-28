@@ -145,6 +145,51 @@ export const getToursDropdown = async (
 /**
  * Get tours from backend API with filters
  */
+/**
+ * Create tour in backend API
+ */
+export const createTour = async (
+  payload: Record<string, unknown>,
+  token: string
+): Promise<unknown> => {
+  console.warn('🎯 [CREATE TOUR] Starting createTour with params:', {
+    payload,
+    hasToken: !!token,
+    BASE_URL,
+  });
+
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('⚠️ [CREATE TOUR] BACKEND_URL is not configured, returning error');
+    return { success: false, error: 'Backend URL not configured' };
+  }
+
+  try {
+    const toursEndpoint = 'tours';
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token}`);
+
+    const result = await toursService.create(payload);
+
+    console.warn('✅ [CREATE TOUR] Success! Result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    console.error('❌ [CREATE TOUR] Error caught:', error);
+    if (error instanceof Error) {
+      console.error('❌ [CREATE TOUR] Error message:', error.message);
+      console.error('❌ [CREATE TOUR] Error stack:', error.stack);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          '⚠️ [CREATE TOUR] Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('❌ [CREATE TOUR] Unknown error:', error);
+    }
+    return { error, success: false };
+  }
+};
+
 export const getTours = async (payload: ServicePayload): Promise<unknown> => {
   // Check if backend URL is configured
   if (BASE_URL === '' || BASE_URL === undefined) {

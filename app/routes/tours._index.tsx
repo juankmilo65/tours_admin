@@ -6,6 +6,7 @@ import { requireAuth } from '~/utilities/auth.loader';
 import type { Tour, TranslatedTour, Language } from '~/types/PayloadTourDataProps';
 import { translateTours } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
+import { CreateTourModal } from '~/components/tours/CreateTourModal';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
 import {
@@ -361,6 +362,9 @@ function ToursClient(): JSX.Element {
   // Track if user changed city (to show "ready to search" state)
   const [hasCityChanged, setHasCityChanged] = useState(false);
 
+  // Create tour modal state
+  const [isCreateTourModalOpen, setIsCreateTourModalOpen] = useState(false);
+
   // Price range state
   const [priceRange, setPriceRange] = useState<PriceRange | null>(loaderData.priceRange);
   const [selectedMinPrice, setSelectedMinPrice] = useState<number>(
@@ -591,20 +595,51 @@ function ToursClient(): JSX.Element {
         }}
       >
         {/* Page Title and Stats */}
-        <div style={{ marginBottom: 'var(--space-6)' }}>
-          <h1
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 'var(--space-6)',
+          }}
+        >
+          <div>
+            <h1
+              style={{
+                fontSize: 'var(--text-3xl)',
+                fontWeight: 'var(--font-weight-bold)',
+                color: 'var(--color-neutral-900)',
+                marginBottom: 'var(--space-2)',
+              }}
+            >
+              {t('tours.sectionTitle')}
+            </h1>
+            <p style={{ fontSize: 'var(--text-lg)', color: 'var(--color-neutral-600)' }}>
+              {t('common.total')}: {pagination.total} tours
+            </p>
+          </div>
+          <button
+            onClick={() => setIsCreateTourModalOpen(true)}
             style={{
-              fontSize: 'var(--text-3xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: 'var(--color-neutral-900)',
-              marginBottom: 'var(--space-2)',
+              backgroundColor: 'var(--color-primary-500)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-3) var(--space-6)',
+              fontWeight: 'var(--font-weight-medium)',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+              fontSize: 'var(--text-base)',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-600)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-500)';
             }}
           >
-            {t('tours.sectionTitle')}
-          </h1>
-          <p style={{ fontSize: 'var(--text-lg)', color: 'var(--color-neutral-600)' }}>
-            {t('common.total')}: {pagination.total} tours
-          </p>
+            {t('tours.createTour')}
+          </button>
         </div>
 
         {/* Filters Section */}
@@ -1126,6 +1161,15 @@ function ToursClient(): JSX.Element {
             </button>
           </div>
         )}
+
+        {/* Create Tour Modal */}
+        <CreateTourModal
+          isOpen={isCreateTourModalOpen}
+          onSuccess={() => {
+            // Reload the page to fetch updated tours
+            window.location.reload();
+          }}
+        />
       </main>
     </div>
   );

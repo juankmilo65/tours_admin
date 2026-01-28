@@ -1,4 +1,4 @@
-import { getTours, getToursDropdown } from '../tours';
+import { getTours, getToursDropdown, createTour } from '../tours';
 import type { ToursPayload } from '../../types/PayloadTourDataProps';
 import type { ServiceResult } from '../_index';
 
@@ -94,6 +94,31 @@ const toursBusinessLogic = (
 };
 
 /**
+ * Business logic for creating a tour
+ */
+const createTourBusiness = async (
+  data: Record<string, unknown>,
+  token = ''
+): Promise<ServiceResult<unknown>> => {
+  try {
+    if (token === '' || token === undefined) {
+      return Promise.resolve({
+        error: {
+          status: 401,
+          message: 'Access token is required',
+        },
+      });
+    }
+
+    const result = await createTour(data, token);
+    return result;
+  } catch (error) {
+    console.error('Error in createTourBusiness:', error);
+    return Promise.resolve({ error });
+  }
+};
+
+/**
  * Main export function
  */
 const tours = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> => {
@@ -107,5 +132,5 @@ const tours = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> 
   }
 };
 
-export { getToursDropdownBusiness };
+export { getToursDropdownBusiness, createTourBusiness };
 export default tours;

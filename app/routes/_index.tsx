@@ -128,10 +128,6 @@ export default function IndexRoute(): JSX.Element {
       const result = await loginUserBusinessLogic({ email, password });
 
       if (result.success === true && result.data) {
-        console.log('Login successful - result.data:', result.data);
-        console.log('Login successful - accessToken:', result.data.accessToken);
-        console.log('Login successful - user:', result.data.user);
-
         // Login successful, save to Redux
         // Note: Backend returns 'accessToken', not 'token'
         dispatch(
@@ -141,13 +137,11 @@ export default function IndexRoute(): JSX.Element {
           })
         );
 
-        console.log('Login - Dispatching loginSuccess');
-
         // Request OTP for 2FA
         await requestOtpCode(email);
       } else {
         // Extract error message from various possible formats
-        let errorMessage: string;
+        let errorMessage: string = t('auth.errorGenericLogin');
 
         if (result.error !== null && result.error !== undefined) {
           if (typeof result.error === 'string') {
@@ -192,8 +186,6 @@ export default function IndexRoute(): JSX.Element {
           } else {
             errorMessage = t('auth.errorGenericLogin');
           }
-        } else {
-          errorMessage = t('auth.errorGenericLogin');
         }
 
         setError(errorMessage);
@@ -221,7 +213,7 @@ export default function IndexRoute(): JSX.Element {
         // Move to OTP step
         setStep('otp');
       } else {
-        let errorMessage: string;
+        let errorMessage: string = t('auth.errorGenericLogin');
         if (result.error !== null && result.error !== undefined) {
           if (typeof result.error === 'string') {
             errorMessage = result.error;
@@ -263,10 +255,8 @@ export default function IndexRoute(): JSX.Element {
           ) {
             errorMessage = result.error.message as string;
           } else {
-            errorMessage = result.message ?? t('auth.errorGenericLogin');
+            errorMessage = t('auth.errorGenericLogin');
           }
-        } else {
-          errorMessage = result.message ?? t('auth.errorGenericLogin');
         }
         dispatch(requestOtpFailure(errorMessage));
         setError(errorMessage);
@@ -292,14 +282,10 @@ export default function IndexRoute(): JSX.Element {
     dispatch(verifyOtpStart());
     dispatch(setGlobalLoading({ isLoading: true, message: t('auth.verifying') }));
 
-    console.log('handleOtpSubmit - authToken:', authToken);
-    console.log('handleOtpSubmit - otpEmail:', otpEmail);
-    console.log('handleOtpSubmit - otpCode:', otpCode);
-
     try {
       // Call to API endpoint to verify OTP and set server session
-      // Note: We use fetch to call the Remix route /api/auth/verify-email
-      // which handles both: 1) calling backend verifyEmail service, 2) setting server session cookie
+      // We use fetch to call the Remix route which handles:
+      // 1) calling backend verifyEmail service, 2) setting server session cookie
       const response = await window.fetch('/api/auth/verify-email', {
         method: 'POST',
         headers: {
@@ -313,8 +299,6 @@ export default function IndexRoute(): JSX.Element {
       });
 
       const result = (await response.json()) as { success?: boolean; error?: string };
-
-      console.log('Verify OTP Response:', result);
 
       if (response.ok && result.success === true) {
         dispatch(verifyOtpSuccess());
@@ -675,7 +659,7 @@ export default function IndexRoute(): JSX.Element {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="•••••••"
                     disabled={isLoading}
                     className="form-input"
                   />
