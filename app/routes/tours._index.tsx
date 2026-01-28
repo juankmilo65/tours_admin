@@ -1165,6 +1165,7 @@ function ToursClient(): JSX.Element {
         {/* Create Tour Modal */}
         <CreateTourModal
           isOpen={isCreateTourModalOpen}
+          users={loaderData.users}
           onSuccess={() => {
             // Reload the page to fetch updated tours
             window.location.reload();
