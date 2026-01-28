@@ -118,9 +118,11 @@ export function CreateTourModal({
 
   // Update userId when currentUser changes (only in create mode without initialData)
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-    if (currentUser?.id !== undefined && currentUser?.id !== null && !initialData?.userId) {
-      setFormData((prev) => ({ ...prev, userId: currentUser.id }));
+    if ((currentUser?.id ?? undefined) !== undefined && initialData?.userId === undefined) {
+      const userId = currentUser?.id;
+      if (userId !== undefined && userId !== null) {
+        setFormData((prev) => ({ ...prev, userId }));
+      }
     }
   }, [currentUser?.id, initialData?.userId]);
 
@@ -176,25 +178,38 @@ export function CreateTourModal({
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof TourFormData, string>> = {};
 
-    if (!formData.userId) newErrors.userId = t('tours.userIdRequired');
-    if (!formData.categoryId) newErrors.categoryId = t('tours.categoryIdRequired');
-    if (!formData.cityId) newErrors.cityId = t('tours.cityIdRequired');
-    if (!formData.titleEs) newErrors.titleEs = t('tours.titleEsRequired');
-    if (!formData.titleEn) newErrors.titleEn = t('tours.titleEnRequired');
-    if (!formData.descriptionEs) newErrors.descriptionEs = t('tours.descriptionEsRequired');
-    if (!formData.descriptionEn) newErrors.descriptionEn = t('tours.descriptionEnRequired');
+    if (!formData.userId) newErrors.userId = t('tours.userIdRequired') ?? 'User ID is required';
+    if (!formData.categoryId)
+      newErrors.categoryId = t('tours.categoryIdRequired') ?? 'Category is required';
+    if (!formData.cityId) newErrors.cityId = t('tours.cityIdRequired') ?? 'City is required';
+    if (!formData.titleEs)
+      newErrors.titleEs = t('tours.titleEsRequired') ?? 'Title (ES) is required';
+    if (!formData.titleEn)
+      newErrors.titleEn = t('tours.titleEnRequired') ?? 'Title (EN) is required';
+    if (!formData.descriptionEs)
+      newErrors.descriptionEs = t('tours.descriptionEsRequired') ?? 'Description (ES) is required';
+    if (!formData.descriptionEn)
+      newErrors.descriptionEn = t('tours.descriptionEnRequired') ?? 'Description (EN) is required';
     if (!formData.shortDescriptionEs)
-      newErrors.shortDescriptionEs = t('tours.shortDescriptionEsRequired');
+      newErrors.shortDescriptionEs =
+        t('tours.shortDescriptionEsRequired') ?? 'Short description (ES) is required';
     if (!formData.shortDescriptionEn)
-      newErrors.shortDescriptionEn = t('tours.shortDescriptionEnRequired');
-    if (formData.duration <= 0) newErrors.duration = t('tours.durationRequired');
-    if (formData.maxCapacity <= 0) newErrors.maxCapacity = t('tours.maxCapacityRequired');
-    if (formData.basePrice <= 0) newErrors.basePrice = t('tours.basePriceRequired');
+      newErrors.shortDescriptionEn =
+        t('tours.shortDescriptionEnRequired') ?? 'Short description (EN) is required';
+    if (formData.duration <= 0)
+      newErrors.duration = t('tours.durationRequired') ?? 'Duration is required';
+    if (formData.maxCapacity <= 0)
+      newErrors.maxCapacity = t('tours.maxCapacityRequired') ?? 'Max capacity is required';
+    if (formData.basePrice <= 0)
+      newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
     // Validate that at least one image is provided
     const validImages = formData.images.filter((img) => img.trim() !== '');
-    if (validImages.length === 0)
-      newErrors.images = t('tours.imagesRequired') || 'Al menos una imagen es requerida';
-    if (formData.language.length === 0) newErrors.language = t('tours.languageRequired');
+    if (validImages.length === 0) {
+      const imagesRequiredMsg = t('tours.imagesRequired');
+      newErrors.images = imagesRequiredMsg ?? 'Al menos una imagen es requerida';
+    }
+    if (formData.language.length === 0)
+      newErrors.language = t('tours.languageRequired') ?? 'Language is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -362,7 +377,7 @@ export function CreateTourModal({
                   fontWeight: 'var(--font-weight-semibold)',
                 }}
               >
-                {t('common.confirmClose') || '¿Estás seguro?'}
+                {t('common.confirmClose') ?? '¿Estás seguro?'}
               </h3>
               <p
                 style={{
@@ -371,7 +386,7 @@ export function CreateTourModal({
                   fontSize: 'var(--text-sm)',
                 }}
               >
-                {t('common.unsavedChangesWarning') || 'Los cambios no guardados se perderán.'}
+                {t('common.unsavedChangesWarning') ?? 'Los cambios no guardados se perderán.'}
               </p>
             </div>
           </div>
@@ -389,7 +404,7 @@ export function CreateTourModal({
                 fontWeight: 'var(--font-weight-medium)',
               }}
             >
-              {t('common.continueEditing') || 'Continuar editando'}
+              {t('common.continueEditing') ?? 'Continuar editando'}
             </button>
             <button
               type="button"
@@ -404,7 +419,7 @@ export function CreateTourModal({
                 fontWeight: 'var(--font-weight-medium)',
               }}
             >
-              {t('common.discardChanges') || 'Descartar cambios'}
+              {t('common.discardChanges') ?? 'Descartar cambios'}
             </button>
           </div>
         </div>
@@ -463,7 +478,7 @@ export function CreateTourModal({
             }}
           >
             {mode === 'edit'
-              ? t('tours.editTourTitle') || 'Editar Tour'
+              ? (t('tours.editTourTitle') ?? 'Editar Tour')
               : t('tours.createTourTitle')}
           </h2>
           <button
@@ -490,7 +505,7 @@ export function CreateTourModal({
               e.currentTarget.style.color = 'var(--color-neutral-500)';
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
-            aria-label={t('common.close') || 'Cerrar'}
+            aria-label={t('common.close') ?? 'Cerrar'}
           >
             ✕
           </button>
@@ -515,7 +530,7 @@ export function CreateTourModal({
                 <>
                   <Select
                     options={[
-                      { value: '', label: t('common.selectProvider') || 'Seleccionar proveedor' },
+                      { value: '', label: t('common.selectProvider') ?? 'Seleccionar proveedor' },
                       ...users.map((user) => ({
                         value: user.id,
                         label: `${user.name} (${user.email})`,
@@ -528,7 +543,7 @@ export function CreateTourModal({
                         setErrors((prev) => ({ ...prev, userId: undefined }));
                       }
                     }}
-                    placeholder={t('common.selectProvider') || 'Seleccionar proveedor'}
+                    placeholder={t('common.selectProvider') ?? 'Seleccionar proveedor'}
                     id="select-user-provider"
                   />
                   {errors.userId !== undefined && (
@@ -579,7 +594,7 @@ export function CreateTourModal({
               </label>
               <Select
                 options={[
-                  { value: '', label: t('tours.selectCategory') || 'Seleccionar categoría' },
+                  { value: '', label: t('tours.selectCategory') ?? 'Seleccionar categoría' },
                   ...categories.map((cat: Category) => ({
                     value: cat.id,
                     label: cat.name_es,
@@ -592,7 +607,7 @@ export function CreateTourModal({
                     setErrors((prev) => ({ ...prev, categoryId: undefined }));
                   }
                 }}
-                placeholder={t('tours.selectCategory') || 'Seleccionar categoría'}
+                placeholder={t('tours.selectCategory') ?? 'Seleccionar categoría'}
                 id="select-category"
               />
               {errors.categoryId !== undefined && (
@@ -623,7 +638,7 @@ export function CreateTourModal({
               </label>
               <Select
                 options={[
-                  { value: '', label: t('common.selectCity') || 'Seleccionar ciudad' },
+                  { value: '', label: t('common.selectCity') ?? 'Seleccionar ciudad' },
                   ...translatedCities.map((city: TranslatedCity) => ({
                     value: city.id,
                     label: city.name,
@@ -636,7 +651,7 @@ export function CreateTourModal({
                     setErrors((prev) => ({ ...prev, cityId: undefined }));
                   }
                 }}
-                placeholder={t('common.selectCity') || 'Seleccionar ciudad'}
+                placeholder={t('common.selectCity') ?? 'Seleccionar ciudad'}
                 id="select-city-modal"
               />
               {errors.cityId !== undefined && (
@@ -986,9 +1001,9 @@ export function CreateTourModal({
                 </label>
                 <Select
                   options={[
-                    { value: 'easy', label: t('tours.difficultyEasy') || 'Fácil' },
-                    { value: 'medium', label: t('tours.difficultyMedium') || 'Media' },
-                    { value: 'hard', label: t('tours.difficultyHard') || 'Difícil' },
+                    { value: 'easy', label: t('tours.difficultyEasy') ?? 'Fácil' },
+                    { value: 'medium', label: t('tours.difficultyMedium') ?? 'Media' },
+                    { value: 'hard', label: t('tours.difficultyHard') ?? 'Difícil' },
                   ]}
                   value={formData.difficulty}
                   onChange={(value: string) => {
@@ -997,7 +1012,7 @@ export function CreateTourModal({
                       difficulty: value as 'easy' | 'medium' | 'hard',
                     }));
                   }}
-                  placeholder={t('tours.selectDifficulty') || 'Seleccionar dificultad'}
+                  placeholder={t('tours.selectDifficulty') ?? 'Seleccionar dificultad'}
                   id="select-difficulty"
                 />
               </div>
@@ -1119,7 +1134,7 @@ export function CreateTourModal({
                           onChange={(e) => {
                             handleImageChange(index, e.target.value);
                           }}
-                          placeholder={t('tours.imageUrl') || 'URL de la imagen (https://...)'}
+                          placeholder={t('tours.imageUrl') ?? 'URL de la imagen (https://...)'}
                           style={{
                             width: '100%',
                             padding: 'var(--space-2)',
@@ -1157,7 +1172,7 @@ export function CreateTourModal({
                         onMouseOut={(e) => {
                           e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
                         }}
-                        title={t('common.delete') || 'Eliminar'}
+                        title={t('common.delete') ?? 'Eliminar'}
                       >
                         <svg
                           style={{ width: '16px', height: '16px' }}
@@ -1304,7 +1319,7 @@ export function CreateTourModal({
                 {isSubmitting
                   ? t('common.saving')
                   : mode === 'edit'
-                    ? t('common.save') || 'Guardar'
+                    ? (t('common.save') ?? 'Guardar')
                     : t('tours.createTour')}
               </button>
             </div>
