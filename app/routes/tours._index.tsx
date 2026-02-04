@@ -443,6 +443,9 @@ function ToursClient(): JSX.Element {
   // Track if user has made a search (to show "no results" state)
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Track if filters have been changed but not applied
+  const [filtersChanged, setFiltersChanged] = useState(false);
+
   // Country ID from Redux (selected from Header)
   const selectedCountry = useAppSelector(selectSelectedCountry);
   const countryId = selectedCountry?.id ?? null;
@@ -547,6 +550,8 @@ function ToursClient(): JSX.Element {
   // Handle city selection change - clear tours
   const handleCityChange = (newCityId: string): void => {
     setSelectedCityId(newCityId);
+    // Mark filters as changed
+    setFiltersChanged(true);
     // Clear tours when city changes (before clicking Filter)
     setRawTours([]);
     setHasSearched(false);
@@ -566,6 +571,8 @@ function ToursClient(): JSX.Element {
   // Handle category selection change - clear tours
   const handleCategoryChange = (newCategory: string): void => {
     setSelectedCategory(newCategory);
+    // Mark filters as changed
+    setFiltersChanged(true);
     // Clear tours when category changes (before clicking Filter)
     setRawTours([]);
     setHasSearched(false);
@@ -581,6 +588,8 @@ function ToursClient(): JSX.Element {
   const handlePriceChange = (minPrice: number, maxPrice: number): void => {
     setSelectedMinPrice(minPrice);
     setSelectedMaxPrice(maxPrice);
+    // Mark filters as changed
+    setFiltersChanged(true);
     // Clear tours when price changes (before clicking Filter)
     setRawTours([]);
     setHasSearched(false);
@@ -651,6 +660,8 @@ function ToursClient(): JSX.Element {
         params.maxPrice = selectedMaxPrice.toString();
       }
     }
+    // Reset filters changed flag
+    setFiltersChanged(false);
     setSearchParams(params);
   };
 
@@ -667,6 +678,8 @@ function ToursClient(): JSX.Element {
     setSelectedUserId('');
     setSelectedCityId('');
     setSelectedCategory('');
+    // Reset filters changed flag
+    setFiltersChanged(false);
     // Reset price to default range
     if (priceRange !== null) {
       setSelectedMinPrice(priceRange.minPrice);
@@ -1102,6 +1115,30 @@ function ToursClient(): JSX.Element {
             </div>
           </div>
         </div>
+
+        {/* Filters Changed Warning Message */}
+        {filtersChanged && hasSearched && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              padding: 'var(--space-3) var(--space-4)',
+              marginBottom: 'var(--space-4)',
+              backgroundColor: 'var(--color-warning-50)',
+              border: '1px solid var(--color-warning-200)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--color-warning-700)',
+              fontSize: 'var(--text-sm)',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            <span>
+              {t('tours.filtersChangedMessage') ||
+                'Los filtros han cambiado. Presiona "Filtrar" para aplicar los nuevos criterios de búsqueda.'}
+            </span>
+          </div>
+        )}
 
         {/* Loading State */}
         {isLoading && (

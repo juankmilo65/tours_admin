@@ -260,6 +260,8 @@ export const es: Translation = {
     adjustFilters: 'Intenta ajustar los filtros para ver más resultados.',
     selectCityFirst: 'Seleccione un proveedor',
     selectProviderFirst: 'Seleccionar proveedor primero',
+    filtersChangedMessage:
+      'Los filtros han cambiado. Presiona "Filtrar" para aplicar los nuevos criterios de búsqueda.',
     selectCityDescription: 'Elige un proveedor para ver los tours disponibles.',
     readyToSearch: '¡Listo para buscar!',
     readyToSearchDescription:

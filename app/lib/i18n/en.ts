@@ -247,6 +247,7 @@ export const en: Translation = {
     adjustFilters: 'Try adjusting the filters to see more results.',
     selectCityFirst: 'Select a city',
     selectProviderFirst: 'Select provider first',
+    filtersChangedMessage: 'Filters have changed. Click "Filter" to apply the new search criteria.',
     selectCityDescription: 'Choose a city to see available tours.',
     readyToSearch: 'Ready to search!',
     readyToSearchDescription: "Click 'Filter' to search for available tours and configure them.",
