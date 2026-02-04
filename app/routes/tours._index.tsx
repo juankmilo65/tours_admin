@@ -1117,7 +1117,7 @@ function ToursClient(): JSX.Element {
         </div>
 
         {/* Filters Changed Warning Message */}
-        {filtersChanged && hasSearched && (
+        {filtersChanged && selectedUserId !== '' && (
           <div
             style={{
               display: 'flex',
