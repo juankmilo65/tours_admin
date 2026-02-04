@@ -1,8 +1,8 @@
 import React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { JSX } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
-import { createTourBusiness } from '~/server/businessLogic/toursBusinessLogic';
+import { createTourBusiness, uploadTourImages } from '~/server/businessLogic/toursBusinessLogic';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
@@ -36,16 +36,27 @@ interface TourFormData {
   descriptionEn: string;
   shortDescriptionEs: string;
   shortDescriptionEn: string;
-  duration: number;
+  duration: string;
   maxCapacity: number;
   basePrice: number;
   currency: string;
   imageUrl: string;
-  images: string[];
+  images: File[];
   difficulty: 'easy' | 'medium' | 'hard';
   language: string[];
   isActive: boolean;
 }
+
+// Image file with preview
+interface ImageFile extends File {
+  preview: string;
+  id: string;
+}
+
+// Constants
+const MAX_IMAGES = 10;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function CreateTourModal({
   isOpen,
@@ -77,12 +88,12 @@ export function CreateTourModal({
       descriptionEn: initialData?.descriptionEn ?? '',
       shortDescriptionEs: initialData?.shortDescriptionEs ?? '',
       shortDescriptionEn: initialData?.shortDescriptionEn ?? '',
-      duration: initialData?.duration ?? 1,
+      duration: initialData?.duration ?? '1 hour',
       maxCapacity: initialData?.maxCapacity ?? 1,
       basePrice: initialData?.basePrice ?? 0,
       currency: initialData?.currency ?? 'MXN',
       imageUrl: initialData?.imageUrl ?? '',
-      images: initialData?.images ?? [''],
+      images: initialData?.images ?? [],
       difficulty: initialData?.difficulty ?? 'easy',
       language: initialData?.language ?? ['es'],
       isActive: initialData?.isActive ?? true,
@@ -91,11 +102,16 @@ export function CreateTourModal({
   );
 
   const [formData, setFormData] = useState<TourFormData>(getDefaultFormData());
-
   const [errors, setErrors] = useState<Partial<Record<keyof TourFormData, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imageInputs, setImageInputs] = useState<string[]>(initialData?.images ?? ['']);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [imageErrors, setImageErrors] = useState<string[]>([]);
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+  const [setFirstImageAsCover, setSetFirstImageAsCover] = useState(true);
+
+  // Drag and drop state
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Translated cities
   const translatedCities = translateCities(rawCities, 'es');
@@ -104,25 +120,30 @@ export function CreateTourModal({
   const resetForm = useCallback((): void => {
     setFormData(getDefaultFormData());
     setErrors({});
-    setImageInputs(initialData?.images ?? ['']);
+    setImageErrors([]);
+    setUploadProgress(0);
+    setSetFirstImageAsCover(true);
     setShowCloseConfirmation(false);
-  }, [getDefaultFormData, initialData?.images]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [getDefaultFormData]);
 
   // Update form when initialData changes (for edit mode)
   useEffect(() => {
     if (isOpen) {
       setFormData(getDefaultFormData());
-      setImageInputs(initialData?.images ?? ['']);
     }
-  }, [isOpen, getDefaultFormData, initialData?.images]);
+  }, [isOpen, getDefaultFormData]);
 
   // Update userId when currentUser changes (only in create mode without initialData)
   useEffect(() => {
-    if ((currentUser?.id ?? undefined) !== undefined && initialData?.userId === undefined) {
-      const userId = currentUser?.id;
-      if (userId !== undefined && userId !== null) {
-        setFormData((prev) => ({ ...prev, userId }));
-      }
+    if (
+      currentUser?.id !== undefined &&
+      currentUser?.id !== null &&
+      initialData?.userId === undefined
+    ) {
+      setFormData((prev) => ({ ...prev, userId: currentUser.id }));
     }
   }, [currentUser?.id, initialData?.userId]);
 
@@ -143,26 +164,139 @@ export function CreateTourModal({
     }
   };
 
-  const handleImageChange = (index: number, value: string): void => {
-    const newImages = [...imageInputs];
-    newImages[index] = value;
-    setImageInputs(newImages);
+  // Validate image file
+  const validateImageFile = (file: File): string | null => {
+    // Check format
+    if (!ALLOWED_FORMATS.includes(file.type)) {
+      return t('tours.invalidImageFormat') ?? 'Formato inválido. Solo se permiten JPEG, PNG y WebP';
+    }
+
+    // Check size
+    if (file.size > MAX_FILE_SIZE) {
+      return t('tours.imageTooLarge') ?? 'La imagen es muy grande. Máximo 5MB';
+    }
+
+    return null;
+  };
+
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    // Check if adding would exceed maximum
+    if (formData.images.length + files.length > MAX_IMAGES) {
+      setImageErrors([t('tours.maxImagesExceeded') ?? `Máximo ${MAX_IMAGES} imágenes permitidas`]);
+      return;
+    }
+
+    const newImages: ImageFile[] = [];
+    const newErrors: string[] = [];
+
+    files.forEach((file) => {
+      const error = validateImageFile(file);
+      if (error !== null) {
+        newErrors.push(`${file.name}: ${error}`);
+        return;
+      }
+
+      // Create preview
+      const preview = URL.createObjectURL(file);
+      newImages.push(Object.assign(file, { preview, id: Math.random().toString(36).substr(2, 9) }));
+    });
+
+    setImageErrors(newErrors);
     setFormData((prev) => ({
       ...prev,
-      images: newImages.filter((img) => img.trim() !== ''),
+      images: [...prev.images, ...newImages],
     }));
+
+    // Clear errors.images if we have valid images
+    if (newErrors.length === 0 && formData.images.length + newImages.length > 0) {
+      setErrors((prev) => ({ ...prev, images: undefined }));
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
-  const addImageInput = (): void => {
-    setImageInputs([...imageInputs, '']);
+  // Handle drag over
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
-  const removeImageInput = (index: number): void => {
-    const newImages = imageInputs.filter((_, i) => i !== index);
-    setImageInputs(newImages);
+  // Handle drag start for reordering
+  const handleDragStart = (index: number): void => {
+    setDraggedImageIndex(index);
+  };
+
+  // Handle drag over for reordering
+  const handleDragOverImage = (e: React.DragEvent<HTMLDivElement>, index: number): void => {
+    e.preventDefault();
+    if (draggedImageIndex === null || draggedImageIndex === index) return;
+
+    const reorderedImages = [...formData.images];
+    const [draggedImage] = reorderedImages.splice(draggedImageIndex, 1);
+    reorderedImages.splice(index, 0, draggedImage);
+
+    setFormData((prev) => ({ ...prev, images: reorderedImages }));
+    setDraggedImageIndex(index);
+  };
+
+  // Handle drag end
+  const handleDragEnd = (): void => {
+    setDraggedImageIndex(null);
+  };
+
+  // Remove image
+  const handleRemoveImage = (index: number): void => {
+    const imageToRemove = formData.images[index] as ImageFile | undefined;
+    const newImages = formData.images.filter((_, i) => i !== index);
+
+    // Revoke preview URL to avoid memory leak
+    if (imageToRemove?.preview !== undefined) {
+      URL.revokeObjectURL(imageToRemove.preview);
+    }
+
+    setFormData((prev) => ({ ...prev, images: newImages }));
+  };
+
+  // Handle drop zone
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length === 0) return;
+
+    // Check if adding would exceed maximum
+    if (formData.images.length + files.length > MAX_IMAGES) {
+      setImageErrors([t('tours.maxImagesExceeded') ?? `Máximo ${MAX_IMAGES} imágenes permitidas`]);
+      return;
+    }
+
+    const newImages: ImageFile[] = [];
+    const newErrors: string[] = [];
+
+    files.forEach((file) => {
+      const error = validateImageFile(file);
+      if (error !== null) {
+        newErrors.push(`${file.name}: ${error}`);
+        return;
+      }
+
+      // Create preview
+      const preview = URL.createObjectURL(file);
+      newImages.push(Object.assign(file, { preview, id: Math.random().toString(36).substr(2, 9) }));
+    });
+
+    setImageErrors(newErrors);
     setFormData((prev) => ({
       ...prev,
-      images: newImages.filter((img) => img.trim() !== ''),
+      images: [...prev.images, ...newImages],
     }));
   };
 
@@ -196,15 +330,14 @@ export function CreateTourModal({
     if (!formData.shortDescriptionEn)
       newErrors.shortDescriptionEn =
         t('tours.shortDescriptionEnRequired') ?? 'Short description (EN) is required';
-    if (formData.duration <= 0)
+    if (!formData.duration || formData.duration.trim() === '')
       newErrors.duration = t('tours.durationRequired') ?? 'Duration is required';
     if (formData.maxCapacity <= 0)
       newErrors.maxCapacity = t('tours.maxCapacityRequired') ?? 'Max capacity is required';
     if (formData.basePrice <= 0)
       newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
     // Validate that at least one image is provided
-    const validImages = formData.images.filter((img) => img.trim() !== '');
-    if (validImages.length === 0) {
+    if (formData.images.length === 0) {
       const imagesRequiredMsg = t('tours.imagesRequired');
       newErrors.images = imagesRequiredMsg ?? 'Al menos una imagen es requerida';
     }
@@ -223,9 +356,10 @@ export function CreateTourModal({
     }
 
     setIsSubmitting(true);
+    setUploadProgress(0);
 
     try {
-      const filteredImages = formData.images.filter((img) => img.trim() !== '');
+      // Step 1: Create tour
       const payload = {
         userId: formData.userId,
         categoryId: formData.categoryId,
@@ -240,8 +374,6 @@ export function CreateTourModal({
         maxCapacity: formData.maxCapacity,
         basePrice: formData.basePrice,
         currency: formData.currency,
-        imageUrl: filteredImages[0] ?? '', // Use first image as main imageUrl
-        images: filteredImages,
         difficulty: formData.difficulty,
         language: formData.language,
         isActive: formData.isActive,
@@ -263,7 +395,34 @@ export function CreateTourModal({
             },
           })
         );
+        setIsSubmitting(false);
         return;
+      }
+
+      const tourData = result as { data: { id: string } };
+      const tourId = tourData.data?.id ?? '';
+
+      if (tourId === '') {
+        throw new Error('Tour ID not returned from server');
+      }
+
+      // Step 2: Upload images
+      if (formData.images.length > 0) {
+        const uploadResult = await uploadTourImages(
+          tourId,
+          formData.images as unknown as File[],
+          setFirstImageAsCover,
+          token ?? '',
+          (progress) => {
+            setUploadProgress(progress);
+          }
+        );
+
+        if (uploadResult !== null && typeof uploadResult === 'object' && 'error' in uploadResult) {
+          const error = uploadResult.error as { message?: string };
+          console.error('Error uploading images:', error);
+          // Continue even if image upload fails, but warn user
+        }
       }
 
       // Success
@@ -300,6 +459,7 @@ export function CreateTourModal({
       );
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -321,7 +481,7 @@ export function CreateTourModal({
     resetForm();
     setShowCloseConfirmation(false);
     dispatch(closeModal('create-tour'));
-    if (onClose) {
+    if (onClose !== undefined) {
       onClose();
     }
   };
@@ -888,15 +1048,15 @@ export function CreateTourModal({
                     color: 'var(--color-neutral-700)',
                   }}
                 >
-                  {t('tours.duration')} (hours) <span style={{ color: 'red' }}>*</span>
+                  {t('tours.duration')} <span style={{ color: 'red' }}>*</span>
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   name="duration"
                   value={formData.duration}
                   onChange={handleInputChange}
-                  min={1}
                   required
+                  placeholder="1 hour"
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1059,7 +1219,7 @@ export function CreateTourModal({
               )}
             </div>
 
-            {/* Images - Upload Style */}
+            {/* Images - File Upload Style */}
             <div>
               <label
                 style={{
@@ -1069,173 +1229,172 @@ export function CreateTourModal({
                   color: 'var(--color-neutral-700)',
                 }}
               >
-                {t('tours.additionalImages')} <span style={{ color: 'red' }}>*</span>
+                {t('tours.images')} <span style={{ color: 'red' }}>*</span>
+                <span
+                  style={{
+                    fontWeight: 'normal',
+                    color: 'var(--color-neutral-600)',
+                    fontSize: 'var(--text-sm)',
+                  }}
+                >
+                  {' '}
+                  ({formData.images.length}/{MAX_IMAGES} - Máximo 5MB por imagen, JPEG/PNG/WebP)
+                </span>
               </label>
 
-              {/* Image URL inputs */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {imageInputs.map((img, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      display: 'flex',
-                      gap: 'var(--space-2)',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div style={{ flex: 1, position: 'relative' }}>
-                      {img && (
-                        <div
-                          style={{
-                            position: 'relative',
-                            display: 'flex',
-                            gap: 'var(--space-2)',
-                            alignItems: 'center',
-                            padding: 'var(--space-2)',
-                            backgroundColor: 'var(--color-neutral-50)',
-                            borderRadius: 'var(--radius-md)',
-                            border: '1px solid var(--color-neutral-200)',
-                          }}
-                        >
-                          <img
-                            src={img}
-                            alt={`Preview ${index + 1}`}
-                            style={{
-                              width: '48px',
-                              height: '48px',
-                              objectFit: 'cover',
-                              borderRadius: 'var(--radius-sm)',
-                            }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                          <input
-                            type="url"
-                            value={img}
-                            onChange={(e) => {
-                              handleImageChange(index, e.target.value);
-                            }}
-                            placeholder="https://..."
-                            style={{
-                              flex: 1,
-                              padding: 'var(--space-2)',
-                              border: '1px solid var(--color-neutral-300)',
-                              borderRadius: 'var(--radius-md)',
-                              fontSize: 'var(--text-sm)',
-                            }}
-                          />
-                        </div>
-                      )}
-                      {!img && (
-                        <input
-                          type="url"
-                          value={img}
-                          onChange={(e) => {
-                            handleImageChange(index, e.target.value);
-                          }}
-                          placeholder={t('tours.imageUrl') ?? 'URL de la imagen (https://...)'}
-                          style={{
-                            width: '100%',
-                            padding: 'var(--space-2)',
-                            border:
-                              errors.images !== undefined
-                                ? '1px solid red'
-                                : '1px solid var(--color-neutral-300)',
-                            borderRadius: 'var(--radius-md)',
-                            fontSize: 'var(--text-sm)',
-                          }}
-                        />
-                      )}
+              {/* Drop zone */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                style={{
+                  border: '2px dashed var(--color-neutral-300)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-6)',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  backgroundColor: 'var(--color-neutral-50)',
+                  transition: 'all 0.2s',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-primary-400)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary-50)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-neutral-300)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-neutral-50)';
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                />
+                <div style={{ fontSize: '48px', marginBottom: 'var(--space-2)' }}>📷</div>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--color-neutral-700)',
+                    fontWeight: 'var(--font-weight-medium)',
+                  }}
+                >
+                  {t('tours.clickOrDragImages') ?? 'Haz clic o arrastra imágenes aquí'}
+                </p>
+                <p
+                  style={{
+                    margin: 'var(--space-1) 0 0 0',
+                    color: 'var(--color-neutral-600)',
+                    fontSize: 'var(--text-sm)',
+                  }}
+                >
+                  {t('tours.imageFormats') ?? 'JPEG, PNG, WebP - Máximo 5MB'}
+                </p>
+              </div>
+
+              {/* Image errors */}
+              {imageErrors.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 'var(--space-2)',
+                    padding: 'var(--space-2)',
+                    backgroundColor: 'var(--color-error-50)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-error-200)',
+                  }}
+                >
+                  {imageErrors.map((error, index) => (
+                    <div
+                      key={index}
+                      style={{ color: 'var(--color-error-700)', fontSize: 'var(--text-sm)' }}
+                    >
+                      • {error}
                     </div>
-                    {imageInputs.length > 1 && (
+                  ))}
+                </div>
+              )}
+
+              {/* Image previews */}
+              {formData.images.length > 0 && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                    gap: 'var(--space-2)',
+                    marginTop: 'var(--space-3)',
+                  }}
+                >
+                  {formData.images.map((image, index) => (
+                    <div
+                      key={(image as ImageFile).id || index}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOverImage(e, index)}
+                      onDragEnd={handleDragEnd}
+                      style={{
+                        position: 'relative',
+                        aspectRatio: '1',
+                        borderRadius: 'var(--radius-md)',
+                        overflow: 'hidden',
+                        border: '2px solid var(--color-neutral-200)',
+                        cursor: 'move',
+                      }}
+                    >
+                      <img
+                        src={(image as ImageFile).preview}
+                        alt={`Preview ${index + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
                       <button
                         type="button"
-                        onClick={() => {
-                          removeImageInput(index);
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveImage(index);
                         }}
                         style={{
-                          padding: 'var(--space-2)',
-                          backgroundColor: 'var(--color-error-50)',
-                          color: 'var(--color-error-600)',
-                          border: '1px solid var(--color-error-200)',
-                          borderRadius: 'var(--radius-md)',
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                          color: 'white',
+                          border: 'none',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          transition: 'all 0.2s',
+                          fontSize: '16px',
                         }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-error-100)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
-                        }}
-                        title={t('common.delete') ?? 'Eliminar'}
                       >
-                        <svg
-                          style={{ width: '16px', height: '16px' }}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
+                        ×
                       </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Add image button */}
-              <button
-                type="button"
-                onClick={() => {
-                  addImageInput();
-                }}
-                style={{
-                  marginTop: 'var(--space-3)',
-                  padding: 'var(--space-2) var(--space-4)',
-                  backgroundColor: 'var(--color-primary-50)',
-                  color: 'var(--color-primary-600)',
-                  border: '1px dashed var(--color-primary-300)',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--font-weight-medium)',
-                  transition: 'all 0.2s',
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-primary-100)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-primary-50)';
-                }}
-              >
-                <svg
-                  style={{ width: '16px', height: '16px' }}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                {t('tours.addImage')}
-              </button>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                          color: 'white',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {index === 0 ? 'Portada' : `#${index + 1}`}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {errors.images !== undefined && (
                 <span
@@ -1250,6 +1409,28 @@ export function CreateTourModal({
                 </span>
               )}
             </div>
+
+            {/* Set first image as cover option */}
+            {formData.images.length > 0 && (
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <input
+                    type="checkbox"
+                    checked={setFirstImageAsCover}
+                    onChange={(e) => setSetFirstImageAsCover(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span
+                    style={{
+                      fontWeight: 'var(--font-weight-medium)',
+                      color: 'var(--color-neutral-700)',
+                    }}
+                  >
+                    {t('tours.setFirstImageAsCover') ?? 'Establecer primera imagen como portada'}
+                  </span>
+                </label>
+              </div>
+            )}
 
             {/* Active */}
             <div>
@@ -1271,6 +1452,42 @@ export function CreateTourModal({
                 </span>
               </label>
             </div>
+
+            {/* Upload Progress */}
+            {isSubmitting && uploadProgress > 0 && (
+              <div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: 'var(--space-1)',
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--color-neutral-700)',
+                  }}
+                >
+                  <span>{t('tours.uploadingImages') ?? 'Subiendo imágenes...'}</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div
+                  style={{
+                    width: '100%',
+                    height: '8px',
+                    backgroundColor: 'var(--color-neutral-200)',
+                    borderRadius: 'var(--radius-sm)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${uploadProgress}%`,
+                      height: '100%',
+                      backgroundColor: 'var(--color-primary-500)',
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div

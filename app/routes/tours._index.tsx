@@ -9,6 +9,7 @@ import { TourCard } from '~/components/tours/TourCard';
 import { CreateTourModal } from '~/components/tours/CreateTourModal';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
+import { selectSelectedCountry } from '~/store/slices/countriesSlice';
 import {
   selectCategories,
   translateCategories,
@@ -37,7 +38,8 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
 
   const url = new URL(args.request.url);
   const userId = url.searchParams.get('userId') ?? null;
-  const cityId = url.searchParams.get('cityId') ?? null;
+  const countryId = selectedCountryId ?? null; // countryId is mandatory from session
+  const cityId = url.searchParams.get('cityId') ?? null; // cityId is optional filter
   const page = url.searchParams.get('page') ?? '1';
   const category = url.searchParams.get('category') ?? '';
   const minPrice = url.searchParams.get('minPrice') ?? '';
@@ -97,7 +99,8 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   priceRangeFormData.append(
     'filters',
     JSON.stringify({
-      city: cityId ?? '',
+      userId: userId ?? '',
+      countryId: countryId ?? '',
       category: category ?? '',
     })
   );
@@ -106,9 +109,11 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   const priceRangeResult = await priceRangeBL(priceRangeFormData);
   const priceRange = priceRangeResult.success === true ? priceRangeResult.data : null;
 
-  // If no cityId, return empty state with categories and price range
-  if (cityId === null || cityId === undefined) {
+  // If no userId or countryId, return empty state with categories and price range
+  if (userId === null || userId === undefined || countryId === null || countryId === undefined) {
     return data({
+      userId: null,
+      countryId: null,
       cityId: null,
       categories,
       activeCities,
@@ -126,14 +131,15 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     });
   }
 
-  // Build filters object
+  // Build filters object - userId and countryId are mandatory
   const filters: Record<string, string | number> = {
-    cityId: cityId ?? '',
+    userId: userId ?? '',
+    countryId: countryId ?? '',
     page: parseInt(page, 10),
   };
 
-  if (userId !== null && userId !== undefined && userId !== '') {
-    filters.userId = userId;
+  if (cityId !== null && cityId !== undefined && cityId !== '') {
+    filters.cityId = cityId;
   }
   if (category !== null && category !== undefined && category !== '') {
     filters.category = category;
@@ -175,6 +181,8 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
 
   if (isToursResult(result) && result.success === true) {
     return data({
+      userId: userId,
+      countryId: countryId,
       cityId: cityId,
       categories,
       activeCities,
@@ -194,6 +202,8 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
 
   // Return empty on error
   return data({
+    userId,
+    countryId,
     cityId,
     categories,
     activeCities,
@@ -221,6 +231,8 @@ interface PriceRange {
 
 // Helper to extract data from loader response (data() wraps differently than json())
 function extractLoaderData(loaderData: unknown): {
+  userId: string | null;
+  countryId: string | null;
   cityId: string | null;
   categories: Category[];
   activeCities: City[];
@@ -231,6 +243,8 @@ function extractLoaderData(loaderData: unknown): {
   const raw = loaderData as {
     type?: string;
     data?: {
+      userId?: string | null;
+      countryId?: string | null;
       cityId?: string | null;
       categories?: Category[];
       activeCities?: City[];
@@ -238,6 +252,8 @@ function extractLoaderData(loaderData: unknown): {
       priceRange?: PriceRange | null;
       tours?: { data: Tour[]; pagination: unknown };
     };
+    userId?: string | null;
+    countryId?: string | null;
     cityId?: string | null;
     categories?: Category[];
     activeCities?: City[];
@@ -249,6 +265,8 @@ function extractLoaderData(loaderData: unknown): {
   const innerData = raw?.type === 'DataWithResponseInit' ? raw?.data : raw;
 
   return {
+    userId: innerData?.userId ?? null,
+    countryId: innerData?.countryId ?? null,
     cityId: innerData?.cityId ?? null,
     categories: innerData?.categories ?? [],
     activeCities: innerData?.activeCities ?? [],
@@ -322,11 +340,7 @@ function ToursClient(): JSX.Element {
 
   // State for selected filters (only sent on "Filtrar" click)
   const [selectedUserId, setSelectedUserId] = useState<string>(searchParams.get('userId') ?? '');
-  const [selectedCityId, setSelectedCityId] = useState<string>(
-    searchParams.get('cityId') !== null && searchParams.get('cityId') !== ''
-      ? (searchParams.get('cityId') ?? '')
-      : (loaderData.cityId ?? '')
-  );
+  const [selectedCityId, setSelectedCityId] = useState<string>(searchParams.get('cityId') ?? '');
   const [selectedCategory, setSelectedCategory] = useState<string>(
     searchParams.get('category') ?? ''
   );
@@ -359,8 +373,12 @@ function ToursClient(): JSX.Element {
           totalPages: 1,
         }
   );
-  // Track if user changed city (to show "ready to search" state)
-  const [hasCityChanged, setHasCityChanged] = useState(false);
+  // Track if user has made a search (to show "no results" state)
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Country ID from Redux (selected from Header)
+  const selectedCountry = useAppSelector(selectSelectedCountry);
+  const countryId = selectedCountry?.id ?? null;
 
   // Create tour modal state
   const [isCreateTourModalOpen, setIsCreateTourModalOpen] = useState(false);
@@ -378,20 +396,17 @@ function ToursClient(): JSX.Element {
       : (loaderData.priceRange?.maxPrice ?? 10000)
   );
 
-  // Cascading logic: filters only enabled when tours have been loaded
-  const hasLoadedTours = rawTours.length > 0;
+  // City filter: enabled only if provider selected AND country exists
+  const isCityFilterEnabled = selectedUserId !== '' && countryId !== null && countryId !== '';
 
-  // City filter: enabled only if provider selected AND tours have been loaded
-  const isCityFilterEnabled = selectedUserId !== '' && hasLoadedTours;
+  // Category filter: enabled only if provider selected AND country exists
+  const isCategoryFilterEnabled = selectedUserId !== '' && countryId !== null && countryId !== '';
 
-  // Category filter: enabled only if provider AND city selected AND tours have been loaded
-  const isCategoryFilterEnabled = selectedUserId !== '' && selectedCityId !== '' && hasLoadedTours;
-
-  // Price filter: enabled only if provider AND city selected AND tours loaded AND price range exists
+  // Price filter: enabled only if provider selected AND country exists AND price range exists
   const isPriceFilterEnabled =
     selectedUserId !== '' &&
-    selectedCityId !== '' &&
-    hasLoadedTours &&
+    countryId !== null &&
+    countryId !== '' &&
     priceRange !== null &&
     priceRange.count > 0;
 
@@ -437,18 +452,43 @@ function ToursClient(): JSX.Element {
     return () => window.clearTimeout(timeoutId);
   }, [loaderData.priceRange, searchParams]);
 
-  // Handle city selection change - clear tours and mark as changed
+  // Update tours and pagination when loader data changes (after navigation/filter)
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      // Only update tours if we have data and navigation was triggered (user clicked Filter or pagination)
+      const urlUserId = searchParams.get('userId');
+      if (urlUserId !== null && urlUserId !== undefined && urlUserId !== '') {
+        if (loaderData.tours?.data !== undefined && loaderData.tours.data !== null) {
+          setRawTours(loaderData.tours.data);
+        }
+        if (loaderData.tours?.pagination !== undefined && loaderData.tours.pagination !== null) {
+          setPagination(
+            loaderData.tours.pagination as {
+              page: number;
+              limit: number;
+              total: number;
+              totalPages: number;
+            }
+          );
+        }
+        setHasSearched(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [loaderData.tours, searchParams]);
+
+  // Handle city selection change - clear tours
   const handleCityChange = (newCityId: string): void => {
     setSelectedCityId(newCityId);
     // Clear tours when city changes (before clicking Filter)
     setRawTours([]);
+    setHasSearched(false);
     setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
       page: number;
       limit: number;
       total: number;
       totalPages: number;
     });
-    setHasCityChanged(true);
     // Reset price range when city changes
     if (priceRange !== null) {
       setSelectedMinPrice(priceRange.minPrice);
@@ -456,58 +496,34 @@ function ToursClient(): JSX.Element {
     }
   };
 
-  // Update state when loaderData changes (after navigation)
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const extracted = extractLoaderData(rawLoaderData);
-      if (extracted.tours?.data !== undefined && extracted.tours.data !== null) {
-        setRawTours(extracted.tours.data);
-        // Reset hasCityChanged when we get new data from server
-        setHasCityChanged(false);
-      }
-      if (extracted.tours?.pagination !== undefined && extracted.tours.pagination !== null) {
-        setPagination(
-          extracted.tours.pagination as {
-            page: number;
-            limit: number;
-            total: number;
-            totalPages: number;
-          }
-        );
-      }
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [rawLoaderData, setRawTours, setHasCityChanged, setPagination]);
+  // Handle category selection change - clear tours
+  const handleCategoryChange = (newCategory: string): void => {
+    setSelectedCategory(newCategory);
+    // Clear tours when category changes (before clicking Filter)
+    setRawTours([]);
+    setHasSearched(false);
+    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    });
+  };
 
-  useEffect(() => {
-    // If loader returned a cityId but URL/searchParams don't have it, sync them so UI reflects loaded data
-    const urlCity = searchParams.get('cityId');
-    if (loaderData.cityId !== null && loaderData.cityId !== undefined && loaderData.cityId !== '') {
-      if (urlCity === null || urlCity === '') {
-        // preserve other params, ensure page param exists
-        const entries = Object.fromEntries(searchParams.entries());
-        setSearchParams({
-          ...entries,
-          cityId: loaderData.cityId ?? '',
-          page: entries.page ?? '1',
-        });
-      }
-    }
-    // also ensure rawTours is initialized from loader if empty
-    let timeoutId: number | undefined;
-    if ((loaderData.tours?.data ?? []).length > 0 && rawTours.length === 0) {
-      timeoutId = window.setTimeout(() => {
-        if (loaderData.tours?.data !== undefined && loaderData.tours.data !== null) {
-          setRawTours(loaderData.tours.data);
-        }
-      }, 0);
-    }
-    return () => {
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [loaderData.cityId, loaderData.tours?.data, rawTours.length, searchParams, setSearchParams]);
+  // Handle price range change - clear tours
+  const handlePriceChange = (minPrice: number, maxPrice: number): void => {
+    setSelectedMinPrice(minPrice);
+    setSelectedMaxPrice(maxPrice);
+    // Clear tours when price changes (before clicking Filter)
+    setRawTours([]);
+    setHasSearched(false);
+    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    });
+  };
 
   // Check if navigation is loading
   const isLoading = navigation.state === 'loading';
@@ -530,15 +546,33 @@ function ToursClient(): JSX.Element {
       return;
     }
 
+    // Validate that countryId is available from session
+    if (countryId === null || countryId === undefined || countryId === '') {
+      dispatch(
+        openModal({
+          id: 'validation-select-country',
+          type: 'confirm',
+          title: t('common.notice'),
+          isOpen: true,
+          data: {
+            message: 'Por favor seleccionar un país primero',
+            icon: 'alert',
+          },
+        })
+      );
+      return;
+    }
+
     const params: Record<string, string> = {
-      cityId: selectedCityId,
+      userId: selectedUserId,
+      countryId: countryId,
       page: '1',
       category: selectedCategory,
     };
 
-    // Include userId if selected
-    if (selectedUserId !== '') {
-      params.userId = selectedUserId;
+    // Include cityId if selected (optional filter)
+    if (selectedCityId !== '') {
+      params.cityId = selectedCityId;
     }
 
     // Only include price filters if they differ from default range
@@ -550,7 +584,6 @@ function ToursClient(): JSX.Element {
         params.maxPrice = selectedMaxPrice.toString();
       }
     }
-
     setSearchParams(params);
   };
 
@@ -572,13 +605,14 @@ function ToursClient(): JSX.Element {
       setSelectedMinPrice(priceRange.minPrice);
       setSelectedMaxPrice(priceRange.maxPrice);
     }
-    setSearchParams({
-      userId: '',
-      cityId: '',
-      page: '1',
-      category: '',
-      minPrice: '',
-      maxPrice: '',
+    // Clear results
+    setRawTours([]);
+    setHasSearched(false);
+    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
     });
   };
 
@@ -678,13 +712,31 @@ function ToursClient(): JSX.Element {
                   { value: '', label: t('common.selectProvider') || 'Seleccionar proveedor' },
                 ].concat(loaderData.users.map((u) => ({ value: u.id, label: u.name })))}
                 value={selectedUserId}
-                onChange={(v: string) => setSelectedUserId(v)}
+                onChange={(v: string) => {
+                  setSelectedUserId(v);
+                  // Clear search results when provider changes
+                  setRawTours([]);
+                  setHasSearched(false);
+                  setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
+                    page: number;
+                    limit: number;
+                    total: number;
+                    totalPages: number;
+                  });
+                  // Clear city, category and price filters when provider changes
+                  setSelectedCityId('');
+                  setSelectedCategory('');
+                  if (priceRange !== null) {
+                    setSelectedMinPrice(priceRange.minPrice);
+                    setSelectedMaxPrice(priceRange.maxPrice);
+                  }
+                }}
                 placeholder={t('common.selectProvider') || 'Seleccionar proveedor'}
                 id="select-provider"
               />
             </div>
 
-            {/* City Filter - Required, disabled until user is selected and filter is clicked */}
+            {/* City Filter - Optional, disabled until user is selected and filter is clicked */}
             <div>
               <label
                 style={{
@@ -697,7 +749,7 @@ function ToursClient(): JSX.Element {
                   marginBottom: 'var(--space-1)',
                 }}
               >
-                {t('tours.cityRequired')}
+                {t('tours.city')}
                 {!isCityFilterEnabled && (
                   <span
                     style={{ fontWeight: 'normal', marginLeft: 'var(--space-1)', fontSize: '10px' }}
@@ -722,7 +774,7 @@ function ToursClient(): JSX.Element {
               />
             </div>
 
-            {/* Category Filter - Enabled only if provider AND city selected AND tours loaded */}
+            {/* Category Filter - Enabled only if provider selected AND country exists AND tours loaded */}
             <div>
               <label
                 style={{
@@ -740,13 +792,7 @@ function ToursClient(): JSX.Element {
                   <span
                     style={{ fontWeight: 'normal', marginLeft: 'var(--space-1)', fontSize: '10px' }}
                   >
-                    (
-                    {selectedUserId === '' && selectedCityId === ''
-                      ? t('tours.selectProviderFirst')
-                      : selectedUserId === ''
-                        ? t('tours.selectProviderFirst')
-                        : t('tours.selectCityFirst')}
-                    )
+                    ({t('tours.selectProviderFirst') || 'Seleccionar proveedor primero'})
                   </span>
                 )}
               </label>
@@ -755,11 +801,11 @@ function ToursClient(): JSX.Element {
                   translatedCategories.map((c) => ({ value: c.id, label: c.name }))
                 )}
                 value={selectedCategory ?? ''}
-                onChange={(v: string) => setSelectedCategory(v)}
+                onChange={(v: string) => handleCategoryChange(v)}
                 placeholder={
                   isCategoryFilterEnabled
                     ? t('common.allCategories')
-                    : t('tours.selectCityFirst') || 'Seleccione ciudad'
+                    : t('tours.selectProviderFirst') || 'Seleccione proveedor'
                 }
                 id="select-category"
                 disabled={!isCategoryFilterEnabled}
@@ -856,7 +902,7 @@ function ToursClient(): JSX.Element {
                   onChange={(e): void => {
                     const value = parseInt(e.target.value, 10);
                     if (value < selectedMaxPrice && Number.isNaN(value) === false && value !== 0) {
-                      setSelectedMinPrice(value);
+                      handlePriceChange(value, selectedMaxPrice);
                     }
                   }}
                   disabled={!isPriceFilterEnabled}
@@ -885,7 +931,7 @@ function ToursClient(): JSX.Element {
                   onChange={(e): void => {
                     const value = parseInt(e.target.value, 10);
                     if (value > selectedMinPrice && Number.isNaN(value) === false && value !== 0) {
-                      setSelectedMaxPrice(value);
+                      handlePriceChange(selectedMinPrice, value);
                     }
                   }}
                   disabled={!isPriceFilterEnabled}
@@ -1029,23 +1075,15 @@ function ToursClient(): JSX.Element {
           </div>
         )}
 
-        {/* Ready to search state - City selected but user changed it */}
-        {!isLoading &&
-          translatedTours.length === 0 &&
-          selectedCityId !== '' &&
-          hasCityChanged === true && (
-            <EmptyState
-              icon="🔍"
-              title={t('tours.readyToSearch')}
-              description={t('tours.readyToSearchDescription')}
-            />
-          )}
-
         {/* Empty State - No tours found after search */}
         {!isLoading &&
           translatedTours.length === 0 &&
-          selectedCityId !== '' &&
-          hasCityChanged === false && (
+          selectedUserId !== '' &&
+          (hasSearched === true ||
+            (selectedCityId === '' &&
+              selectedCategory === '' &&
+              selectedMinPrice === priceRange?.minPrice &&
+              selectedMaxPrice === priceRange?.maxPrice)) && (
             <EmptyState
               icon="🏛️"
               title={t('tours.noToursFound')}
@@ -1053,11 +1091,11 @@ function ToursClient(): JSX.Element {
             />
           )}
 
-        {/* Initial State - No city selected */}
-        {!isLoading && translatedTours.length === 0 && selectedCityId === '' && (
+        {/* Initial State - No provider selected or filters cleared */}
+        {!isLoading && translatedTours.length === 0 && selectedUserId === '' && (
           <EmptyState
-            icon="🌍"
-            title={t('tours.selectCityFirst')}
+            icon="👤"
+            title={t('tours.selectProviderFirst')}
             description={t('tours.selectCityDescription')}
           />
         )}

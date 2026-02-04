@@ -216,6 +216,7 @@ export interface Pagination {
 export interface TourFilters {
   cityId?: string;
   userId?: string;
+  countryId?: string;
   category?: string;
   difficulty?: string;
   minPrice?: string;
@@ -257,12 +258,13 @@ export interface ServicePayload {
   data?: TourFilters;
   token?: string;
   cityId?: string;
+  userId?: string;
+  countryId?: string;
   page?: number;
   category?: string;
   difficulty?: string;
   minPrice?: number;
   maxPrice?: number;
-  userId?: string;
   language?: string;
   currency?: string;
 }

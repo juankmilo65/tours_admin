@@ -1,4 +1,11 @@
-import { getTours, getToursDropdown, createTour } from '../tours';
+import {
+  getTours,
+  getToursDropdown,
+  createTour,
+  uploadTourImages,
+  setImageAsCover,
+  deleteTourImage,
+} from '../tours';
 import type { ToursPayload } from '../../types/PayloadTourDataProps';
 import type { ServiceResult } from '../_index';
 
@@ -27,11 +34,21 @@ const generatePayload = (formData: FormData, token = ''): ToursPayload => {
 const getToursBusiness = async (data: ToursPayload): Promise<ServiceResult<unknown>> => {
   try {
     const { filters = {}, token, language = 'es' } = data;
-    const { cityId, page = 1, category, difficulty, minPrice, maxPrice, userId } = filters;
+    const {
+      cityId,
+      page = 1,
+      category,
+      difficulty,
+      minPrice,
+      maxPrice,
+      userId,
+      countryId,
+    } = filters;
 
     const payload = {
       cityId,
       userId,
+      countryId,
       page: typeof page === 'string' ? Number.parseInt(page, 10) : page,
       category,
       difficulty,
@@ -132,5 +149,11 @@ const tours = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> 
   }
 };
 
-export { getToursDropdownBusiness, createTourBusiness };
+export {
+  getToursDropdownBusiness,
+  createTourBusiness,
+  uploadTourImages,
+  setImageAsCover,
+  deleteTourImage,
+};
 export default tours;
