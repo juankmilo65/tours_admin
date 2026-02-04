@@ -1,5 +1,7 @@
 import { createServiceREST } from './_index';
 import type { ServicePayload } from '../types/PayloadTourDataProps';
+import axios from 'axios';
+import type { AxiosProgressEvent } from 'axios';
 
 // Type declaration for Vite environment variables
 interface ViteImportMetaEnv {
@@ -190,10 +192,165 @@ export const createTour = async (
   }
 };
 
-export const getTours = async (payload: ServicePayload): Promise<unknown> => {
+/**
+ * Upload multiple images for a tour using multipart/form-data
+ */
+
+export const uploadTourImages = async (
+  tourId: string,
+  images: File[],
+  setCover = false,
+  token: string,
+
+  // eslint-disable-next-line no-unused-vars
+  onProgress?: (progress: number) => void
+): Promise<unknown> => {
+  console.warn('🎯 [UPLOAD TOUR IMAGES] Starting with params:', {
+    tourId,
+    imageCount: images.length,
+    setCover,
+    hasToken: !!token,
+    BASE_URL,
+  });
+
   // Check if backend URL is configured
   if (BASE_URL === '' || BASE_URL === undefined) {
-    console.warn('BACKEND_URL is not configured, returning empty for tours');
+    console.warn('⚠️ [UPLOAD TOUR IMAGES] BACKEND_URL is not configured, returning error');
+    return { success: false, error: 'Backend URL not configured' };
+  }
+
+  try {
+    const toursEndpoint = `tours/${tourId}/images`;
+    const fullUrl = `${BASE_URL}/api/${toursEndpoint}`;
+    console.warn('🌐 [UPLOAD TOUR IMAGES] Full URL to call:', fullUrl);
+
+    // Create FormData for multipart upload
+    const formData = new FormData();
+
+    // Append all images to the 'images' field
+    images.forEach((file) => {
+      formData.append('images', file);
+    });
+
+    // Add setCover parameter
+    formData.append('setCover', setCover ? 'true' : 'false');
+
+    // Use axios directly for upload progress support
+    const axiosInstance = axios.create({
+      baseURL: `${BASE_URL}/api/`,
+      timeout: 60000, // 60 second timeout for uploads
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const result = await axiosInstance.post(toursEndpoint, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+        if (progressEvent.total !== undefined && progressEvent.total > 0 && onProgress) {
+          const uploadProgress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(uploadProgress);
+        }
+      },
+    });
+
+    console.warn('✅ [UPLOAD TOUR IMAGES] Success! Result:', JSON.stringify(result.data, null, 2));
+    return result.data;
+  } catch (error) {
+    console.error('❌ [UPLOAD TOUR IMAGES] Error caught:', error);
+    if (error instanceof Error) {
+      console.error('❌ [UPLOAD TOUR IMAGES] Error message:', error.message);
+      console.error('❌ [UPLOAD TOUR IMAGES] Error stack:', error.stack);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          '⚠️ [UPLOAD TOUR IMAGES] Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('❌ [UPLOAD TOUR IMAGES] Unknown error:', error);
+    }
+    return { error, success: false };
+  }
+};
+
+/**
+ * Set image as cover for a tour
+ */
+export const setImageAsCover = async (
+  tourId: string,
+  imageId: string,
+  token: string
+): Promise<unknown> => {
+  console.warn('🎯 [SET IMAGE AS COVER] Starting with params:', {
+    tourId,
+    imageId,
+    hasToken: !!token,
+    BASE_URL,
+  });
+
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    return { success: false, error: 'Backend URL not configured' };
+  }
+
+  try {
+    const toursEndpoint = `tours/${tourId}/images/${imageId}/set-cover`;
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token}`);
+
+    const result = await toursService.update({});
+
+    console.warn('✅ [SET IMAGE AS COVER] Success!');
+    return result;
+  } catch (error) {
+    console.error('❌ [SET IMAGE AS COVER] Error caught:', error);
+    return { error, success: false };
+  }
+};
+
+/**
+ * Delete image from a tour
+ */
+export const deleteTourImage = async (
+  tourId: string,
+  imageId: string,
+  token: string
+): Promise<unknown> => {
+  console.warn('🎯 [DELETE TOUR IMAGE] Starting with params:', {
+    tourId,
+    imageId,
+    hasToken: !!token,
+    BASE_URL,
+  });
+
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    return { success: false, error: 'Backend URL not configured' };
+  }
+
+  try {
+    const toursEndpoint = `tours/${tourId}/images/${imageId}`;
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token}`);
+
+    const result = await toursService.delete();
+
+    console.warn('✅ [DELETE TOUR IMAGE] Success!');
+    return result;
+  } catch (error) {
+    console.error('❌ [DELETE TOUR IMAGE] Error caught:', error);
+    return { error, success: false };
+  }
+};
+
+export const getTours = async (payload: ServicePayload): Promise<unknown> => {
+  console.warn('🎯 [GET TOURS] Starting getTours with payload:', {
+    payload,
+    BASE_URL,
+  });
+
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('⚠️ [GET TOURS] BACKEND_URL is not configured, returning empty for tours');
     return {
       success: false,
       data: [],
@@ -204,26 +361,34 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
   try {
     const {
       cityId,
+      userId,
+      countryId,
       page = 1,
       category,
       difficulty,
       minPrice,
       maxPrice,
-      userId,
       language = 'es',
       currency = 'MXN',
+      token,
     } = payload;
 
-    // cityId is required UNLESS userId is provided (to filter by provider)
-    if (
-      (cityId === null || cityId === undefined || cityId === '') &&
-      (userId === null || userId === undefined || userId === '')
-    ) {
+    // userId AND countryId are mandatory (for provider filtering)
+    if (userId === null || userId === undefined || userId === '') {
       return {
         success: false,
         data: [],
         pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
-        error: 'Either cityId or userId is required',
+        error: 'userId is required',
+      };
+    }
+
+    if (countryId === null || countryId === undefined || countryId === '') {
+      return {
+        success: false,
+        data: [],
+        pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
+        error: 'countryId is required',
       };
     }
 
@@ -233,14 +398,15 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
       limit: 10,
     };
 
-    // Only add cityId if it's provided
+    // Mandatory parameters
+    params.userId = userId;
+    params.countryId = countryId;
+
+    // Optional parameters
     if (cityId !== null && cityId !== undefined && cityId !== '') {
       params.cityId = cityId;
     }
 
-    if (userId !== null && userId !== undefined && userId !== '') {
-      params.userId = userId;
-    }
     if (category !== null && category !== undefined && category !== '') {
       params.category = category;
     }
@@ -255,7 +421,17 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
     }
 
     const toursEndpoint = 'tours/cards';
-    const toursService = createServiceREST(BASE_URL, toursEndpoint, 'Bearer');
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token ?? ''}`);
+
+    console.warn('🌐 [GET TOURS] Calling backend API:', {
+      endpoint: toursEndpoint,
+      params,
+      headers: {
+        'X-Language': language,
+        'X-Currency': currency,
+        Authorization: `Bearer ${token ?? ''}`,
+      },
+    });
 
     const result = await toursService.get({
       params,
@@ -265,19 +441,21 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
       },
     });
 
+    console.warn('✅ [GET TOURS] Success! Result:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
     // Handle network errors gracefully (ECONNREFUSED, etc.)
     if (error instanceof Error) {
-      console.error('Error in getTours service:', error.message);
+      console.error('❌ [GET TOURS] Error caught:', error.message);
+      console.error('❌ [GET TOURS] Error stack:', error.stack);
       if (error.message.includes('ECONNREFUSED')) {
         console.warn(
-          'Backend API is not available. Please ensure that backend server is running at:',
+          '⚠️ [GET TOURS] Backend API is not available. Please ensure that backend server is running at:',
           BASE_URL
         );
       }
     } else {
-      console.error('Unknown error in getTours service:', error);
+      console.error('❌ [GET TOURS] Unknown error:', error);
     }
     return {
       error,
