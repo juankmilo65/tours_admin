@@ -22,9 +22,10 @@ import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
 import citiesBL from '~/server/businessLogic/citiesBusinessLogic';
+import countriesBL from '~/server/businessLogic/countriesBusinessLogic';
 import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import { useTranslation } from '~/lib/i18n/utils';
-import { getSession } from '~/utilities/sessions';
+import { getSession, commitSession } from '~/utilities/sessions';
 import Select from '~/components/ui/Select';
 
 // Loader function - runs on server
@@ -34,7 +35,48 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
 
   // Load session to get selected countryId
   const session = await getSession(args.request.headers.get('Cookie'));
-  const selectedCountryId = session.get('selectedCountryId') as string | undefined;
+  let selectedCountryId = session.get('selectedCountryId') as string | undefined;
+
+  // Si no hay countryId en sesión, obtener el default (México) de los países
+  // Esto sincroniza con la lógica del root.tsx loader
+  if (selectedCountryId === undefined || selectedCountryId === null || selectedCountryId === '') {
+    // Fetch countries to get default (Mexico)
+    const countriesFormData = new FormData();
+    countriesFormData.append('action', 'getCountriesBusiness');
+    countriesFormData.append('language', 'es');
+    const countriesResult = await countriesBL(countriesFormData);
+
+    interface CountryData {
+      id: string;
+      code: string;
+      name_es?: string;
+      name_en?: string;
+    }
+
+    const isCountriesResult = (
+      result: unknown
+    ): result is { success: boolean; data: CountryData[] | null } =>
+      typeof result === 'object' && result !== null && 'success' in result && 'data' in result;
+
+    if (isCountriesResult(countriesResult) && countriesResult.success && countriesResult.data) {
+      const countries = countriesResult.data;
+      // Buscar México como default
+      const mexicoCountry = countries.find(
+        (c: CountryData) =>
+          c.code === 'MX' ||
+          c.name_es?.toLowerCase() === 'méxico' ||
+          c.name_en?.toLowerCase() === 'mexico'
+      );
+      const defaultCountry = mexicoCountry ?? countries[0];
+
+      if (defaultCountry) {
+        selectedCountryId = defaultCountry.id;
+        // Guardar en sesión para futuras requests
+        session.set('selectedCountryId', defaultCountry.id);
+        session.set('selectedCountryCode', defaultCountry.code);
+      }
+    }
+  }
 
   const url = new URL(args.request.url);
   const userId = url.searchParams.get('userId') ?? null;
@@ -67,23 +109,27 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
       ? categoriesResult.data
       : [];
 
-  // Fetch active cities
-  const citiesFormData = new FormData();
-  citiesFormData.append('action', 'getCitiesBusiness');
-  citiesFormData.append(
-    'filters',
-    JSON.stringify({ isActive: true, countryId: selectedCountryId ?? '' })
-  );
-  citiesFormData.append('language', 'es');
-  const citiesResult = await citiesBL(citiesFormData);
+  // Fetch active cities - SOLO si tenemos un countryId válido
+  let activeCities: City[] = [];
 
-  const isCitiesResult = (result: unknown): result is { success: boolean; data: City[] | null } =>
-    typeof result === 'object' && result !== null && 'success' in result && 'data' in result;
+  if (selectedCountryId !== undefined && selectedCountryId !== null && selectedCountryId !== '') {
+    const citiesFormData = new FormData();
+    citiesFormData.append('action', 'getCitiesBusiness');
+    citiesFormData.append(
+      'filters',
+      JSON.stringify({ isActive: true, countryId: selectedCountryId })
+    );
+    citiesFormData.append('language', 'es');
+    const citiesResult = await citiesBL(citiesFormData);
 
-  const activeCities: City[] =
-    isCitiesResult(citiesResult) && citiesResult.success === true && citiesResult.data !== null
-      ? citiesResult.data
-      : [];
+    const isCitiesResult = (result: unknown): result is { success: boolean; data: City[] | null } =>
+      typeof result === 'object' && result !== null && 'success' in result && 'data' in result;
+
+    activeCities =
+      isCitiesResult(citiesResult) && citiesResult.success === true && citiesResult.data !== null
+        ? citiesResult.data
+        : [];
+  }
 
   // Fetch users for dropdown
   const usersResult = await getUsersDropdownBusiness(
@@ -111,24 +157,31 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
 
   // If no userId or countryId, return empty state with categories and price range
   if (userId === null || userId === undefined || countryId === null || countryId === undefined) {
-    return data({
-      userId: null,
-      countryId: null,
-      cityId: null,
-      categories,
-      activeCities,
-      users,
-      priceRange,
-      tours: {
-        data: [],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: 0,
-          totalPages: 1,
+    return data(
+      {
+        userId: null,
+        countryId: countryId,
+        cityId: null,
+        categories,
+        activeCities,
+        users,
+        priceRange,
+        tours: {
+          data: [],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 0,
+            totalPages: 1,
+          },
         },
       },
-    });
+      {
+        headers: {
+          'Set-Cookie': await commitSession(session),
+        },
+      }
+    );
   }
 
   // Build filters object - userId and countryId are mandatory
@@ -180,45 +233,59 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     'pagination' in toursResult;
 
   if (isToursResult(result) && result.success === true) {
-    return data({
-      userId: userId,
-      countryId: countryId,
-      cityId: cityId,
+    return data(
+      {
+        userId: userId,
+        countryId: countryId,
+        cityId: cityId,
+        categories,
+        activeCities,
+        users,
+        priceRange,
+        tours: {
+          data: result.data ?? [],
+          pagination: result.pagination ?? {
+            page: parseInt(page, 10),
+            limit: 10,
+            total: 0,
+            totalPages: 1,
+          },
+        },
+      },
+      {
+        headers: {
+          'Set-Cookie': await commitSession(session),
+        },
+      }
+    );
+  }
+
+  // Return empty on error
+  return data(
+    {
+      userId,
+      countryId,
+      cityId,
       categories,
       activeCities,
       users,
       priceRange,
       tours: {
-        data: result.data ?? [],
-        pagination: result.pagination ?? {
+        data: [],
+        pagination: {
           page: parseInt(page, 10),
           limit: 10,
           total: 0,
           totalPages: 1,
         },
       },
-    });
-  }
-
-  // Return empty on error
-  return data({
-    userId,
-    countryId,
-    cityId,
-    categories,
-    activeCities,
-    users,
-    priceRange,
-    tours: {
-      data: [],
-      pagination: {
-        page: parseInt(page, 10),
-        limit: 10,
-        total: 0,
-        totalPages: 1,
-      },
     },
-  });
+    {
+      headers: {
+        'Set-Cookie': await commitSession(session),
+      },
+    }
+  );
 }
 
 // Price range type
@@ -1204,8 +1271,9 @@ function ToursClient(): JSX.Element {
         <CreateTourModal
           isOpen={isCreateTourModalOpen}
           users={loaderData.users}
+          onClose={() => setIsCreateTourModalOpen(false)}
           onSuccess={() => {
-            // Reload the page to fetch updated tours
+            // Reload page to fetch updated tours
             window.location.reload();
           }}
         />

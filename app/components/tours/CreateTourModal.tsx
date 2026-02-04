@@ -240,6 +240,10 @@ export function CreateTourModal({
 
     const reorderedImages = [...formData.images];
     const [draggedImage] = reorderedImages.splice(draggedImageIndex, 1);
+
+    // Ensure draggedImage exists before inserting
+    if (draggedImage === undefined) return;
+
     reorderedImages.splice(index, 0, draggedImage);
 
     setFormData((prev) => ({ ...prev, images: reorderedImages }));
@@ -410,7 +414,7 @@ export function CreateTourModal({
       if (formData.images.length > 0) {
         const uploadResult = await uploadTourImages(
           tourId,
-          formData.images as unknown as File[],
+          formData.images,
           setFirstImageAsCover,
           token ?? '',
           (progress) => {
@@ -466,14 +470,28 @@ export function CreateTourModal({
   // Handle close with confirmation
   const handleRequestClose = (): void => {
     // Check if form has been modified
+    // Also allow closing if form is empty (no user input)
+    // Note: userId is auto-filled and not considered user input
+    const isFormEmpty =
+      !formData.titleEs &&
+      !formData.titleEn &&
+      !formData.descriptionEs &&
+      !formData.descriptionEn &&
+      !formData.shortDescriptionEs &&
+      !formData.shortDescriptionEn &&
+      formData.images.length === 0;
+
     const defaultData = getDefaultFormData();
     const hasChanges = JSON.stringify(formData) !== JSON.stringify(defaultData);
 
-    if (hasChanges) {
-      setShowCloseConfirmation(true);
-    } else {
+    // Allow closing without confirmation if form is empty OR no changes
+    if (isFormEmpty || !hasChanges) {
       handleConfirmClose();
+      return;
     }
+
+    // Show confirmation only if there are actual changes
+    setShowCloseConfirmation(true);
   };
 
   // Confirm close and reset form
