@@ -9,7 +9,7 @@ import { TourCard } from '~/components/tours/TourCard';
 import { CreateTourModal } from '~/components/tours/CreateTourModal';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
-import { selectSelectedCountry } from '~/store/slices/countriesSlice';
+import { selectSelectedCountry, selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import {
   selectCategories,
   translateCategories,
@@ -141,12 +141,25 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
 
   // Fetch activities for dropdown
-  const activitiesResult = (await getActivitiesDropdownBusiness('es')) as {
-    success?: boolean;
-    data?: Array<{ id: string; name: string }>;
-  };
+  const activitiesResult = await getActivitiesDropdownBusiness('es');
+
+  // Type guard for activitiesResult
+  const isActivitiesResult = (
+    result: unknown
+  ): result is {
+    success: boolean;
+    data?: Array<{ id: string; activityEs: string; activityEn: string }>;
+  } =>
+    typeof result === 'object' &&
+    result !== null &&
+    'success' in result &&
+    typeof (result as { success?: boolean }).success === 'boolean' &&
+    'data' in result;
+
   const activities =
-    activitiesResult.success === true && activitiesResult.data !== undefined
+    isActivitiesResult(activitiesResult) &&
+    activitiesResult.success === true &&
+    activitiesResult.data !== undefined
       ? activitiesResult.data
       : [];
 
@@ -318,35 +331,30 @@ function extractLoaderData(loaderData: unknown): {
   categories: Category[];
   activeCities: City[];
   users: Array<{ id: string; name: string; email: string }>;
-  activities: Array<{ id: string; name: string }>;
+  activities: Array<{ id: string; activityEs: string; activityEn: string }>;
   priceRange: PriceRange | null;
   tours: { data: Tour[]; pagination: unknown };
 } {
-  const raw = loaderData as {
-    type?: string;
-    data?: {
-      userId?: string | null;
-      countryId?: string | null;
-      cityId?: string | null;
-      categories?: Category[];
-      activeCities?: City[];
-      users?: Array<{ id: string; name: string; email: string }>;
-      activities?: Array<{ id: string; name: string }>;
-      priceRange?: PriceRange | null;
-      tours?: { data: Tour[]; pagination: unknown };
-    };
-    userId?: string | null;
-    countryId?: string | null;
-    cityId?: string | null;
-    categories?: Category[];
-    activeCities?: City[];
-    users?: Array<{ id: string; name: string; email: string }>;
-    activities?: Array<{ id: string; name: string }>;
-    priceRange?: PriceRange | null;
-    tours?: { data: Tour[]; pagination: unknown };
-  };
-
-  const innerData = raw?.type === 'DataWithResponseInit' ? raw?.data : raw;
+  const innerData = (
+    typeof loaderData === 'object' &&
+    loaderData !== null &&
+    'type' in loaderData &&
+    (loaderData as { type?: string }).type === 'DataWithResponseInit'
+      ? (loaderData as { data?: typeof loaderData }).data
+      : loaderData
+  ) as
+    | {
+        userId?: string | null;
+        countryId?: string | null;
+        cityId?: string | null;
+        categories?: Category[];
+        activeCities?: City[];
+        users?: Array<{ id: string; name: string; email: string }>;
+        activities?: Array<{ id: string; activityEs: string; activityEn: string }>;
+        priceRange?: PriceRange | null;
+        tours?: { data: Tour[]; pagination: unknown };
+      }
+    | undefined;
 
   return {
     userId: innerData?.userId ?? null,
@@ -409,6 +417,7 @@ function ToursClient(): JSX.Element {
   const categories = useAppSelector(selectCategories);
   const currentLanguage = useAppSelector(selectLanguage) as Language;
   const { t } = useTranslation();
+  const currencyCode = useAppSelector(selectSelectedCurrencyCode);
 
   // Translated active cities from loader
   const translatedCities = useMemo(() => {
@@ -1068,7 +1077,7 @@ function ToursClient(): JSX.Element {
                   marginBottom: 'var(--space-1)',
                 }}
               >
-                {t('tours.priceRange')} ({priceRange?.currency ?? 'MXN'})
+                {t('tours.priceRange')} ({currencyCode})
                 {!isPriceFilterEnabled && (
                   <span
                     style={{ fontWeight: 'normal', marginLeft: 'var(--space-1)', fontSize: '10px' }}

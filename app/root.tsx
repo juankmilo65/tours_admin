@@ -342,7 +342,6 @@ type ActionParameters = GetCitiesParameters | GetCountriesParameters;
 const actionsLoader = (action: string, parameters: ActionParameters) => {
   const ACTIONS = {
     getCitiesByCountryId: () => getCitiesByCountryId(parameters as GetCitiesParameters),
-
     getCountries: () => getCountries(parameters as GetCountriesParameters),
   };
 

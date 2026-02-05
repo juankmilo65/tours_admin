@@ -16,6 +16,8 @@ export interface Country {
   description_es?: string;
   description_en?: string;
   flagUrl?: string;
+  currencySymbol: string;
+  currencyCode: string;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -131,5 +133,9 @@ export const selectSelectedCountry = (state: { country: CountriesState }): Count
   state.country.selectedCountry;
 export const selectSelectedCountryId = (state: { country: CountriesState }): string | null =>
   state.country.selectedCountry?.id ?? null;
+export const selectSelectedCurrencySymbol = (state: { country: CountriesState }): string =>
+  state.country.selectedCountry?.currencySymbol ?? 'MXN';
+export const selectSelectedCurrencyCode = (state: { country: CountriesState }): string =>
+  state.country.selectedCountry?.currencyCode ?? 'MXN';
 
 export default countriesSlice.reducer;

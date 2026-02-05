@@ -10,6 +10,7 @@ import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
 import { selectLanguage } from '~/store/slices/uiSlice';
+import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import { setGlobalLoading, openModal } from '~/store/slices/uiSlice';
 import Select from '~/components/ui/Select';
 import { Button } from '~/components/ui/Button';
@@ -80,6 +81,7 @@ export function TourEditForm({
 }: TourEditFormProps): JSX.Element {
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector(selectLanguage) as Language;
+  const currencyCode = useAppSelector(selectSelectedCurrencyCode);
   const rawCities = useAppSelector(selectCities);
   const cities = translateCities(
     rawCities.filter((city) => city.isActive === true),
@@ -1129,7 +1131,7 @@ export function TourEditForm({
                 marginBottom: 'var(--space-1)',
               }}
             >
-              Base Price (MXN) *
+              Base Price ({currencyCode}) *
             </label>
             <input
               type="number"

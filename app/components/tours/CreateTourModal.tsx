@@ -15,7 +15,9 @@ import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
+import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import { openModal, closeModal } from '~/store/slices/uiSlice';
+import { getCachedLanguages, setLanguages as setLanguagesCache } from '~/store/slices/cacheSlice';
 import Select from '~/components/ui/Select';
 
 // Type definitions
@@ -102,6 +104,10 @@ export function CreateTourModal({
   const categories = useAppSelector(selectCategories);
   const rawCities = useAppSelector(selectCities);
   const currentLanguage = useAppSelector((state) => state.ui.language);
+  const currencyCode = useAppSelector(selectSelectedCurrencyCode);
+
+  // Get cached languages for current language
+  const cachedLanguages = useAppSelector(getCachedLanguages(currentLanguage));
 
   // Determine if we're in edit mode
   const isEditMode = mode === 'edit';
@@ -150,13 +156,22 @@ export function CreateTourModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
 
-  // Fetch languages on mount
+  // Fetch languages on mount with caching
   useEffect(() => {
+    // If already cached, set languages immediately
+    if (cachedLanguages !== undefined) {
+      setLanguages(cachedLanguages);
+      return;
+    }
+
+    // If not in cache, fetch from API
     const fetchLanguages = async () => {
       try {
         const result = await getLanguagesDropdownBusiness(currentLanguage);
         if (result.success === true && result.data !== undefined) {
           setLanguages(result.data);
+          // Save to Redux cache
+          dispatch(setLanguagesCache({ language: currentLanguage, data: result.data }));
         }
       } catch (error) {
         console.error('Error fetching languages:', error);
@@ -164,7 +179,7 @@ export function CreateTourModal({
     };
 
     void fetchLanguages();
-  }, [currentLanguage]);
+  }, [currentLanguage, dispatch, cachedLanguages]);
 
   // Translated cities
   const translatedCities = translateCities(rawCities, 'es');
@@ -1356,7 +1371,7 @@ export function CreateTourModal({
                     color: 'var(--color-neutral-700)',
                   }}
                 >
-                  {t('tours.basePrice')} (MXN) <span style={{ color: 'red' }}>*</span>
+                  {t('tours.basePrice')} ({currencyCode}) <span style={{ color: 'red' }}>*</span>
                 </label>
                 <input
                   type="number"
