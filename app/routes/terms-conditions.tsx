@@ -135,6 +135,26 @@ export default function TermsConditions(): JSX.Element {
     void fetchTourTerms();
   }, [page, limit, language, token, dispatch, t]);
 
+  // Helper function to get latest active version for a tour
+  const getLatestActiveVersion = (tourId: string): TourTerm | null => {
+    const tourTermsList = tourTerms.filter((t) => t.tourId === tourId && t.isActive);
+    if (tourTermsList.length === 0) return null;
+
+    // Sort by version and get latest
+    const sorted = tourTermsList.sort((a, b) => {
+      const aParts = a.version.split('.').map(Number);
+      const bParts = b.version.split('.').map(Number);
+      for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+        const aVal = aParts[i] ?? 0;
+        const bVal = bParts[i] ?? 0;
+        if (aVal > bVal) return -1;
+        if (aVal < bVal) return 1;
+      }
+      return 0;
+    });
+    return sorted[0] ?? null;
+  };
+
   // Helper function to increment version number
   const incrementVersion = (currentVersion: string): string => {
     try {
@@ -151,7 +171,13 @@ export default function TermsConditions(): JSX.Element {
     }
   };
 
+  // View mode state
+  const [viewMode, setViewMode] = useState(false);
+  const [viewingTerm, setViewingTerm] = useState<TourTerm | null>(null);
+
   const resetForm = () => {
+    setViewMode(false);
+    setViewingTerm(null);
     setNewTerm({
       tourId: '',
       terms_conditions_es: '',
@@ -163,6 +189,8 @@ export default function TermsConditions(): JSX.Element {
   };
 
   const handleEditTerm = (term: TourTerm) => {
+    setViewMode(false);
+    setViewingTerm(null);
     setEditingTerm(term);
     // Auto-increment version when editing
     const nextVersion = incrementVersion(term.version);
@@ -176,8 +204,27 @@ export default function TermsConditions(): JSX.Element {
     setIsCreateModalOpen(true);
   };
 
+  const handleViewTerm = (term: TourTerm) => {
+    setEditingTerm(null);
+    setViewMode(true);
+    setViewingTerm(term);
+    setNewTerm({
+      tourId: term.tourId,
+      terms_conditions_es: term.terms_conditions_es,
+      terms_conditions_en: term.terms_conditions_en,
+      version: term.version,
+    });
+    setErrors({});
+    setIsCreateModalOpen(true);
+  };
+
   // Handle create tour terms (create new version)
   const handleCreateTerm = async () => {
+    // Block any action in view mode
+    if (viewMode === true || viewingTerm !== null) {
+      return;
+    }
+
     if (token === null || token === '') {
       console.error('No token available');
       return;
@@ -359,46 +406,82 @@ export default function TermsConditions(): JSX.Element {
     {
       key: 'id',
       label: t('termsConditions.actions'),
-      render: (_: unknown, row: TourTerm) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          {/* Active/Inactive Status */}
-          <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
-              row.isActive
-                ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200'
-                : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border-red-200'
-            }`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${row.isActive ? 'bg-green-600' : 'bg-red-600'}`}
-            />
-            {row.isActive ? t('termsConditions.active') : t('termsConditions.inactive')}
-          </span>
+      render: (_: unknown, row: TourTerm) => {
+        const latestActive = getLatestActiveVersion(row.tourId);
+        const isLatestActive = latestActive !== null && latestActive.id === row.id && row.isActive;
 
-          {/* Edit Button */}
-          <button
-            onClick={() => {
-              handleEditTerm(row);
-            }}
-            className="p-1.5 rounded-md text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-            title={t('common.edit') ?? 'Edit'}
-          >
-            <svg
-              style={{ width: '16px', height: '16px' }}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+            {/* Active/Inactive Status */}
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                row.isActive
+                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200'
+                  : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border-red-200'
+              }`}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${row.isActive ? 'bg-green-600' : 'bg-red-600'}`}
               />
-            </svg>
-          </button>
-        </div>
-      ),
+              {row.isActive ? t('termsConditions.active') : t('termsConditions.inactive')}
+            </span>
+
+            {/* View Button - Show for all terms */}
+            <button
+              onClick={() => {
+                handleViewTerm(row);
+              }}
+              className="p-1.5 rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+              title={t('common.view') ?? 'View'}
+            >
+              <svg
+                style={{ width: '16px', height: '16px' }}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                />
+              </svg>
+            </button>
+
+            {/* Edit Button - Show only for latest active version */}
+            {isLatestActive && (
+              <button
+                onClick={() => {
+                  handleEditTerm(row);
+                }}
+                className="p-1.5 rounded-md text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                title={t('common.edit') ?? 'Edit'}
+              >
+                <svg
+                  style={{ width: '16px', height: '16px' }}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -666,31 +749,47 @@ export default function TermsConditions(): JSX.Element {
           resetForm();
         }}
         title={
-          editingTerm !== null
-            ? t('termsConditions.updateTermsTitle')
-            : t('termsConditions.createTermsTitle')
+          viewMode === true
+            ? t('termsConditions.viewTermsTitle')
+            : editingTerm !== null
+              ? t('termsConditions.updateTermsTitle')
+              : t('termsConditions.createTermsTitle')
         }
         size="lg"
         footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setIsCreateModalOpen(false);
-                resetForm();
-              }}
-            >
-              {t('termsConditions.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                void handleCreateTerm();
-              }}
-            >
-              {editingTerm !== null ? t('termsConditions.update') : t('termsConditions.save')}
-            </Button>
-          </>
+          viewMode === true ? (
+            <>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  resetForm();
+                }}
+              >
+                {t('termsConditions.close')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  resetForm();
+                }}
+              >
+                {t('termsConditions.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  void handleCreateTerm();
+                }}
+              >
+                {editingTerm !== null ? t('termsConditions.update') : t('termsConditions.save')}
+              </Button>
+            </>
+          )
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -719,11 +818,8 @@ export default function TermsConditions(): JSX.Element {
                 })),
               ]}
               value={newTerm.tourId}
-              onChange={(value) => {
-                setNewTerm({ ...newTerm, tourId: value });
-                if (errors.tourId !== undefined && errors.tourId !== '')
-                  setErrors({ ...errors, tourId: '' });
-              }}
+              onChange={() => {}}
+              disabled={viewMode === true || viewingTerm !== null}
               className="w-full"
             />
             {errors.tourId !== undefined && errors.tourId !== '' && (
@@ -756,26 +852,31 @@ export default function TermsConditions(): JSX.Element {
                   ({t('termsConditions.autoIncrement') ?? 'Auto-incremented'})
                 </span>
               )}
+              {viewMode === true && (
+                <span className="ml-2 text-xs text-gray-500">
+                  ({t('termsConditions.readOnly') ?? 'Read only'})
+                </span>
+              )}
             </label>
             <input
               type="text"
               className="form-input"
               placeholder="1.0"
               value={newTerm.version}
-              disabled={editingTerm !== null}
-              onChange={(e) => {
-                if (editingTerm === null) {
-                  setNewTerm({ ...newTerm, version: e.target.value });
-                  if (errors.version !== undefined && errors.version !== '')
-                    setErrors({ ...errors, version: '' });
-                }
-              }}
+              disabled={editingTerm !== null || viewMode === true || viewingTerm !== null}
+              onChange={() => {}}
               style={{
-                backgroundColor: editingTerm !== null ? 'var(--color-neutral-100)' : 'white',
-                cursor: editingTerm !== null ? 'not-allowed' : 'text',
+                backgroundColor:
+                  editingTerm !== null || viewMode === true || viewingTerm !== null
+                    ? 'var(--color-neutral-100)'
+                    : 'white',
+                cursor:
+                  editingTerm !== null || viewMode === true || viewingTerm !== null
+                    ? 'not-allowed'
+                    : 'text',
               }}
             />
-            {editingTerm !== null && (
+            {(editingTerm !== null || viewMode === true) && (
               <p
                 style={{
                   marginTop: 'var(--space-1)',
@@ -783,8 +884,11 @@ export default function TermsConditions(): JSX.Element {
                   color: 'var(--color-neutral-500)',
                 }}
               >
-                {t('termsConditions.versionAutoIncrement') ??
-                  'Version is automatically incremented when creating a new version'}
+                {viewMode === true
+                  ? (t('termsConditions.viewModeDescription') ??
+                    'This version is in view mode. All fields are read-only.')
+                  : (t('termsConditions.versionAutoIncrement') ??
+                    'Version is automatically incremented when creating a new version')}
               </p>
             )}
           </div>
@@ -794,14 +898,11 @@ export default function TermsConditions(): JSX.Element {
             label={t('termsConditions.termsEs')}
             placeholder="Términos y condiciones en español"
             value={newTerm.terms_conditions_es}
-            onChange={(e) => {
-              setNewTerm({ ...newTerm, terms_conditions_es: e.target.value });
-              if (errors.terms_conditions_es !== undefined && errors.terms_conditions_es !== '')
-                setErrors({ ...errors, terms_conditions_es: '' });
-            }}
+            onChange={() => {}}
             error={errors.terms_conditions_es}
-            required
+            required={viewMode === false && viewingTerm === null}
             rows={6}
+            disabled={viewMode === true || viewingTerm !== null}
           />
 
           {/* Terms in English */}
@@ -809,14 +910,11 @@ export default function TermsConditions(): JSX.Element {
             label={t('termsConditions.termsEn')}
             placeholder="Terms and conditions in English"
             value={newTerm.terms_conditions_en}
-            onChange={(e) => {
-              setNewTerm({ ...newTerm, terms_conditions_en: e.target.value });
-              if (errors.terms_conditions_en !== undefined && errors.terms_conditions_en !== '')
-                setErrors({ ...errors, terms_conditions_en: '' });
-            }}
+            onChange={() => {}}
             error={errors.terms_conditions_en}
-            required
+            required={viewMode === false && viewingTerm === null}
             rows={6}
+            disabled={viewMode === true || viewingTerm !== null}
           />
         </div>
       </Dialog>
