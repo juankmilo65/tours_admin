@@ -14,12 +14,15 @@ import {
   getActivities,
   createActivity,
   updateActivity,
-  deleteActivity,
   toggleActivityStatus,
   type Activity,
   type ActivityResponse,
   type CreateActivityDto,
 } from '~/server/activities';
+import {
+  getCategoriesDropdownBusiness,
+  type CategoryDropdownItem,
+} from '~/server/businessLogic/categoriesBusinessLogic';
 import type { Column } from '~/components/ui/Table';
 import { useAppDispatch } from '~/store/hooks';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
@@ -42,23 +45,20 @@ export default function ActivitiesRoute(): JSX.Element {
 
   // Local state for activities and pagination
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [dropdownCategories, setDropdownCategories] = useState<CategoryDropdownItem[]>([]);
 
   // Local state for modal and form
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newActivity, setNewActivity] = useState<CreateActivityDto>({
     activityEs: '',
     activityEn: '',
-    category: '',
+    categoryId: '',
     isActive: true,
   });
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
-  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; activity: Activity | null }>({
-    isOpen: false,
-    activity: null,
-  });
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -72,6 +72,22 @@ export default function ActivitiesRoute(): JSX.Element {
   });
   const isInitialMount = useRef(true);
   const dispatch = useAppDispatch();
+
+  // Fetch categories for dropdown on mount
+  useEffect(() => {
+    const fetchDropdownCategories = async () => {
+      try {
+        const result = await getCategoriesDropdownBusiness(true, language);
+        if (result.success === true && result.data !== undefined) {
+          setDropdownCategories(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching dropdown categories:', error);
+      }
+    };
+
+    void fetchDropdownCategories();
+  }, [language]);
 
   // Fetch activities when filters or pagination change (but not on initial mount)
   useEffect(() => {
@@ -123,7 +139,7 @@ export default function ActivitiesRoute(): JSX.Element {
     setNewActivity({
       activityEs: '',
       activityEn: '',
-      category: '',
+      categoryId: '',
       isActive: true,
     });
     setErrors({});
@@ -135,7 +151,7 @@ export default function ActivitiesRoute(): JSX.Element {
     setNewActivity({
       activityEs: activity.activityEs,
       activityEn: activity.activityEn,
-      category: activity.category?.slug ?? '',
+      categoryId: activity.category?.id ?? '',
       isActive: activity.isActive,
     });
     setIsEditMode(true);
@@ -187,50 +203,6 @@ export default function ActivitiesRoute(): JSX.Element {
     }
   };
 
-  // Handle delete activity
-  const handleDeleteActivity = async () => {
-    if (token === null || token === '' || deleteModal.activity === null) return;
-
-    try {
-      dispatch(
-        setGlobalLoading({
-          isLoading: true,
-          message: t('activities.deleting') ?? 'Deleting...',
-        })
-      );
-
-      const result = (await deleteActivity(deleteModal.activity.id, token, language)) as {
-        success?: boolean;
-        message?: string;
-        error?: { message?: string };
-      };
-
-      if (result.success === true) {
-        setActivities(activities.filter((a) => a.id !== deleteModal.activity?.id));
-        setDeleteModal({ isOpen: false, activity: null });
-        // Hide loader after React finishes rendering
-        window.requestAnimationFrame(() => {
-          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
-        });
-      } else {
-        setErrorModal({
-          isOpen: true,
-          title: t('activities.errorDeleteTitle'),
-          message: result.message ?? result.error?.message ?? t('activities.errorDelete'),
-        });
-        setDeleteModal({ isOpen: false, activity: null });
-        // Hide loader on error after React renders
-        window.requestAnimationFrame(() => {
-          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
-        });
-      }
-    } catch (error) {
-      console.error('Error deleting activity:', error);
-      // Hide loader on exception
-      dispatch(setGlobalLoading({ isLoading: false, message: '' }));
-    }
-  };
-
   // Handle create or update activity
   const handleSaveActivity = async () => {
     if (token === null || token === '') {
@@ -245,8 +217,8 @@ export default function ActivitiesRoute(): JSX.Element {
       newErrors.activityEs = t('activities.validation.nameEsRequired');
     if (!newActivity.activityEn.trim())
       newErrors.activityEn = t('activities.validation.nameEnRequired');
-    if (!newActivity.category.trim())
-      newErrors.category = t('activities.validation.categoryRequired');
+    if (!newActivity.categoryId.trim())
+      newErrors.categoryId = t('activities.validation.categoryRequired');
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -367,11 +339,6 @@ export default function ActivitiesRoute(): JSX.Element {
     );
   });
 
-  // Get unique categories for filter dropdown
-  const uniqueCategories = [
-    ...new Map(activities.map((a) => [a.category.id, a.category])).values(),
-  ];
-
   const columns: Column<Activity>[] = [
     {
       key: 'activityEs',
@@ -476,47 +443,6 @@ export default function ActivitiesRoute(): JSX.Element {
             </svg>
           </button>
 
-          {/* Delete Button */}
-          <button
-            type="button"
-            onClick={() => setDeleteModal({ isOpen: true, activity: row })}
-            style={{
-              padding: '10px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              color: '#dc2626',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            title={t('activities.deleteActivity')}
-          >
-            <svg
-              style={{ width: '20px', height: '20px' }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-          </button>
-
           {/* Active Status Toggle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
@@ -612,7 +538,7 @@ export default function ActivitiesRoute(): JSX.Element {
             <Select
               options={[
                 { value: '', label: t('activities.allCategories') },
-                ...uniqueCategories.map((cat) => ({
+                ...dropdownCategories.map((cat) => ({
                   value: cat.slug,
                   label: language === 'en' ? cat.name_en : cat.name_es,
                 })),
@@ -833,23 +759,23 @@ export default function ActivitiesRoute(): JSX.Element {
             <Select
               options={[
                 { value: '', label: t('activities.allCategories') },
-                ...uniqueCategories.map((cat) => ({
-                  value: cat.slug,
+                ...dropdownCategories.map((cat) => ({
+                  value: cat.id,
                   label: language === 'en' ? cat.name_en : cat.name_es,
                 })),
               ]}
-              value={newActivity.category}
+              value={newActivity.categoryId}
               onChange={(v: string) => {
-                setNewActivity({ ...newActivity, category: v });
-                if (errors.category !== undefined && errors.category !== '')
-                  setErrors({ ...errors, category: '' });
+                setNewActivity({ ...newActivity, categoryId: v });
+                if (errors.categoryId !== undefined && errors.categoryId !== '')
+                  setErrors({ ...errors, categoryId: '' });
               }}
               placeholder={t('activities.allCategories')}
               className="w-full"
             />
-            {errors.category !== undefined && errors.category !== '' && (
+            {errors.categoryId !== undefined && errors.categoryId !== '' && (
               <p style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {errors.category}
+                {errors.categoryId}
               </p>
             )}
           </div>
@@ -885,68 +811,6 @@ export default function ActivitiesRoute(): JSX.Element {
               />
             </div>
           </div>
-        </div>
-      </Dialog>
-
-      {/* Delete Confirmation Modal */}
-      <Dialog
-        isOpen={deleteModal.isOpen}
-        onClose={() => setDeleteModal({ isOpen: false, activity: null })}
-        title={t('activities.deleteActivityTitle')}
-        size="sm"
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => setDeleteModal({ isOpen: false, activity: null })}
-            >
-              {t('activities.cancel')}
-            </Button>
-            <Button variant="primary" onClick={() => void handleDeleteActivity()}>
-              {t('common.delete')}
-            </Button>
-          </>
-        }
-      >
-        <div style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
-          <svg
-            style={{
-              width: '48px',
-              height: '48px',
-              color: '#dc2626',
-              margin: '0 auto var(--space-4)',
-            }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-          <p style={{ fontSize: '1rem', fontWeight: 500, marginBottom: 'var(--space-2)' }}>
-            {t('activities.confirmDelete')}
-          </p>
-          <p style={{ fontSize: '0.875rem', color: 'var(--color-neutral-500)' }}>
-            {t('activities.deleteWarning')}
-          </p>
-          {deleteModal.activity !== null && (
-            <p
-              style={{
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                marginTop: 'var(--space-3)',
-                color: 'var(--color-neutral-700)',
-              }}
-            >
-              {language === 'en'
-                ? deleteModal.activity.activityEn
-                : deleteModal.activity.activityEs}
-            </p>
-          )}
         </div>
       </Dialog>
 

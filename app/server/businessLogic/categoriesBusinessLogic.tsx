@@ -1,5 +1,14 @@
-import { getCategories, getCategoryById } from '../categories';
+import {
+  getCategories,
+  getCategoryById,
+  getCategoriesDropdown,
+  type CategoryDropdownResponse,
+  type CategoryDropdownItem,
+} from '../categories';
 import type { ServiceResult } from '../_index';
+
+// Re-export types for components to use
+export type { CategoryDropdownItem, CategoryDropdownResponse };
 
 interface CategoriesPayload {
   token?: string;
@@ -38,10 +47,12 @@ const generatePayload = (formData: FormData, token = ''): CategoriesPayload => {
  * Business logic for getting all categories
  */
 const getCategoriesBusiness = (data: CategoriesPayload): Promise<ServiceResult<unknown>> => {
-  return getCategories(data.language ?? 'es', data.isActive).catch((error: unknown) => {
-    console.error('Error in getCategoriesBusiness:', error);
-    return { error };
-  });
+  return getCategories({ language: data.language ?? 'es', isActive: data.isActive }).catch(
+    (error: unknown) => {
+      console.error('Error in getCategoriesBusiness:', error);
+      return { error };
+    }
+  );
 };
 
 /**
@@ -56,6 +67,22 @@ const getCategoryByIdBusiness = (data: CategoriesPayload): Promise<ServiceResult
     console.error('Error in getCategoryByIdBusiness:', error);
     return { error };
   });
+};
+
+/**
+ * Business logic for getting categories dropdown (simplified list for select/dropdown)
+ * Exported directly for use in components
+ */
+export const getCategoriesDropdownBusiness = async (
+  isActive = true,
+  language = 'es'
+): Promise<CategoryDropdownResponse> => {
+  try {
+    return await getCategoriesDropdown(isActive, language);
+  } catch (error: unknown) {
+    console.error('Error in getCategoriesDropdownBusiness:', error);
+    return { success: false, data: [] };
+  }
 };
 
 /**

@@ -45,6 +45,25 @@ export interface GetCategoriesParams {
 }
 
 /**
+ * Category item for dropdown (simplified version)
+ */
+export interface CategoryDropdownItem {
+  id: string;
+  slug: string;
+  isActive: boolean;
+  name_es: string;
+  name_en: string;
+}
+
+/**
+ * Response for categories dropdown endpoint
+ */
+export interface CategoryDropdownResponse {
+  success: boolean;
+  data: CategoryDropdownItem[];
+}
+
+/**
  * Get categories from backend API with pagination and filters
  */
 export const getCategories = async (params: GetCategoriesParams = {}): Promise<unknown> => {
@@ -265,4 +284,50 @@ export const toggleCategoryStatus = async (
     }
   );
   return result;
+};
+
+/**
+ * Get categories for dropdown (simplified list with only active categories)
+ * Uses the /api/categories/dropdown endpoint
+ */
+export const getCategoriesDropdown = async (
+  isActive = true,
+  language = 'es'
+): Promise<CategoryDropdownResponse> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('BACKEND_URL is not configured, returning empty for categories dropdown');
+    return { success: false, data: [] };
+  }
+
+  try {
+    const queryParams: Record<string, string> = {};
+    if (isActive !== undefined) {
+      queryParams.isActive = isActive.toString();
+    }
+
+    const categoriesDropdownEndpoint = 'categories/dropdown';
+    const categoriesService = createServiceREST(BASE_URL, categoriesDropdownEndpoint, 'Bearer');
+
+    const result = await categoriesService.get({
+      params: queryParams,
+      headers: {
+        'X-Language': language,
+      },
+    });
+
+    return result as CategoryDropdownResponse;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Error in getCategoriesDropdown service:', error.message);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          'Backend API is not available. Please ensure the backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('Unknown error in getCategoriesDropdown service:', error);
+    }
+    return { success: false, data: [] };
+  }
 };

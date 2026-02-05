@@ -64,14 +64,14 @@ export interface GetActivitiesParams {
 export interface CreateActivityDto {
   activityEs: string;
   activityEn: string;
-  category: string; // Category slug (e.g., 'nature', 'meal')
+  categoryId: string; // Category UUID
   isActive: boolean;
 }
 
 export interface UpdateActivityDto {
   activityEs?: string;
   activityEn?: string;
-  category?: string; // Category slug (e.g., 'nature', 'meal')
+  categoryId?: string; // Category UUID
   isActive?: boolean;
 }
 
@@ -209,7 +209,7 @@ export const updateActivity = async (
   }
 
   try {
-    const response = await axios.patch(`${BASE_URL}/api/activities/${activityId}`, data, {
+    const response = await axios.put(`${BASE_URL}/api/activities/${activityId}`, data, {
       headers: {
         Authorization: `Bearer ${token}`,
         'X-Language': language,
