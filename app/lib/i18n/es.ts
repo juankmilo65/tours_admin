@@ -312,7 +312,8 @@ export const es: Translation = {
     invalidImageFormat: 'Formato inválido. Solo se permiten JPEG, PNG y WebP',
     imageTooLarge: 'La imagen es muy grande. Máximo 5MB',
     maxImagesExceeded: 'Máximo {max} imágenes permitidas',
-    imageFormats: 'JPEG, PNG, WebP - Máximo 5MB',
+    imageFormats: 'JPEG, PNG, WebP',
+    maxFileSize: 'Máximo 5MB por imagen',
     validation: {
       required: 'Requerido',
       invalidFormat: 'Formato no válido (solo JPG, PNG, WEBP)',

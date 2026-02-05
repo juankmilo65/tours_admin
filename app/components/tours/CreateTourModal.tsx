@@ -7,6 +7,10 @@ import {
   updateTourBusiness,
   uploadTourImages,
 } from '~/server/businessLogic/toursBusinessLogic';
+import {
+  getLanguagesDropdownBusiness,
+  type LanguageOption,
+} from '~/server/businessLogic/languagesBusinessLogic';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
@@ -146,8 +150,27 @@ export function CreateTourModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
 
+  // Fetch languages on mount
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      try {
+        const result = await getLanguagesDropdownBusiness(currentLanguage);
+        if (result.success === true && result.data !== undefined) {
+          setLanguages(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching languages:', error);
+      }
+    };
+
+    void fetchLanguages();
+  }, [currentLanguage]);
+
   // Translated cities
   const translatedCities = translateCities(rawCities, 'es');
+
+  // Languages state
+  const [languages, setLanguages] = useState<LanguageOption[]>([]);
 
   // Reset form to initial state
   const resetForm = useCallback((): void => {
@@ -347,7 +370,7 @@ export function CreateTourModal({
     }));
   };
 
-  const handleLanguageToggle = (lang: 'es' | 'en'): void => {
+  const handleLanguageToggle = (lang: string): void => {
     setFormData((prev) => ({
       ...prev,
       language: prev.language.includes(lang)
@@ -1404,28 +1427,22 @@ export function CreateTourModal({
                 {t('tours.languages')} <span style={{ color: 'red' }}>*</span>
               </label>
               <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                  <input
-                    type="checkbox"
-                    checked={formData.language.includes('es')}
-                    onChange={() => {
-                      handleLanguageToggle('es');
-                    }}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <span>Español</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                  <input
-                    type="checkbox"
-                    checked={formData.language.includes('en')}
-                    onChange={() => {
-                      handleLanguageToggle('en');
-                    }}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <span>English</span>
-                </label>
+                {languages.map((lang) => (
+                  <label
+                    key={lang.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.language.includes(lang.code)}
+                      onChange={() => {
+                        handleLanguageToggle(lang.code);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>{currentLanguage === 'en' ? lang.name_en : lang.name_es}</span>
+                  </label>
+                ))}
               </div>
               {errors.language !== undefined && (
                 <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>{errors.language}</span>
@@ -1450,7 +1467,7 @@ export function CreateTourModal({
                     fontSize: 'var(--text-sm)',
                   }}
                 >
-                  {` (${formData.existingImageUrls.length + formData.images.length}/${MAX_IMAGES} - Máximo 5MB por imagen, JPEG/PNG/WebP)`}
+                  {`(${formData.existingImageUrls.length + formData.images.length}/${MAX_IMAGES} - ${t('tours.maxFileSize')}, ${t('tours.imageFormats')})`}
                 </span>
               </label>
 

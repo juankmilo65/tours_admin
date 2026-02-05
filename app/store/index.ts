@@ -18,6 +18,7 @@ import storage from './storage';
 import citiesReducer from '~/store/slices/citiesSlice';
 import countriesReducer from '~/store/slices/countriesSlice';
 import categoriesReducer from '~/store/slices/categoriesSlice';
+import languagesReducer from '~/store/slices/languagesSlice';
 import uiReducer from '~/store/slices/uiSlice';
 import authReducer from '~/store/slices/authSlice';
 /* import toursReducer from '~/store/slices/toursSlice';
@@ -38,6 +39,7 @@ const rootReducer = combineReducers({
   city: citiesReducer,
   country: countriesReducer,
   category: categoriesReducer,
+  languages: languagesReducer,
   ui: uiReducer,
   auth: authReducer,
   /* offers: offersReducer, */
