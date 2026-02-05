@@ -10,6 +10,7 @@ import {
   updateActivity,
   deleteActivity,
   toggleActivityStatus,
+  getActivitiesDropdown,
   type GetActivitiesParams,
   type CreateActivityDto,
   type UpdateActivityDto,
@@ -166,6 +167,19 @@ const toggleActivityStatusBusiness = async (
 };
 
 /**
+ * Business logic for getting activities dropdown
+ */
+const getActivitiesDropdownBusiness = async (language = 'es'): Promise<ServiceResult<unknown>> => {
+  try {
+    const result = await getActivitiesDropdown(language);
+    return result;
+  } catch (error) {
+    console.error('Error in getActivitiesDropdownBusiness:', error);
+    return Promise.resolve({ error });
+  }
+};
+
+/**
  * Main activities business logic handler
  */
 export const activitiesBusinessLogic = (
@@ -191,4 +205,5 @@ export {
   updateActivityBusiness,
   deleteActivityBusiness,
   toggleActivityStatusBusiness,
+  getActivitiesDropdownBusiness,
 };

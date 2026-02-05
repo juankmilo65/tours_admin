@@ -283,3 +283,36 @@ export const toggleActivityStatus = async (
     return { error };
   }
 };
+
+/**
+ * Get activities dropdown for select inputs
+ */
+export const getActivitiesDropdown = async (
+  language = 'es'
+): Promise<{
+  success: boolean;
+  data?: Array<{ id: string; activityEs: string; activityEn: string }>;
+  error?: unknown;
+}> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('BACKEND_URL is not configured, returning empty for activities dropdown');
+    return { success: false, data: [] };
+  }
+
+  try {
+    const response = await axios.get(`${BASE_URL}/api/activities/dropdown`, {
+      headers: {
+        'X-Language': language,
+      },
+    });
+    return response.data as {
+      success: boolean;
+      data?: Array<{ id: string; activityEs: string; activityEn: string }>;
+    };
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      return { error: error.response.data as unknown, success: false };
+    }
+    return { error, success: false };
+  }
+};

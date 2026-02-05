@@ -21,11 +21,18 @@ interface UserDropdownOption {
   email: string;
 }
 
+interface ActivityDropdownOption {
+  id: string;
+  activityEs: string;
+  activityEn: string;
+}
+
 interface CreateTourModalProps {
   isOpen: boolean;
   onSuccess?: () => void;
   onClose?: () => void;
   users?: UserDropdownOption[];
+  activities?: ActivityDropdownOption[];
   mode?: 'create' | 'edit';
   tourId?: string;
   initialData?: Partial<TourFormData>;
@@ -50,6 +57,7 @@ interface TourFormData {
   existingImageUrls: string[]; // URLs of existing images (for edit mode)
   difficulty: 'easy' | 'medium' | 'hard';
   language: string[];
+  activities: string[];
   isActive: boolean;
 }
 
@@ -69,6 +77,7 @@ export function CreateTourModal({
   onSuccess,
   onClose,
   users = [],
+  activities = [],
   mode = 'create',
   tourId,
   initialData,
@@ -88,6 +97,7 @@ export function CreateTourModal({
   const currentUser = useAppSelector(selectCurrentUser);
   const categories = useAppSelector(selectCategories);
   const rawCities = useAppSelector(selectCities);
+  const currentLanguage = useAppSelector((state) => state.ui.language);
 
   // Determine if we're in edit mode
   const isEditMode = mode === 'edit';
@@ -117,6 +127,7 @@ export function CreateTourModal({
       existingImageUrls: initialData?.existingImageUrls ?? [],
       difficulty: initialData?.difficulty ?? 'easy',
       language: initialData?.language ?? ['es'],
+      activities: initialData?.activities ?? [],
       isActive: initialData?.isActive ?? true,
     }),
     [initialData, currentUser?.id]
@@ -133,6 +144,7 @@ export function CreateTourModal({
   // Drag and drop state
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedActivityId, setSelectedActivityId] = useState<string>('');
 
   // Translated cities
   const translatedCities = translateCities(rawCities, 'es');
@@ -371,6 +383,10 @@ export function CreateTourModal({
       newErrors.maxCapacity = t('tours.maxCapacityRequired') ?? 'Max capacity is required';
     if (formData.basePrice <= 0)
       newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
+    // Validate that at least one activity is provided
+    if (formData.activities.length === 0) {
+      newErrors.activities = t('tours.activitiesRequired') ?? 'Al menos una actividad es requerida';
+    }
     // Validate that at least one image is provided
     if (formData.images.length === 0) {
       const imagesRequiredMsg = t('tours.imagesRequired');
@@ -840,7 +856,7 @@ export function CreateTourModal({
                   { value: '', label: t('tours.selectCategory') ?? 'Seleccionar categoría' },
                   ...categories.map((cat: Category) => ({
                     value: cat.id,
-                    label: cat.name_es,
+                    label: currentLanguage === 'en' ? cat.name_en : cat.name_es,
                   })),
                 ]}
                 value={formData.categoryId}
@@ -907,6 +923,120 @@ export function CreateTourModal({
                   }}
                 >
                   {errors.cityId}
+                </span>
+              )}
+            </div>
+
+            {/* Activities */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: 'var(--space-2)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-700)',
+                }}
+              >
+                {t('tours.activities')} <span style={{ color: 'red' }}>*</span>
+              </label>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <Select
+                    options={[
+                      { value: '', label: t('tours.selectActivity') ?? 'Seleccionar actividad' },
+                      ...activities
+                        .filter((a) => !formData.activities.includes(a.id))
+                        .map((activity) => ({
+                          value: activity.id,
+                          label:
+                            currentLanguage === 'en' ? activity.activityEn : activity.activityEs,
+                        })),
+                    ]}
+                    value={selectedActivityId}
+                    onChange={(value: string) => {
+                      if (value !== '' && !formData.activities.includes(value)) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          activities: [...prev.activities, value],
+                        }));
+                        setSelectedActivityId(''); // Reset dropdown value
+                        if (errors.activities !== undefined) {
+                          setErrors((prev) => ({ ...prev, activities: undefined }));
+                        }
+                      }
+                    }}
+                    placeholder={t('tours.selectActivity')}
+                    id="select-activities"
+                  />
+                </div>
+              </div>
+              {formData.activities.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 'var(--space-2)',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 'var(--space-2)',
+                  }}
+                >
+                  {formData.activities.map((activityId) => {
+                    const activity = activities.find((a) => a.id === activityId);
+                    return (
+                      activity && (
+                        <span
+                          key={activityId}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-1)',
+                            padding: 'var(--space-2) var(--space-3)',
+                            backgroundColor: 'var(--color-primary-50)',
+                            color: 'var(--color-primary-700)',
+                            borderRadius: 'var(--radius-md)',
+                            fontSize: 'var(--text-sm)',
+                            border: '1px solid var(--color-primary-200)',
+                          }}
+                        >
+                          {currentLanguage === 'en' ? activity.activityEn : activity.activityEs}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                activities: prev.activities.filter((a) => a !== activityId),
+                              }));
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--color-primary-700)',
+                              fontSize: '18px',
+                              lineHeight: 1,
+                              padding: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              marginLeft: 'var(--space-1)',
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )
+                    );
+                  })}
+                </div>
+              )}
+              {errors.activities !== undefined && (
+                <span
+                  style={{
+                    color: 'red',
+                    fontSize: 'var(--text-xs)',
+                    marginTop: 'var(--space-1)',
+                    display: 'block',
+                  }}
+                >
+                  {errors.activities}
                 </span>
               )}
             </div>
@@ -1363,7 +1493,7 @@ export function CreateTourModal({
                     fontWeight: 'var(--font-weight-medium)',
                   }}
                 >
-                  {t('tours.clickOrDragImages') ?? 'Haz clic o arrastra imágenes aquí'}
+                  {t('tours.clickOrDragImages')}
                 </p>
                 <p
                   style={{
@@ -1372,7 +1502,7 @@ export function CreateTourModal({
                     fontSize: 'var(--text-sm)',
                   }}
                 >
-                  {t('tours.imageFormats') ?? 'JPEG, PNG, WebP - Máximo 5MB'}
+                  {t('tours.imageFormats')}
                 </p>
               </div>
 

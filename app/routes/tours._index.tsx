@@ -24,6 +24,7 @@ import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
 import citiesBL from '~/server/businessLogic/citiesBusinessLogic';
 import countriesBL from '~/server/businessLogic/countriesBusinessLogic';
 import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
+import { getActivitiesDropdownBusiness } from '~/server/businessLogic/activitiesBusinessLogic';
 import { useTranslation } from '~/lib/i18n/utils';
 import { getSession, commitSession } from '~/utilities/sessions';
 import Select from '~/components/ui/Select';
@@ -139,6 +140,16 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   const users =
     usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
 
+  // Fetch activities for dropdown
+  const activitiesResult = (await getActivitiesDropdownBusiness('es')) as {
+    success?: boolean;
+    data?: Array<{ id: string; name: string }>;
+  };
+  const activities =
+    activitiesResult.success === true && activitiesResult.data !== undefined
+      ? activitiesResult.data
+      : [];
+
   // Fetch price range (based on current filters)
   const priceRangeFormData = new FormData();
   priceRangeFormData.append('action', 'getPriceRangeBusiness');
@@ -165,6 +176,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
         categories,
         activeCities,
         users,
+        activities,
         priceRange,
         tours: {
           data: [],
@@ -241,6 +253,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
         categories,
         activeCities,
         users,
+        activities,
         priceRange,
         tours: {
           data: result.data ?? [],
@@ -269,6 +282,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
       categories,
       activeCities,
       users,
+      activities,
       priceRange,
       tours: {
         data: [],
@@ -304,6 +318,7 @@ function extractLoaderData(loaderData: unknown): {
   categories: Category[];
   activeCities: City[];
   users: Array<{ id: string; name: string; email: string }>;
+  activities: Array<{ id: string; name: string }>;
   priceRange: PriceRange | null;
   tours: { data: Tour[]; pagination: unknown };
 } {
@@ -316,6 +331,7 @@ function extractLoaderData(loaderData: unknown): {
       categories?: Category[];
       activeCities?: City[];
       users?: Array<{ id: string; name: string; email: string }>;
+      activities?: Array<{ id: string; name: string }>;
       priceRange?: PriceRange | null;
       tours?: { data: Tour[]; pagination: unknown };
     };
@@ -325,6 +341,7 @@ function extractLoaderData(loaderData: unknown): {
     categories?: Category[];
     activeCities?: City[];
     users?: Array<{ id: string; name: string; email: string }>;
+    activities?: Array<{ id: string; name: string }>;
     priceRange?: PriceRange | null;
     tours?: { data: Tour[]; pagination: unknown };
   };
@@ -338,6 +355,7 @@ function extractLoaderData(loaderData: unknown): {
     categories: innerData?.categories ?? [],
     activeCities: innerData?.activeCities ?? [],
     users: innerData?.users ?? [],
+    activities: innerData?.activities ?? [],
     priceRange: innerData?.priceRange ?? null,
     tours: innerData?.tours ?? {
       data: [],
@@ -1462,6 +1480,7 @@ function ToursClient(): JSX.Element {
         <CreateTourModal
           isOpen={isCreateTourModalOpen}
           users={loaderData.users}
+          activities={loaderData.activities}
           onClose={() => setIsCreateTourModalOpen(false)}
           onSuccess={() => {
             // Reload page to fetch updated tours
@@ -1477,6 +1496,7 @@ function ToursClient(): JSX.Element {
             tourId={editTourData.tourId}
             initialData={editTourData.initialData}
             users={loaderData.users}
+            activities={loaderData.activities}
             onClose={() => {
               console.warn('[tours._index] Edit modal onClose called');
               setEditingTour(null);
