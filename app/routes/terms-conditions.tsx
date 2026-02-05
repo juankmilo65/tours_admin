@@ -12,7 +12,7 @@ import { Table } from '~/components/ui/Table';
 import Select from '~/components/ui/Select';
 import {
   getMyTourTerms,
-  createTourTerms,
+  updateTourTerms,
   type TourTerm,
   type CreateTourTermDto,
 } from '~/server/tourTerms';
@@ -44,6 +44,7 @@ export default function TermsConditions(): JSX.Element {
 
   // Local state for modal and form
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingTerm, setEditingTerm] = useState<TourTerm | null>(null);
   const [newTerm, setNewTerm] = useState<CreateTourTermDto>({
     tourId: '',
     terms_conditions_es: '',
@@ -141,6 +142,19 @@ export default function TermsConditions(): JSX.Element {
       version: '1.0',
     });
     setErrors({});
+    setEditingTerm(null);
+  };
+
+  const handleEditTerm = (term: TourTerm) => {
+    setEditingTerm(term);
+    setNewTerm({
+      tourId: term.tourId,
+      terms_conditions_es: term.terms_conditions_es,
+      terms_conditions_en: term.terms_conditions_en,
+      version: term.version,
+    });
+    setErrors({});
+    setIsCreateModalOpen(true);
   };
 
   // Handle create tour terms
@@ -169,29 +183,40 @@ export default function TermsConditions(): JSX.Element {
     setErrors({});
 
     try {
+      const isEditing = editingTerm !== null;
       dispatch(
         setGlobalLoading({
           isLoading: true,
-          message: t('termsConditions.creating') ?? 'Creating...',
+          message: isEditing
+            ? (t('termsConditions.updating') ?? 'Updating...')
+            : (t('termsConditions.creating') ?? 'Creating...'),
         })
       );
 
-      const result = (await createTourTerms(newTerm, token, language)) as {
+      const result = (await updateTourTerms(
+        editingTerm?.tourId ?? '',
+        {
+          terms_conditions_es: newTerm.terms_conditions_es,
+          terms_conditions_en: newTerm.terms_conditions_en,
+        },
+        token,
+        language
+      )) as {
         success?: boolean;
         message?: string;
         error?: { message?: string };
       };
 
       if (result.error !== undefined || result.success === false) {
-        console.error('Error creating tour terms:', result.error ?? result);
+        console.error('Error updating tour terms:', result.error ?? result);
         dispatch(setGlobalLoading({ isLoading: false, message: '' }));
         setErrorModal({
           isOpen: true,
-          title: t('termsConditions.errorCreateTitle') ?? 'Error',
+          title: t('termsConditions.errorUpdateTitle') ?? 'Error',
           message:
             result.message ??
             (result.error as { message?: string })?.message ??
-            t('termsConditions.errorCreate'),
+            t('termsConditions.errorUpdate'),
         });
         return;
       }
@@ -220,7 +245,7 @@ export default function TermsConditions(): JSX.Element {
         dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       }
     } catch (error) {
-      console.error('Error in tour terms creation flow:', error);
+      console.error('Error in tour terms update flow:', error);
       dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       setErrorModal({
         isOpen: true,
@@ -294,12 +319,44 @@ export default function TermsConditions(): JSX.Element {
     {
       key: 'id',
       label: t('termsConditions.actions'),
-      render: () => (
+      render: (_: unknown, row: TourTerm) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border border-green-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
-            {t('termsConditions.active')}
+          {/* Active/Inactive Status */}
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+              row.isActive
+                ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200'
+                : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border-red-200'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${row.isActive ? 'bg-green-600' : 'bg-red-600'}`}
+            />
+            {row.isActive ? t('termsConditions.active') : t('termsConditions.inactive')}
           </span>
+
+          {/* Edit Button */}
+          <button
+            onClick={() => {
+              handleEditTerm(row);
+            }}
+            className="p-1.5 rounded-md text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+            title={t('common.edit') ?? 'Edit'}
+          >
+            <svg
+              style={{ width: '16px', height: '16px' }}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+          </button>
         </div>
       ),
     },
@@ -568,7 +625,11 @@ export default function TermsConditions(): JSX.Element {
           setIsCreateModalOpen(false);
           resetForm();
         }}
-        title={t('termsConditions.createTermsTitle')}
+        title={
+          editingTerm !== null
+            ? t('termsConditions.updateTermsTitle')
+            : t('termsConditions.createTermsTitle')
+        }
         size="lg"
         footer={
           <>
@@ -581,8 +642,13 @@ export default function TermsConditions(): JSX.Element {
             >
               {t('termsConditions.cancel')}
             </Button>
-            <Button variant="primary" onClick={() => void handleCreateTerm()}>
-              {t('termsConditions.save')}
+            <Button
+              variant="primary"
+              onClick={() => {
+                void handleCreateTerm();
+              }}
+            >
+              {editingTerm !== null ? t('termsConditions.update') : t('termsConditions.save')}
             </Button>
           </>
         }
