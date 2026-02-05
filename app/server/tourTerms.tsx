@@ -25,6 +25,8 @@ export interface TourTerm {
   terms_conditions_es: string;
   terms_conditions_en: string;
   termsConditionsId?: string;
+  version: string;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,6 +55,7 @@ export interface CreateTourTermDto {
   tourId: string;
   terms_conditions_es: string;
   terms_conditions_en: string;
+  version?: string;
 }
 
 export interface UpdateTourTermDto {
@@ -103,7 +106,13 @@ export const getAllTourTerms = async (
  * Get tour terms for current user's tours (Owner)
  */
 export const getMyTourTerms = async (
-  params: { page?: number; limit?: number; language?: string } = {},
+  params: {
+    page?: number;
+    limit?: number;
+    tourId?: string;
+    version?: string;
+    language?: string;
+  } = {},
   token: string
 ): Promise<TourTermsResponse> => {
   if (BASE_URL === '' || BASE_URL === undefined || token === '') {
@@ -120,6 +129,10 @@ export const getMyTourTerms = async (
     const queryParams = new URLSearchParams();
     if (params.page !== undefined) queryParams.append('page', params.page.toString());
     if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());
+    if (params.tourId !== undefined && params.tourId !== '')
+      queryParams.append('tourId', params.tourId);
+    if (params.version !== undefined && params.version !== '')
+      queryParams.append('version', params.version);
 
     const result = await tourTermsService.get({
       headers: {

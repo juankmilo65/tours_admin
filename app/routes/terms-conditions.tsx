@@ -48,10 +48,13 @@ export default function TermsConditions(): JSX.Element {
     tourId: '',
     terms_conditions_es: '',
     terms_conditions_en: '',
+    version: '1.0',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTourFilter, setSelectedTourFilter] = useState('');
+  const [versionFilter, setVersionFilter] = useState('');
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [pagination, setPagination] = useState({
@@ -103,6 +106,8 @@ export default function TermsConditions(): JSX.Element {
             page,
             limit,
             language,
+            tourId: selectedTourFilter,
+            version: versionFilter,
           },
           token
         );
@@ -133,6 +138,7 @@ export default function TermsConditions(): JSX.Element {
       tourId: '',
       terms_conditions_es: '',
       terms_conditions_en: '',
+      version: '1.0',
     });
     setErrors({});
   };
@@ -224,7 +230,7 @@ export default function TermsConditions(): JSX.Element {
     }
   };
 
-  // Filter tour terms by search term
+  // Filter tour terms by search term (client-side filter after API fetch)
   const filteredTourTerms = tourTerms.filter((term) => {
     const searchLower = searchTerm.toLowerCase();
     const tourName = term.tour ? (language === 'en' ? term.tour.title_en : term.tour.title_es) : '';
@@ -232,7 +238,8 @@ export default function TermsConditions(): JSX.Element {
     return (
       tourName.toLowerCase().includes(searchLower) ||
       term.terms_conditions_es.toLowerCase().includes(searchLower) ||
-      term.terms_conditions_en.toLowerCase().includes(searchLower)
+      term.terms_conditions_en.toLowerCase().includes(searchLower) ||
+      term.version.toLowerCase().includes(searchLower)
     );
   });
 
@@ -250,6 +257,7 @@ export default function TermsConditions(): JSX.Element {
               : t('termsConditions.unknownTour')}
           </div>
           <div className="text-sm text-gray-500 font-mono mt-0.5">{row.tour?.slug ?? ''}</div>
+          <div className="text-xs text-gray-400 mt-0.5">v{row.version}</div>
         </div>
       ),
     },
@@ -305,80 +313,170 @@ export default function TermsConditions(): JSX.Element {
           style={{
             marginBottom: 'var(--space-6)',
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: 'column',
             gap: 'var(--space-4)',
           }}
         >
-          {/* Search */}
-          <div style={{ flex: 1 }}>
-            <div style={{ position: 'relative' }}>
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  bottom: 0,
-                  left: 0,
-                  paddingLeft: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  pointerEvents: 'none',
-                }}
-              >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-4)',
+            }}
+          >
+            {/* Search */}
+            <div style={{ flex: 1 }}>
+              <div style={{ position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    paddingLeft: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <svg
+                    style={{
+                      height: '1.25rem',
+                      width: '1.25rem',
+                      color: 'var(--color-neutral-400)',
+                    }}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+                <input
+                  type="search"
+                  className="form-input"
+                  style={{ paddingLeft: '2.5rem' }}
+                  placeholder={t('termsConditions.searchPlaceholder')}
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Add Button */}
+            <Button
+              variant="primary"
+              className="whitespace-nowrap"
+              onClick={() => {
+                resetForm();
+                setIsCreateModalOpen(true);
+              }}
+            >
+              <span className="flex items-center gap-2">
                 <svg
-                  style={{ height: '1.25rem', width: '1.25rem', color: 'var(--color-neutral-400)' }}
+                  style={{ width: '20px', height: '20px' }}
+                  className="w-5 h-5"
                   fill="none"
-                  viewBox="0 0 24 24"
                   stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    d="M12 4v16m8-8H4"
                   />
                 </svg>
-              </div>
+                {t('termsConditions.addNewTerms')}
+              </span>
+            </Button>
+          </div>
+
+          {/* Filter Row */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 'var(--space-4)',
+              alignItems: 'flex-end',
+            }}
+          >
+            {/* Tour Filter */}
+            <div style={{ flex: 1, maxWidth: '400px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: 'var(--space-1)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-700)',
+                }}
+              >
+                {t('termsConditions.filterByTour')}
+              </label>
+              <Select
+                options={[
+                  { value: '', label: t('termsConditions.allTours') },
+                  ...tours.map((tour) => ({
+                    value: tour.id,
+                    label: language === 'en' ? tour.title_en : tour.title_es,
+                  })),
+                ]}
+                value={selectedTourFilter}
+                onChange={(value) => {
+                  setSelectedTourFilter(value);
+                  setPage(1);
+                }}
+                className="w-full"
+              />
+            </div>
+
+            {/* Version Filter */}
+            <div style={{ maxWidth: '200px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: 'var(--space-1)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-700)',
+                }}
+              >
+                {t('termsConditions.filterByVersion')}
+              </label>
               <input
-                type="search"
+                type="text"
                 className="form-input"
-                style={{ paddingLeft: '2.5rem' }}
-                placeholder={t('termsConditions.searchPlaceholder')}
-                value={searchTerm}
+                placeholder="1.0"
+                value={versionFilter}
                 onChange={(e) => {
-                  setSearchTerm(e.target.value);
+                  setVersionFilter(e.target.value);
                   setPage(1);
                 }}
               />
             </div>
-          </div>
 
-          {/* Add Button */}
-          <Button
-            variant="primary"
-            className="whitespace-nowrap"
-            onClick={() => {
-              resetForm();
-              setIsCreateModalOpen(true);
-            }}
-          >
-            <span className="flex items-center gap-2">
-              <svg
-                style={{ width: '20px', height: '20px' }}
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {/* Clear Filters */}
+            {(selectedTourFilter !== '' || versionFilter !== '') && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelectedTourFilter('');
+                  setVersionFilter('');
+                  setPage(1);
+                }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              {t('termsConditions.addNewTerms')}
-            </span>
-          </Button>
+                {t('termsConditions.clearFilters')}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Table */}
@@ -531,6 +629,46 @@ export default function TermsConditions(): JSX.Element {
                 }}
               >
                 {errors.tourId}
+              </p>
+            )}
+          </div>
+
+          {/* Version */}
+          <div style={{ width: '100%' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 'var(--space-1)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--font-weight-medium)',
+                color:
+                  errors.version !== undefined && errors.version !== ''
+                    ? 'var(--color-error-600)'
+                    : 'var(--color-neutral-700)',
+              }}
+            >
+              {t('termsConditions.version')}
+            </label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="1.0"
+              value={newTerm.version}
+              onChange={(e) => {
+                setNewTerm({ ...newTerm, version: e.target.value });
+                if (errors.version !== undefined && errors.version !== '')
+                  setErrors({ ...errors, version: '' });
+              }}
+            />
+            {errors.version !== undefined && errors.version !== '' && (
+              <p
+                style={{
+                  marginTop: 'var(--space-1)',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-error-500)',
+                }}
+              >
+                {errors.version}
               </p>
             )}
           </div>
