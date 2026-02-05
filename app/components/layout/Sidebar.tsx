@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
   { path: '/offers', labelKey: 'sidebar.offers', icon: '🎁' },
   { path: '/reservations', labelKey: 'sidebar.reservations', icon: '📅' },
   { path: '/users', labelKey: 'sidebar.users', icon: '👥' },
+  { path: '/terms-conditions', labelKey: 'sidebar.termsConditions', icon: '📝' },
 ];
 
 interface SidebarProps {
