@@ -282,7 +282,15 @@ export default function TermsConditions(): JSX.Element {
               : t('termsConditions.unknownTour')}
           </div>
           <div className="text-sm text-gray-500 font-mono mt-0.5">{row.tour?.slug ?? ''}</div>
-          <div className="text-xs text-gray-400 mt-0.5">v{row.version}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'version',
+      label: t('termsConditions.version'),
+      render: (_: unknown, row: TourTerm) => (
+        <div className="font-mono text-sm font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded-md inline-block">
+          v{row.version}
         </div>
       ),
     },
