@@ -88,15 +88,6 @@ export function CreateTourModal({
   tourId,
   initialData,
 }: CreateTourModalProps): JSX.Element | null {
-  // Debug logs
-  console.warn('[CreateTourModal] Rendering with props:', {
-    isOpen,
-    mode,
-    tourId,
-    hasInitialData: initialData !== undefined,
-    initialData,
-  });
-
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
@@ -111,7 +102,6 @@ export function CreateTourModal({
 
   // Determine if we're in edit mode
   const isEditMode = mode === 'edit';
-  console.warn('[CreateTourModal] isEditMode:', isEditMode);
 
   // Check if user is admin
   const isAdmin = currentUser?.role === 'admin';
@@ -607,14 +597,9 @@ export function CreateTourModal({
     setShowCloseConfirmation(false);
   };
 
-  console.warn('[CreateTourModal] Before render check - isOpen:', isOpen);
-
   if (!isOpen) {
-    console.warn('[CreateTourModal] Returning null because isOpen is false');
     return null;
   }
-
-  console.warn('[CreateTourModal] Modal is open, rendering content...');
 
   // Close confirmation modal
   if (showCloseConfirmation) {

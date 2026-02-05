@@ -246,10 +246,33 @@ function ClientOnlyModal(): ReactNode {
       setIsClient(true);
     }, 0);
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  });
 
   if (!isClient) return null;
   return <ModalRoot />;
+}
+
+// Wrapper to handle PersistGate only when persistor is available
+function PersistGateWrapper({ children }: { children: ReactNode }): ReactNode {
+  if (persistor === null) {
+    return (
+      <>
+        {children}
+        <ClientOnlyGlobalLoader />
+        <ScrollRestoration />
+        <Scripts />
+      </>
+    );
+  }
+
+  return (
+    <PersistGate loading={null} persistor={persistor}>
+      {children}
+      <ClientOnlyGlobalLoader />
+      <ScrollRestoration />
+      <Scripts />
+    </PersistGate>
+  );
 }
 
 export const links: LinksFunction = () => [
@@ -267,16 +290,6 @@ const store = makeStore();
 const persistor = typeof window !== 'undefined' ? makePersistor(store) : null;
 
 export function Layout({ children }: { children: ReactNode }): ReactNode {
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    // Defer setState to avoid cascading renders
-    const timeoutId = window.setTimeout(() => {
-      setIsClient(true);
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, []);
-
   return (
     <html lang="en">
       <head>
@@ -285,23 +298,12 @@ export function Layout({ children }: { children: ReactNode }): ReactNode {
         <Meta />
         <Links />
       </head>
-      <body style={{ backgroundColor: 'var(--color-neutral-50)', position: 'relative' }}>
+      <body
+        style={{ backgroundColor: 'var(--color-neutral-50)', position: 'relative' }}
+        suppressHydrationWarning
+      >
         <Provider store={store}>
-          {isClient && persistor ? (
-            <PersistGate loading={null} persistor={persistor}>
-              {children}
-              <ClientOnlyGlobalLoader />
-              <ScrollRestoration />
-              <Scripts />
-            </PersistGate>
-          ) : (
-            <>
-              {children}
-              <ClientOnlyGlobalLoader />
-              <ScrollRestoration />
-              <Scripts />
-            </>
-          )}
+          <PersistGateWrapper>{children}</PersistGateWrapper>
         </Provider>
       </body>
     </html>
