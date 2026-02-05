@@ -74,7 +74,7 @@ export const getAllTourTerms = async (
   try {
     const tourTermsService = createServiceREST(
       BASE_URL,
-      'tour-terms',
+      'terms-conditions',
       token !== undefined && token !== '' ? `Bearer ${token}` : ''
     );
 
@@ -113,7 +113,7 @@ export const getMyTourTerms = async (
   try {
     const tourTermsService = createServiceREST(
       BASE_URL,
-      'tour-terms/user/my-tours',
+      'terms-conditions/user/my-tours',
       `Bearer ${token}`
     );
 
@@ -150,7 +150,7 @@ export const getTourTermsByTourId = async (
   }
 
   try {
-    const tourTermsService = createServiceREST(BASE_URL, `tour-terms/tour/${tourId}`, '');
+    const tourTermsService = createServiceREST(BASE_URL, `terms-conditions/tour/${tourId}`, '');
 
     const result = await tourTermsService.get({
       headers: {
@@ -182,7 +182,7 @@ export const createTourTerms = async (
   }
 
   try {
-    const tourTermsService = createServiceREST(BASE_URL, 'tour-terms', `Bearer ${token}`);
+    const tourTermsService = createServiceREST(BASE_URL, 'terms-conditions', `Bearer ${token}`);
 
     const result = await tourTermsService.create(data, {
       headers: {
@@ -217,7 +217,7 @@ export const updateTourTerms = async (
   try {
     const tourTermsService = createServiceREST(
       BASE_URL,
-      `tour-terms/tour/${tourId}`,
+      `terms-conditions/tour/${tourId}`,
       `Bearer ${token}`
     );
 
