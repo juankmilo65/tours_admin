@@ -818,8 +818,14 @@ export default function TermsConditions(): JSX.Element {
                 })),
               ]}
               value={newTerm.tourId}
-              onChange={() => {}}
-              disabled={viewMode === true || viewingTerm !== null}
+              onChange={(value) => {
+                if (viewMode === false && viewingTerm === null) {
+                  setNewTerm({ ...newTerm, tourId: value });
+                  if (errors.tourId !== undefined && errors.tourId !== '')
+                    setErrors({ ...errors, tourId: '' });
+                }
+              }}
+              disabled={viewMode === true || viewingTerm !== null || editingTerm !== null}
               className="w-full"
             />
             {errors.tourId !== undefined && errors.tourId !== '' && (
@@ -863,17 +869,12 @@ export default function TermsConditions(): JSX.Element {
               className="form-input"
               placeholder="1.0"
               value={newTerm.version}
-              disabled={editingTerm !== null || viewMode === true || viewingTerm !== null}
+              disabled={viewMode === true || viewingTerm !== null}
               onChange={() => {}}
               style={{
                 backgroundColor:
-                  editingTerm !== null || viewMode === true || viewingTerm !== null
-                    ? 'var(--color-neutral-100)'
-                    : 'white',
-                cursor:
-                  editingTerm !== null || viewMode === true || viewingTerm !== null
-                    ? 'not-allowed'
-                    : 'text',
+                  viewMode === true || viewingTerm !== null ? 'var(--color-neutral-100)' : 'white',
+                cursor: viewMode === true || viewingTerm !== null ? 'not-allowed' : 'text',
               }}
             />
             {(editingTerm !== null || viewMode === true) && (
@@ -898,7 +899,13 @@ export default function TermsConditions(): JSX.Element {
             label={t('termsConditions.termsEs')}
             placeholder="Términos y condiciones en español"
             value={newTerm.terms_conditions_es}
-            onChange={() => {}}
+            onChange={(e) => {
+              if (viewMode === false && viewingTerm === null) {
+                setNewTerm({ ...newTerm, terms_conditions_es: e.target.value });
+                if (errors.terms_conditions_es !== undefined && errors.terms_conditions_es !== '')
+                  setErrors({ ...errors, terms_conditions_es: '' });
+              }
+            }}
             error={errors.terms_conditions_es}
             required={viewMode === false && viewingTerm === null}
             rows={6}
@@ -910,7 +917,13 @@ export default function TermsConditions(): JSX.Element {
             label={t('termsConditions.termsEn')}
             placeholder="Terms and conditions in English"
             value={newTerm.terms_conditions_en}
-            onChange={() => {}}
+            onChange={(e) => {
+              if (viewMode === false && viewingTerm === null) {
+                setNewTerm({ ...newTerm, terms_conditions_en: e.target.value });
+                if (errors.terms_conditions_en !== undefined && errors.terms_conditions_en !== '')
+                  setErrors({ ...errors, terms_conditions_en: '' });
+              }
+            }}
             error={errors.terms_conditions_en}
             required={viewMode === false && viewingTerm === null}
             rows={6}
