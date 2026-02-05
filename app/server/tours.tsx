@@ -21,12 +21,14 @@ const BASE_URL =
 export const getTourById = async (
   id: string,
   language = 'es',
-  currency = 'MXN'
+  currency = 'MXN',
+  token = ''
 ): Promise<unknown> => {
   console.warn('🎯 [GET TOUR BY ID] Starting getTourById with params:', {
     id,
     language,
     currency,
+    hasToken: token !== '',
     BASE_URL,
   });
 
@@ -41,10 +43,11 @@ export const getTourById = async (
     const fullUrl = `${BASE_URL}/${tourEndpoint}`;
     console.warn('🌐 [GET TOUR BY ID] Full URL to call:', fullUrl);
 
-    const tourService = createServiceREST(BASE_URL, tourEndpoint, 'Bearer');
+    const tourService = createServiceREST(BASE_URL, tourEndpoint, `Bearer ${token}`);
     console.warn('📡 [GET TOUR BY ID] Calling backend with headers:', {
       'X-Language': language,
       'X-Currency': currency,
+      Authorization: `Bearer ${token.substring(0, 20)}...`,
     });
 
     const result = await tourService.get({
@@ -187,6 +190,53 @@ export const createTour = async (
       }
     } else {
       console.error('❌ [CREATE TOUR] Unknown error:', error);
+    }
+    return { error, success: false };
+  }
+};
+
+/**
+ * Update tour in backend API
+ */
+export const updateTour = async (
+  tourId: string,
+  payload: Record<string, unknown>,
+  token: string
+): Promise<unknown> => {
+  console.warn('🎯 [UPDATE TOUR] Starting updateTour with params:', {
+    tourId,
+    payload,
+    hasToken: !!token,
+    BASE_URL,
+  });
+
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('⚠️ [UPDATE TOUR] BACKEND_URL is not configured, returning error');
+    return { success: false, error: 'Backend URL not configured' };
+  }
+
+  try {
+    const toursEndpoint = `tours/${tourId}`;
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token}`);
+
+    const result = await toursService.update(payload);
+
+    console.warn('✅ [UPDATE TOUR] Success! Result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    console.error('❌ [UPDATE TOUR] Error caught:', error);
+    if (error instanceof Error) {
+      console.error('❌ [UPDATE TOUR] Error message:', error.message);
+      console.error('❌ [UPDATE TOUR] Error stack:', error.stack);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          '⚠️ [UPDATE TOUR] Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('❌ [UPDATE TOUR] Unknown error:', error);
     }
     return { error, success: false };
   }

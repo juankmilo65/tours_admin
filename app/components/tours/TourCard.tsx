@@ -20,7 +20,7 @@ interface TourCardProps {
 export function TourCard({
   tour,
   onViewDetails,
-  // ...existing code...
+  onEdit,
   onDelete,
 }: TourCardProps): React.JSX.Element {
   const { t } = useTranslation();
@@ -279,12 +279,19 @@ export function TourCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              // Activate global loading before navigating
-              dispatch(
-                setGlobalLoading({ isLoading: true, message: 'Cargando tour para edición...' })
-              );
-              // Navigate to edit page
-              navigate(`/tours/${tour.id}/edit`);
+              console.warn('[TourCard] Edit button clicked for tour:', tour.id);
+              console.warn('[TourCard] onEdit callback exists:', onEdit !== undefined);
+              if (onEdit !== undefined) {
+                console.warn('[TourCard] Calling onEdit callback...');
+                onEdit();
+              } else {
+                console.warn('[TourCard] No onEdit callback, navigating to edit page...');
+                // Fallback: Navigate to edit page
+                dispatch(
+                  setGlobalLoading({ isLoading: true, message: 'Cargando tour para edición...' })
+                );
+                navigate(`/tours/${tour.id}/edit`);
+              }
             }}
             style={{
               padding: 'var(--space-2) var(--space-3)',

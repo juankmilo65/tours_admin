@@ -2,7 +2,11 @@ import React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { JSX } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
-import { createTourBusiness, uploadTourImages } from '~/server/businessLogic/toursBusinessLogic';
+import {
+  createTourBusiness,
+  updateTourBusiness,
+  uploadTourImages,
+} from '~/server/businessLogic/toursBusinessLogic';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
@@ -23,6 +27,7 @@ interface CreateTourModalProps {
   onClose?: () => void;
   users?: UserDropdownOption[];
   mode?: 'create' | 'edit';
+  tourId?: string;
   initialData?: Partial<TourFormData>;
 }
 
@@ -42,6 +47,7 @@ interface TourFormData {
   currency: string;
   imageUrl: string;
   images: File[];
+  existingImageUrls: string[]; // URLs of existing images (for edit mode)
   difficulty: 'easy' | 'medium' | 'hard';
   language: string[];
   isActive: boolean;
@@ -64,14 +70,28 @@ export function CreateTourModal({
   onClose,
   users = [],
   mode = 'create',
+  tourId,
   initialData,
 }: CreateTourModalProps): JSX.Element | null {
+  // Debug logs
+  console.warn('[CreateTourModal] Rendering with props:', {
+    isOpen,
+    mode,
+    tourId,
+    hasInitialData: initialData !== undefined,
+    initialData,
+  });
+
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectCurrentUser);
   const categories = useAppSelector(selectCategories);
   const rawCities = useAppSelector(selectCities);
+
+  // Determine if we're in edit mode
+  const isEditMode = mode === 'edit';
+  console.warn('[CreateTourModal] isEditMode:', isEditMode);
 
   // Check if user is admin
   const isAdmin = currentUser?.role === 'admin';
@@ -94,6 +114,7 @@ export function CreateTourModal({
       currency: initialData?.currency ?? 'MXN',
       imageUrl: initialData?.imageUrl ?? '',
       images: initialData?.images ?? [],
+      existingImageUrls: initialData?.existingImageUrls ?? [],
       difficulty: initialData?.difficulty ?? 'easy',
       language: initialData?.language ?? ['es'],
       isActive: initialData?.isActive ?? true,
@@ -184,8 +205,9 @@ export function CreateTourModal({
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
 
-    // Check if adding would exceed maximum
-    if (formData.images.length + files.length > MAX_IMAGES) {
+    // Check if adding would exceed maximum (including existing images)
+    const totalImages = formData.images.length + formData.existingImageUrls.length + files.length;
+    if (totalImages > MAX_IMAGES) {
       setImageErrors([t('tours.maxImagesExceeded') ?? `Máximo ${MAX_IMAGES} imágenes permitidas`]);
       return;
     }
@@ -255,7 +277,7 @@ export function CreateTourModal({
     setDraggedImageIndex(null);
   };
 
-  // Remove image
+  // Remove new image
   const handleRemoveImage = (index: number): void => {
     const imageToRemove = formData.images[index] as ImageFile | undefined;
     const newImages = formData.images.filter((_, i) => i !== index);
@@ -268,6 +290,14 @@ export function CreateTourModal({
     setFormData((prev) => ({ ...prev, images: newImages }));
   };
 
+  // Remove existing image URL
+  const handleRemoveExistingImage = (index: number): void => {
+    setFormData((prev) => ({
+      ...prev,
+      existingImageUrls: prev.existingImageUrls.filter((_, i) => i !== index),
+    }));
+  };
+
   // Handle drop zone
   const handleDrop = (e: React.DragEvent<HTMLDivElement>): void => {
     e.preventDefault();
@@ -276,8 +306,9 @@ export function CreateTourModal({
     const files = Array.from(e.dataTransfer.files ?? []);
     if (files.length === 0) return;
 
-    // Check if adding would exceed maximum
-    if (formData.images.length + files.length > MAX_IMAGES) {
+    // Check if adding would exceed maximum (including existing images)
+    const totalImages = formData.images.length + formData.existingImageUrls.length + files.length;
+    if (totalImages > MAX_IMAGES) {
       setImageErrors([t('tours.maxImagesExceeded') ?? `Máximo ${MAX_IMAGES} imágenes permitidas`]);
       return;
     }
@@ -363,7 +394,6 @@ export function CreateTourModal({
     setUploadProgress(0);
 
     try {
-      // Step 1: Create tour
       const payload = {
         userId: formData.userId,
         categoryId: formData.categoryId,
@@ -383,18 +413,29 @@ export function CreateTourModal({
         isActive: formData.isActive,
       };
 
-      const result = await createTourBusiness(payload, token ?? '');
+      let result: unknown;
+      let currentTourId = tourId ?? '';
+
+      if (isEditMode && tourId !== undefined) {
+        // Update existing tour
+        result = await updateTourBusiness(tourId, payload, token ?? '');
+      } else {
+        // Create new tour
+        result = await createTourBusiness(payload, token ?? '');
+      }
 
       if (result !== null && typeof result === 'object' && 'error' in result) {
         const error = result.error as { message?: string; statusCode?: number };
         dispatch(
           openModal({
-            id: 'create-tour-error',
+            id: isEditMode ? 'update-tour-error' : 'create-tour-error',
             type: 'confirm',
             title: t('common.error'),
             isOpen: true,
             data: {
-              message: error.message ?? t('tours.createTourError'),
+              message:
+                error.message ??
+                (isEditMode ? t('tours.updateTourError') : t('tours.createTourError')),
               icon: 'alert',
             },
           })
@@ -403,17 +444,20 @@ export function CreateTourModal({
         return;
       }
 
-      const tourData = result as { data: { id: string } };
-      const tourId = tourData.data?.id ?? '';
+      // For create mode, get the new tour ID
+      if (!isEditMode) {
+        const tourData = result as { data: { id: string } };
+        currentTourId = tourData.data?.id ?? '';
 
-      if (tourId === '') {
-        throw new Error('Tour ID not returned from server');
+        if (currentTourId === '') {
+          throw new Error('Tour ID not returned from server');
+        }
       }
 
-      // Step 2: Upload images
+      // Step 2: Upload images (only new images for edit mode)
       if (formData.images.length > 0) {
         const uploadResult = await uploadTourImages(
-          tourId,
+          currentTourId,
           formData.images,
           setFirstImageAsCover,
           token ?? '',
@@ -430,33 +474,33 @@ export function CreateTourModal({
       }
 
       // Success
-      dispatch(closeModal('create-tour'));
+      dispatch(closeModal(isEditMode ? 'edit-tour' : 'create-tour'));
       if (onSuccess !== undefined) {
         onSuccess();
       }
 
       dispatch(
         openModal({
-          id: 'create-tour-success',
+          id: isEditMode ? 'update-tour-success' : 'create-tour-success',
           type: 'confirm',
           title: t('common.success'),
           isOpen: true,
           data: {
-            message: t('tours.createTourSuccess'),
+            message: isEditMode ? t('tours.updateTourSuccess') : t('tours.createTourSuccess'),
             icon: 'success',
           },
         })
       );
     } catch (error) {
-      console.error('Error creating tour:', error);
+      console.error(isEditMode ? 'Error updating tour:' : 'Error creating tour:', error);
       dispatch(
         openModal({
-          id: 'create-tour-error',
+          id: isEditMode ? 'update-tour-error' : 'create-tour-error',
           type: 'confirm',
           title: t('common.error'),
           isOpen: true,
           data: {
-            message: t('tours.createTourError'),
+            message: isEditMode ? t('tours.updateTourError') : t('tours.createTourError'),
             icon: 'alert',
           },
         })
@@ -509,9 +553,14 @@ export function CreateTourModal({
     setShowCloseConfirmation(false);
   };
 
+  console.warn('[CreateTourModal] Before render check - isOpen:', isOpen);
+
   if (!isOpen) {
+    console.warn('[CreateTourModal] Returning null because isOpen is false');
     return null;
   }
+
+  console.warn('[CreateTourModal] Modal is open, rendering content...');
 
   // Close confirmation modal
   if (showCloseConfirmation) {
@@ -716,14 +765,30 @@ export function CreateTourModal({
                     ]}
                     value={formData.userId}
                     onChange={(value: string) => {
-                      setFormData((prev) => ({ ...prev, userId: value }));
-                      if (errors.userId !== undefined) {
-                        setErrors((prev) => ({ ...prev, userId: undefined }));
+                      if (!isEditMode) {
+                        setFormData((prev) => ({ ...prev, userId: value }));
+                        if (errors.userId !== undefined) {
+                          setErrors((prev) => ({ ...prev, userId: undefined }));
+                        }
                       }
                     }}
                     placeholder={t('common.selectProvider') ?? 'Seleccionar proveedor'}
                     id="select-user-provider"
+                    disabled={isEditMode}
                   />
+                  {isEditMode && (
+                    <span
+                      style={{
+                        color: 'var(--color-neutral-500)',
+                        fontSize: 'var(--text-xs)',
+                        marginTop: 'var(--space-1)',
+                        display: 'block',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      {t('tours.providerCannotBeChanged') ?? 'El proveedor no puede ser modificado'}
+                    </span>
+                  )}
                   {errors.userId !== undefined && (
                     <span
                       style={{
@@ -1255,8 +1320,7 @@ export function CreateTourModal({
                     fontSize: 'var(--text-sm)',
                   }}
                 >
-                  {' '}
-                  ({formData.images.length}/{MAX_IMAGES} - Máximo 5MB por imagen, JPEG/PNG/WebP)
+                  {` (${formData.existingImageUrls.length + formData.images.length}/${MAX_IMAGES} - Máximo 5MB por imagen, JPEG/PNG/WebP)`}
                 </span>
               </label>
 
@@ -1334,83 +1398,185 @@ export function CreateTourModal({
                 </div>
               )}
 
-              {/* Image previews */}
+              {/* Existing Image previews (from URLs) */}
+              {formData.existingImageUrls.length > 0 && (
+                <div style={{ marginTop: 'var(--space-3)' }}>
+                  <p
+                    style={{
+                      margin: '0 0 var(--space-2) 0',
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--color-neutral-600)',
+                    }}
+                  >
+                    Imágenes existentes:
+                  </p>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                      gap: 'var(--space-2)',
+                    }}
+                  >
+                    {formData.existingImageUrls.map((imageUrl, index) => (
+                      <div
+                        key={`existing-${index}`}
+                        style={{
+                          position: 'relative',
+                          aspectRatio: '1',
+                          borderRadius: 'var(--radius-md)',
+                          overflow: 'hidden',
+                          border: '2px solid var(--color-success-300)',
+                        }}
+                      >
+                        <img
+                          src={imageUrl}
+                          alt={`Existing ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveExistingImage(index);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                            color: 'white',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '16px',
+                          }}
+                        >
+                          ×
+                        </button>
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            backgroundColor: 'rgba(34, 197, 94, 0.9)',
+                            color: 'white',
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            textAlign: 'center',
+                          }}
+                        >
+                          {index === 0 && formData.images.length === 0
+                            ? 'Portada'
+                            : `#${index + 1}`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* New Image previews */}
               {formData.images.length > 0 && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                    gap: 'var(--space-2)',
-                    marginTop: 'var(--space-3)',
-                  }}
-                >
-                  {formData.images.map((image, index) => (
-                    <div
-                      key={(image as ImageFile).id || index}
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragOver={(e) => handleDragOverImage(e, index)}
-                      onDragEnd={handleDragEnd}
+                <div style={{ marginTop: 'var(--space-3)' }}>
+                  {formData.existingImageUrls.length > 0 && (
+                    <p
                       style={{
-                        position: 'relative',
-                        aspectRatio: '1',
-                        borderRadius: 'var(--radius-md)',
-                        overflow: 'hidden',
-                        border: '2px solid var(--color-neutral-200)',
-                        cursor: 'move',
+                        margin: '0 0 var(--space-2) 0',
+                        fontSize: 'var(--text-sm)',
+                        color: 'var(--color-neutral-600)',
                       }}
                     >
-                      <img
-                        src={(image as ImageFile).preview}
-                        alt={`Preview ${index + 1}`}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveImage(index);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: 4,
-                          right: 4,
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                          color: 'white',
-                          border: 'none',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '16px',
-                        }}
-                      >
-                        ×
-                      </button>
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                          color: 'white',
-                          padding: '4px 8px',
-                          fontSize: '12px',
-                          textAlign: 'center',
-                        }}
-                      >
-                        {index === 0 ? 'Portada' : `#${index + 1}`}
-                      </div>
-                    </div>
-                  ))}
+                      Nuevas imágenes:
+                    </p>
+                  )}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                      gap: 'var(--space-2)',
+                    }}
+                  >
+                    {formData.images.map((image, index) => {
+                      const displayIndex = formData.existingImageUrls.length + index;
+                      return (
+                        <div
+                          key={(image as ImageFile).id || index}
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => handleDragOverImage(e, index)}
+                          onDragEnd={handleDragEnd}
+                          style={{
+                            position: 'relative',
+                            aspectRatio: '1',
+                            borderRadius: 'var(--radius-md)',
+                            overflow: 'hidden',
+                            border: '2px solid var(--color-neutral-200)',
+                            cursor: 'move',
+                          }}
+                        >
+                          <img
+                            src={(image as ImageFile).preview}
+                            alt={`Preview ${index + 1}`}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveImage(index);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: 4,
+                              right: 4,
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                              color: 'white',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '16px',
+                            }}
+                          >
+                            ×
+                          </button>
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                              color: 'white',
+                              padding: '4px 8px',
+                              fontSize: '12px',
+                              textAlign: 'center',
+                            }}
+                          >
+                            {displayIndex === 0 ? 'Portada' : `#${displayIndex + 1}`}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -1429,7 +1595,7 @@ export function CreateTourModal({
             </div>
 
             {/* Set first image as cover option */}
-            {formData.images.length > 0 && (
+            {(formData.images.length > 0 || formData.existingImageUrls.length > 0) && (
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <input

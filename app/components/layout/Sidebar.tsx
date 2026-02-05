@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
   { path: '/tours', labelKey: 'sidebar.tours', icon: '🏛️' },
   { path: '/cities', labelKey: 'sidebar.cities', icon: '🏙️' },
   { path: '/categories', labelKey: 'sidebar.categories', icon: '📁' },
+  { path: '/activities', labelKey: 'sidebar.activities', icon: '🎯' },
   { path: '/news', labelKey: 'sidebar.news', icon: '📰' },
   { path: '/offers', labelKey: 'sidebar.offers', icon: '🎁' },
   { path: '/reservations', labelKey: 'sidebar.reservations', icon: '📅' },

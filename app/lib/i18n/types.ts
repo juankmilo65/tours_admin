@@ -25,6 +25,7 @@ export type TranslationKey =
   | 'tours'
   | 'cities'
   | 'categories'
+  | 'activities'
   | 'news'
   | 'offers'
   | 'reservations'

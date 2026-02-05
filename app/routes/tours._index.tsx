@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { useLoaderData, useNavigation, useSearchParams } from '@remix-run/react';
+import { useLoaderData, useNavigation, useSearchParams, useFetcher } from '@remix-run/react';
 import { data, type LoaderFunctionArgs } from '@remix-run/node';
 import { requireAuth } from '~/utilities/auth.loader';
 import type { Tour, TranslatedTour, Language } from '~/types/PayloadTourDataProps';
@@ -452,6 +452,151 @@ function ToursClient(): JSX.Element {
 
   // Create tour modal state
   const [isCreateTourModalOpen, setIsCreateTourModalOpen] = useState(false);
+
+  // Edit tour modal state
+  const [editingTour, setEditingTour] = useState<TranslatedTour | null>(null);
+
+  // Fetcher for loading tour details via BL
+  const tourDetailsFetcher = useFetcher<{
+    success: boolean;
+    data?: Record<string, unknown>;
+    error?: string;
+  }>();
+
+  // Type guard for tour API result
+  const isTourSuccessResult = (r: unknown): r is { success: true; data: Record<string, unknown> } =>
+    typeof r === 'object' &&
+    r !== null &&
+    'success' in r &&
+    (r as { success: unknown }).success === true &&
+    'data' in r;
+
+  // Derive fullTourData from fetcher data using useMemo (no useEffect/setState needed)
+  const fullTourData = useMemo(() => {
+    if (
+      editingTour !== null &&
+      tourDetailsFetcher.state === 'idle' &&
+      tourDetailsFetcher.data !== undefined &&
+      isTourSuccessResult(tourDetailsFetcher.data)
+    ) {
+      console.warn('[tours._index] Full tour data derived from fetcher');
+      return tourDetailsFetcher.data.data;
+    }
+    return null;
+  }, [editingTour, tourDetailsFetcher.state, tourDetailsFetcher.data]);
+
+  // Fetch full tour data when editingTour changes using useFetcher
+  useEffect(() => {
+    if (editingTour === null) {
+      return;
+    }
+
+    console.warn('[tours._index] Fetching full tour data for:', editingTour.id);
+
+    // Show global loading while fetching tour details
+    dispatch(setGlobalLoading({ isLoading: true, message: 'Cargando datos del tour...' }));
+
+    // Use fetcher to call the API route which uses BL
+    tourDetailsFetcher.load(
+      `/api/tours/getById?tourId=${editingTour.id}&language=${currentLanguage ?? 'es'}&currency=MXN`
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingTour, currentLanguage, dispatch]);
+
+  // Hide global loading when fetcher completes
+  useEffect(() => {
+    if (tourDetailsFetcher.state === 'idle' && tourDetailsFetcher.data !== undefined) {
+      console.warn('[tours._index] Tour details fetcher completed, hiding loader');
+      dispatch(setGlobalLoading({ isLoading: false }));
+    }
+  }, [tourDetailsFetcher.state, tourDetailsFetcher.data, dispatch]);
+
+  // Loading state from fetcher
+  const isLoadingFullTour = tourDetailsFetcher.state === 'loading';
+
+  // Edit tour data - computed from editingTour, rawTours, and fullTourData
+  const editTourData = useMemo(() => {
+    if (editingTour === null) {
+      return { isOpen: false, initialData: undefined, tourId: undefined, isLoading: false };
+    }
+
+    // If still loading full tour data, show loading state
+    if (isLoadingFullTour) {
+      return { isOpen: true, initialData: undefined, tourId: editingTour.id, isLoading: true };
+    }
+
+    console.warn('[tours._index] Computing editTourData for tour:', editingTour.id);
+
+    // Find the raw tour data with both languages
+    const rawTourForEdit = rawTours.find((t) => t.id === editingTour.id);
+    console.warn('[tours._index] rawTourForEdit found:', rawTourForEdit !== undefined);
+    console.warn(
+      '[tours._index] rawTourForEdit KEYS:',
+      rawTourForEdit ? Object.keys(rawTourForEdit) : 'undefined'
+    );
+    console.warn('[tours._index] rawTourForEdit.images:', rawTourForEdit?.images);
+
+    if (rawTourForEdit === undefined) {
+      return { isOpen: true, initialData: undefined, tourId: editingTour.id, isLoading: false };
+    }
+
+    // Convert raw tour to initialData format
+    // API uses snake_case field names: title_es, title_en, shortDescription_es, shortDescription_en
+    const rawData = rawTourForEdit as unknown as Record<string, unknown>;
+
+    // Get existing image URLs from the raw tour data
+    const existingImageUrls: string[] = rawTourForEdit.images ?? [];
+
+    // Use fullTourData if available (has owners and long descriptions), fallback to rawData
+    const fullData = fullTourData ?? {};
+    console.warn('[tours._index] Using fullTourData:', fullTourData !== null);
+    console.warn('[tours._index] fullData owners:', fullData.owners);
+
+    // Helper to safely get owner ID from owners array
+    // API returns: owners: [{ id, name, email }]
+    const getOwnerIdFromArray = (): string => {
+      const owners = fullData.owners;
+      if (Array.isArray(owners) && owners.length > 0) {
+        const firstOwner = owners[0] as { id?: string };
+        return firstOwner.id ?? '';
+      }
+      return '';
+    };
+
+    const initialData = {
+      // userId comes from fullTourData.owners[0].id (not available in /tours/cards endpoint)
+      userId: getOwnerIdFromArray(),
+      categoryId: rawTourForEdit.categoryId ?? rawTourForEdit.category?.id ?? '',
+      cityId: rawTourForEdit.cityId ?? rawTourForEdit.city?.id ?? '',
+      // API returns: title_es, title_en - prefer fullData if available
+      titleEs: (fullData.title_es as string) ?? (rawData.title_es as string) ?? '',
+      titleEn: (fullData.title_en as string) ?? (rawData.title_en as string) ?? '',
+      // Long descriptions come from fullTourData (not available in /tours/cards endpoint)
+      descriptionEs: (fullData.description_es as string) ?? '',
+      descriptionEn: (fullData.description_en as string) ?? '',
+      // API returns: shortDescription_es, shortDescription_en
+      shortDescriptionEs:
+        (fullData.shortDescription_es as string) ?? (rawData.shortDescription_es as string) ?? '',
+      shortDescriptionEn:
+        (fullData.shortDescription_en as string) ?? (rawData.shortDescription_en as string) ?? '',
+      duration: String(fullData.duration ?? rawTourForEdit.duration ?? 1),
+      maxCapacity: (fullData.maxCapacity as number) ?? rawTourForEdit.maxCapacity ?? 1,
+      basePrice: (fullData.base_price as number) ?? rawTourForEdit.base_price ?? 0,
+      currency: (fullData.currency as string) ?? rawTourForEdit.currency ?? 'MXN',
+      imageUrl: (fullData.imageUrl as string) ?? rawTourForEdit.imageUrl ?? '',
+      images: [] as File[],
+      existingImageUrls: (fullData.images as string[]) ?? existingImageUrls,
+      difficulty:
+        ((fullData.difficulty ?? rawTourForEdit.difficulty) as 'easy' | 'medium' | 'hard') ??
+        'easy',
+      language: (fullData.language as string[]) ?? rawTourForEdit.language ?? ['es'],
+      isActive: (fullData.isActive as boolean) ?? rawTourForEdit.isActive ?? true,
+    };
+
+    console.warn('[tours._index] editInitialData computed:', initialData);
+
+    return { isOpen: true, initialData, tourId: editingTour.id, isLoading: false };
+  }, [editingTour, rawTours, fullTourData, isLoadingFullTour]);
 
   // Price range state
   const [priceRange, setPriceRange] = useState<PriceRange | null>(loaderData.priceRange);
@@ -1174,7 +1319,16 @@ function ToursClient(): JSX.Element {
             }}
           >
             {translatedTours.map((tour: TranslatedTour) => (
-              <TourCard key={tour.id} tour={tour} />
+              <TourCard
+                key={tour.id}
+                tour={tour}
+                onEdit={() => {
+                  console.warn('[tours._index] onEdit called for tour:', tour.id, tour.title);
+                  console.warn('[tours._index] Setting editingTour to:', tour);
+                  setEditingTour(tour);
+                  console.warn('[tours._index] editingTour should now be set');
+                }}
+              />
             ))}
           </div>
         )}
@@ -1314,6 +1468,27 @@ function ToursClient(): JSX.Element {
             window.location.reload();
           }}
         />
+
+        {/* Edit Tour Modal */}
+        {editTourData.isOpen && !editTourData.isLoading && (
+          <CreateTourModal
+            isOpen={true}
+            mode="edit"
+            tourId={editTourData.tourId}
+            initialData={editTourData.initialData}
+            users={loaderData.users}
+            onClose={() => {
+              console.warn('[tours._index] Edit modal onClose called');
+              setEditingTour(null);
+            }}
+            onSuccess={() => {
+              console.warn('[tours._index] Edit modal onSuccess called');
+              setEditingTour(null);
+              // Reload page to fetch updated tours
+              window.location.reload();
+            }}
+          />
+        )}
       </main>
     </div>
   );

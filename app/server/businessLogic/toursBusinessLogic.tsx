@@ -1,7 +1,9 @@
 import {
   getTours,
+  getTourById,
   getToursDropdown,
   createTour,
+  updateTour,
   uploadTourImages,
   setImageAsCover,
   deleteTourImage,
@@ -86,6 +88,27 @@ const getToursDropdownBusiness = async (
 };
 
 /**
+ * Business logic for getting a single tour by ID with full details
+ * This endpoint returns complete tour data including userId, descriptions, etc.
+ */
+const getTourByIdBusiness = async (
+  tourId: string,
+  language = 'es',
+  currency = 'MXN',
+  token = ''
+): Promise<ServiceResult<unknown>> => {
+  try {
+    console.warn('[getTourByIdBusiness] Fetching tour details for:', tourId);
+    const result = await getTourById(tourId, language, currency, token);
+    console.warn('[getTourByIdBusiness] Result:', result);
+    return result;
+  } catch (error) {
+    console.error('Error in getTourByIdBusiness:', error);
+    return Promise.resolve({ error });
+  }
+};
+
+/**
  * Main business logic router
  */
 const toursBusinessLogic = (
@@ -136,6 +159,41 @@ const createTourBusiness = async (
 };
 
 /**
+ * Business logic for updating a tour
+ */
+const updateTourBusiness = async (
+  tourId: string,
+  data: Record<string, unknown>,
+  token = ''
+): Promise<ServiceResult<unknown>> => {
+  try {
+    if (token === '' || token === undefined) {
+      return Promise.resolve({
+        error: {
+          status: 401,
+          message: 'Access token is required',
+        },
+      });
+    }
+
+    if (tourId === '' || tourId === undefined) {
+      return Promise.resolve({
+        error: {
+          status: 400,
+          message: 'Tour ID is required',
+        },
+      });
+    }
+
+    const result = await updateTour(tourId, data, token);
+    return result;
+  } catch (error) {
+    console.error('Error in updateTourBusiness:', error);
+    return Promise.resolve({ error });
+  }
+};
+
+/**
  * Main export function
  */
 const tours = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> => {
@@ -151,7 +209,9 @@ const tours = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> 
 
 export {
   getToursDropdownBusiness,
+  getTourByIdBusiness,
   createTourBusiness,
+  updateTourBusiness,
   uploadTourImages,
   setImageAsCover,
   deleteTourImage,
