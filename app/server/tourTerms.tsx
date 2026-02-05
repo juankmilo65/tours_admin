@@ -215,6 +215,46 @@ export const createTourTerms = async (
 };
 
 /**
+ * Update tour terms status
+ */
+export const updateTourTermsStatus = async (
+  termsId: string,
+  isActive: boolean,
+  token: string,
+  language?: string
+): Promise<TourTermResponse> => {
+  if (BASE_URL === '' || BASE_URL === undefined || token === '' || termsId === '') {
+    return { success: false, data: undefined };
+  }
+
+  try {
+    const tourTermsService = createServiceREST(
+      BASE_URL,
+      `terms-conditions/${termsId}/status`,
+      `Bearer ${token}`
+    );
+
+    const result = await tourTermsService.update(
+      { isActive },
+      {
+        headers: {
+          'X-Language': language ?? 'es',
+        },
+      }
+    );
+
+    return result as TourTermResponse;
+  } catch (error) {
+    console.error('Error in updateTourTermsStatus:', error);
+    return {
+      error: error instanceof Error ? { message: error.message } : { message: 'Unknown error' },
+      success: false,
+      data: undefined,
+    };
+  }
+};
+
+/**
  * Update tour terms
  */
 export const updateTourTerms = async (

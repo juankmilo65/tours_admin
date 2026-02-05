@@ -12,7 +12,8 @@ import { Table } from '~/components/ui/Table';
 import Select from '~/components/ui/Select';
 import {
   getMyTourTerms,
-  updateTourTerms,
+  createTourTerms,
+  updateTourTermsStatus,
   type TourTerm,
   type CreateTourTermDto,
 } from '~/server/tourTerms';
@@ -134,6 +135,22 @@ export default function TermsConditions(): JSX.Element {
     void fetchTourTerms();
   }, [page, limit, language, token, dispatch, t]);
 
+  // Helper function to increment version number
+  const incrementVersion = (currentVersion: string): string => {
+    try {
+      const parts = currentVersion.split('.');
+      if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
+        const major = parseInt(parts[0], 10);
+        const minor = parseInt(parts[1], 10);
+        const newMinor = minor + 1;
+        return `${major}.${newMinor}`;
+      }
+      return '1.0';
+    } catch {
+      return '1.0';
+    }
+  };
+
   const resetForm = () => {
     setNewTerm({
       tourId: '',
@@ -147,17 +164,19 @@ export default function TermsConditions(): JSX.Element {
 
   const handleEditTerm = (term: TourTerm) => {
     setEditingTerm(term);
+    // Auto-increment version when editing
+    const nextVersion = incrementVersion(term.version);
     setNewTerm({
       tourId: term.tourId,
       terms_conditions_es: term.terms_conditions_es,
       terms_conditions_en: term.terms_conditions_en,
-      version: term.version,
+      version: nextVersion,
     });
     setErrors({});
     setIsCreateModalOpen(true);
   };
 
-  // Handle create tour terms
+  // Handle create tour terms (create new version)
   const handleCreateTerm = async () => {
     if (token === null || token === '') {
       console.error('No token available');
@@ -184,20 +203,22 @@ export default function TermsConditions(): JSX.Element {
 
     try {
       const isEditing = editingTerm !== null;
+      const previousTermId = isEditing ? editingTerm.id : null;
+
       dispatch(
         setGlobalLoading({
           isLoading: true,
-          message: isEditing
-            ? (t('termsConditions.updating') ?? 'Updating...')
-            : (t('termsConditions.creating') ?? 'Creating...'),
+          message: t('termsConditions.creating') ?? 'Creating...',
         })
       );
 
-      const result = (await updateTourTerms(
-        editingTerm?.tourId ?? '',
+      // Always create a new version
+      const result = (await createTourTerms(
         {
+          tourId: newTerm.tourId,
           terms_conditions_es: newTerm.terms_conditions_es,
           terms_conditions_en: newTerm.terms_conditions_en,
+          version: newTerm.version,
         },
         token,
         language
@@ -208,24 +229,35 @@ export default function TermsConditions(): JSX.Element {
       };
 
       if (result.error !== undefined || result.success === false) {
-        console.error('Error updating tour terms:', result.error ?? result);
+        console.error('Error creating tour terms:', result.error ?? result);
         dispatch(setGlobalLoading({ isLoading: false, message: '' }));
         setErrorModal({
           isOpen: true,
-          title: t('termsConditions.errorUpdateTitle') ?? 'Error',
+          title: t('termsConditions.errorCreateTitle') ?? 'Error',
           message:
             result.message ??
             (result.error as { message?: string })?.message ??
-            t('termsConditions.errorUpdate'),
+            t('termsConditions.errorCreate'),
         });
         return;
       }
 
-      // Success - Keep loader open while refetching
+      // Success creating new version - now deactivate previous version if editing
+      if (isEditing && previousTermId !== null) {
+        try {
+          await updateTourTermsStatus(previousTermId, false, token, language);
+          console.log('Previous version deactivated successfully');
+        } catch (error) {
+          console.error('Error deactivating previous version:', error);
+          // Don't fail the whole process if deactivation fails, just log it
+        }
+      }
+
+      // Success - Close modal and reset form
       setIsCreateModalOpen(false);
       resetForm();
 
-      // Refetch
+      // Refetch data
       const refreshResult = await getMyTourTerms(
         {
           page: 1,
@@ -245,7 +277,7 @@ export default function TermsConditions(): JSX.Element {
         dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       }
     } catch (error) {
-      console.error('Error in tour terms update flow:', error);
+      console.error('Error in tour terms create flow:', error);
       dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       setErrorModal({
         isOpen: true,
@@ -715,34 +747,44 @@ export default function TermsConditions(): JSX.Element {
                 marginBottom: 'var(--space-1)',
                 fontSize: 'var(--text-sm)',
                 fontWeight: 'var(--font-weight-medium)',
-                color:
-                  errors.version !== undefined && errors.version !== ''
-                    ? 'var(--color-error-600)'
-                    : 'var(--color-neutral-700)',
+                color: 'var(--color-neutral-700)',
               }}
             >
               {t('termsConditions.version')}
+              {editingTerm !== null && (
+                <span className="ml-2 text-xs text-gray-500">
+                  ({t('termsConditions.autoIncrement') ?? 'Auto-incremented'})
+                </span>
+              )}
             </label>
             <input
               type="text"
               className="form-input"
               placeholder="1.0"
               value={newTerm.version}
+              disabled={editingTerm !== null}
               onChange={(e) => {
-                setNewTerm({ ...newTerm, version: e.target.value });
-                if (errors.version !== undefined && errors.version !== '')
-                  setErrors({ ...errors, version: '' });
+                if (editingTerm === null) {
+                  setNewTerm({ ...newTerm, version: e.target.value });
+                  if (errors.version !== undefined && errors.version !== '')
+                    setErrors({ ...errors, version: '' });
+                }
+              }}
+              style={{
+                backgroundColor: editingTerm !== null ? 'var(--color-neutral-100)' : 'white',
+                cursor: editingTerm !== null ? 'not-allowed' : 'text',
               }}
             />
-            {errors.version !== undefined && errors.version !== '' && (
+            {editingTerm !== null && (
               <p
                 style={{
                   marginTop: 'var(--space-1)',
-                  fontSize: 'var(--text-sm)',
-                  color: 'var(--color-error-500)',
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-neutral-500)',
                 }}
               >
-                {errors.version}
+                {t('termsConditions.versionAutoIncrement') ??
+                  'Version is automatically incremented when creating a new version'}
               </p>
             )}
           </div>
