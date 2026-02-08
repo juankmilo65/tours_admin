@@ -5,28 +5,12 @@
 import type { JSX } from 'react';
 import { Link, useLocation, useNavigation } from '@remix-run/react';
 import { useState, useEffect } from 'react';
-import { useAppDispatch } from '~/store/hooks';
+import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
+import { selectAuthToken } from '~/store/slices/authSlice';
 import { useTranslation } from '~/lib/i18n/utils';
-
-interface NavItem {
-  path: string;
-  labelKey: string;
-  icon: string;
-}
-
-const navItems: NavItem[] = [
-  { path: '/', labelKey: 'sidebar.dashboard', icon: '📊' },
-  { path: '/tours', labelKey: 'sidebar.tours', icon: '🏛️' },
-  { path: '/cities', labelKey: 'sidebar.cities', icon: '🏙️' },
-  { path: '/categories', labelKey: 'sidebar.categories', icon: '📁' },
-  { path: '/activities', labelKey: 'sidebar.activities', icon: '🎯' },
-  { path: '/news', labelKey: 'sidebar.news', icon: '📰' },
-  { path: '/offers', labelKey: 'sidebar.offers', icon: '🎁' },
-  { path: '/reservations', labelKey: 'sidebar.reservations', icon: '📅' },
-  { path: '/users', labelKey: 'sidebar.users', icon: '👥' },
-  { path: '/terms-conditions', labelKey: 'sidebar.termsConditions', icon: '📝' },
-];
+import type { NavItem } from '~/types/MenuProps';
+import { getUserMenuBusiness } from '~/server/businessLogic/menusBusinessLogic';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -35,12 +19,16 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.Element {
+  const token = useAppSelector(selectAuthToken);
+  const currentLanguage = useAppSelector((state) => state.ui.language);
   const location = useLocation();
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const currentPath = location.pathname;
   const [isMobile, setIsMobile] = useState(false);
+  const [navItems, setNavItems] = useState<NavItem[]>([]);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(true);
 
   // Turn off global loading when navigation completes
   useEffect(() => {
@@ -48,6 +36,35 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.El
       dispatch(setGlobalLoading({ isLoading: false }));
     }
   }, [navigation.state, dispatch]);
+
+  // Fetch menu from API based on user's role
+  useEffect(() => {
+    async function fetchMenu() {
+      try {
+        const language = currentLanguage ?? 'es';
+
+        if (token === null || token === '') {
+          setNavItems([]);
+          setIsLoadingMenu(false);
+          return;
+        }
+
+        const result = await getUserMenuBusiness(token, language);
+
+        if (result.success === true && result.data !== undefined && Array.isArray(result.data)) {
+          setNavItems(result.data);
+        } else {
+          setNavItems([]);
+        }
+      } catch {
+        setNavItems([]);
+      } finally {
+        setIsLoadingMenu(false);
+      }
+    }
+
+    void fetchMenu();
+  }, [token, currentLanguage]);
 
   // Check if screen is mobile
   useEffect(() => {
@@ -174,48 +191,70 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.El
             gap: 'var(--space-1)',
           }}
         >
-          {navItems.map((item) => {
-            const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
-            const label = t(item.labelKey);
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => handleLinkClick(item.path)}
-                style={{
-                  textDecoration: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: isCollapsed ? 0 : 'var(--space-3)',
-                  padding: isCollapsed ? 'var(--space-3)' : 'var(--space-3) var(--space-4)',
-                  borderRadius: 'var(--radius-lg)',
-                  transition: 'all var(--transition-base)',
-                  color: isActive ? 'var(--color-primary-700)' : 'var(--color-neutral-600)',
-                  backgroundColor: isActive ? 'var(--color-primary-50)' : 'transparent',
-                  fontWeight: isActive
-                    ? 'var(--font-weight-semibold)'
-                    : 'var(--font-weight-normal)',
-                  justifyContent: isCollapsed ? 'center' : 'flex-start',
-                }}
-                onMouseOver={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
-                    e.currentTarget.style.color = 'var(--color-neutral-800)';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'var(--color-neutral-600)';
-                  }
-                }}
-                title={isCollapsed ? label : ''}
-              >
-                <span style={{ fontSize: 'var(--text-xl)' }}>{item.icon}</span>
-                {!isCollapsed && <span>{label}</span>}
-              </Link>
-            );
-          })}
+          {isLoadingMenu ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: 'var(--space-4)',
+                color: 'var(--color-neutral-500)',
+              }}
+            >
+              Loading menu...
+            </div>
+          ) : navItems.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: 'var(--space-4)',
+                color: 'var(--color-neutral-500)',
+              }}
+            >
+              No menu items available
+            </div>
+          ) : (
+            navItems.map((item) => {
+              const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
+              const label = t(item.labelKey);
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => handleLinkClick(item.path)}
+                  style={{
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: isCollapsed ? 0 : 'var(--space-3)',
+                    padding: isCollapsed ? 'var(--space-3)' : 'var(--space-3) var(--space-4)',
+                    borderRadius: 'var(--radius-lg)',
+                    transition: 'all var(--transition-base)',
+                    color: isActive ? 'var(--color-primary-700)' : 'var(--color-neutral-600)',
+                    backgroundColor: isActive ? 'var(--color-primary-50)' : 'transparent',
+                    fontWeight: isActive
+                      ? 'var(--font-weight-semibold)'
+                      : 'var(--font-weight-normal)',
+                    justifyContent: isCollapsed ? 'center' : 'flex-start',
+                  }}
+                  onMouseOver={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
+                      e.currentTarget.style.color = 'var(--color-neutral-800)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = 'var(--color-neutral-600)';
+                    }
+                  }}
+                  title={isCollapsed ? label : ''}
+                >
+                  <span style={{ fontSize: 'var(--text-xl)' }}>{item.icon}</span>
+                  {!isCollapsed && <span>{label}</span>}
+                </Link>
+              );
+            })
+          )}
         </nav>
       </aside>
     </>
