@@ -95,6 +95,7 @@ export const es: Translation = {
     reservations: 'Reservas',
     users: 'Usuarios',
     termsConditions: 'Términos y Condiciones',
+    menus: 'Menús',
     settings: 'Configuración',
   },
   header: {

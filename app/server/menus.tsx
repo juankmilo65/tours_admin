@@ -3,6 +3,7 @@
  */
 
 import { createServiceREST } from './_index';
+import type { CreateMenuDto, UpdateMenuDto, GetMenusParams } from '../types/MenuProps';
 
 // Type declaration for Vite environment variables
 interface ViteImportMetaEnv {
@@ -17,19 +18,185 @@ const BASE_URL =
   (import.meta as unknown as ViteImportMeta).env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
 /**
+ * Get all menus with filters and pagination
+ */
+export const getMenus = async (params: GetMenusParams = {}): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('BACKEND_URL is not configured, returning empty for menus');
+    return {
+      success: false,
+      data: [],
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+    };
+  }
+
+  try {
+    const { page = 1, limit = 10, isActive, role, language = 'es', token } = params;
+
+    const queryParams: Record<string, string | number> = { page, limit };
+    if (isActive !== undefined) {
+      queryParams.isActive = isActive.toString();
+    }
+    if (role !== undefined && role !== '') {
+      queryParams.role = role;
+    }
+
+    const menusEndpoint = 'menus';
+    const menusService = createServiceREST(
+      BASE_URL,
+      menusEndpoint,
+      token !== undefined && token !== '' ? `Bearer ${token}` : 'Bearer'
+    );
+
+    const result = await menusService.get({
+      params: queryParams,
+      headers: {
+        'X-Language': language,
+      },
+    });
+
+    return result;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Error in getMenus service:', error.message);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          'Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('Unknown error in getMenus service:', error);
+    }
+    return {
+      error,
+      success: false,
+      data: [],
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+    };
+  }
+};
+
+/**
+ * Get menu by ID
+ */
+export const getMenuById = async (id: string, token: string, language = 'es'): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('BACKEND_URL is not configured');
+    return { success: false, data: null };
+  }
+
+  try {
+    const menuEndpoint = `menus/${id}`;
+    const menuService = createServiceREST(BASE_URL, menuEndpoint, `Bearer ${token}`);
+
+    const result = await menuService.get({
+      headers: {
+        'X-Language': language,
+      },
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error in getMenuById service:', error);
+    return { error, success: false, data: null };
+  }
+};
+
+/**
+ * Create new menu
+ */
+export const createMenu = async (
+  data: CreateMenuDto,
+  token: string,
+  language = 'es'
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    throw new Error('BACKEND_URL is not configured');
+  }
+
+  const menusEndpoint = 'menus';
+  const menusService = createServiceREST(BASE_URL, menusEndpoint, `Bearer ${token}`);
+
+  const result = await menusService.create(data, {
+    headers: {
+      'X-Language': language,
+    },
+  });
+  return result;
+};
+
+/**
+ * Update menu
+ */
+export const updateMenu = async (
+  menuId: string,
+  data: UpdateMenuDto,
+  token: string,
+  language = 'es'
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    throw new Error('BACKEND_URL is not configured');
+  }
+
+  const menusEndpoint = `menus/${menuId}`;
+  const menusService = createServiceREST(BASE_URL, 'menus', `Bearer ${token}`);
+
+  const result = await menusService.update(data, {
+    headers: {
+      'X-Language': language,
+    },
+    url: `/${menusEndpoint}`,
+  });
+  return result;
+};
+
+/**
+ * Delete menu
+ */
+export const deleteMenu = async (menuId: string, token: string): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    throw new Error('BACKEND_URL is not configured');
+  }
+
+  const menusEndpoint = `menus/${menuId}`;
+  const menuService = createServiceREST(BASE_URL, menusEndpoint, `Bearer ${token}`);
+
+  const result = await menuService.delete();
+  return result;
+};
+
+/**
+ * Associate roles to a menu
+ */
+export const associateRolesToMenu = async (
+  menuId: string,
+  roleIds: string[],
+  token: string
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    throw new Error('BACKEND_URL is not configured');
+  }
+
+  const menusEndpoint = `menus/${menuId}/roles`;
+  const menusService = createServiceREST(BASE_URL, 'menus', `Bearer ${token}`);
+
+  const result = await menusService.create(
+    { roleIds },
+    {
+      url: `/${menusEndpoint}`,
+    }
+  );
+  return result;
+};
+
+/**
  * Get user's menu based on their role
  * The endpoint automatically extracts the role from the JWT token
  */
 export const getUserMenu = async (token: string, language = 'es'): Promise<unknown> => {
-  console.warn('🎯 [GET USER MENU] Starting getUserMenu with params:', {
-    hasToken: token !== '',
-    language,
-    BASE_URL,
-  });
-
-  // Check if backend URL is configured
   if (BASE_URL === '' || BASE_URL === undefined) {
-    console.warn('⚠️ [GET USER MENU] BACKEND_URL is not configured, returning empty menu');
+    console.warn('BACKEND_URL is not configured, returning empty menu');
     return {
       success: false,
       data: [],
@@ -38,14 +205,7 @@ export const getUserMenu = async (token: string, language = 'es'): Promise<unkno
 
   try {
     const menuEndpoint = 'menus/my-menu';
-    const fullUrl = `${BASE_URL}/${menuEndpoint}`;
-    console.warn('🌐 [GET USER MENU] Full URL to call:', fullUrl);
-
     const menuService = createServiceREST(BASE_URL, menuEndpoint, `Bearer ${token}`);
-    console.warn('📡 [GET USER MENU] Calling backend with headers:', {
-      'X-Language': language,
-      Authorization: `Bearer ${token.substring(0, 20)}...`,
-    });
 
     const result = await menuService.get({
       headers: {
@@ -53,23 +213,9 @@ export const getUserMenu = async (token: string, language = 'es'): Promise<unkno
       },
     });
 
-    console.warn('✅ [GET USER MENU] Success! Result:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
-    // Handle network errors gracefully (ECONNREFUSED, etc.)
-    console.error('❌ [GET USER MENU] Error caught:', error);
-    if (error instanceof Error) {
-      console.error('❌ [GET USER MENU] Error message:', error.message);
-      console.error('❌ [GET USER MENU] Error stack:', error.stack);
-      if (error.message.includes('ECONNREFUSED')) {
-        console.warn(
-          '⚠️ [GET USER MENU] Backend API is not available. Please ensure that backend server is running at:',
-          BASE_URL
-        );
-      }
-    } else {
-      console.error('❌ [GET USER MENU] Unknown error:', error);
-    }
+    console.error('Error in getUserMenu service:', error);
     return { error, success: false, data: [] };
   }
 };

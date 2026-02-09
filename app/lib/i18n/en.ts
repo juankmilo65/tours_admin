@@ -89,6 +89,7 @@ export const en: Translation = {
     reservations: 'Reservations',
     users: 'Users',
     termsConditions: 'Terms and Conditions',
+    menus: 'Menus',
     settings: 'Settings',
   },
   header: {
