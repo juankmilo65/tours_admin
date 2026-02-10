@@ -10,6 +10,7 @@ import {
   deleteMenu,
   associateRolesToMenu,
   getUserMenu,
+  getParentMenus,
 } from '../menus';
 import type { ServiceResult } from '../_index';
 import type {
@@ -19,10 +20,20 @@ import type {
   CreateMenuDto,
   UpdateMenuDto,
   NavItem,
+  ParentMenuItem,
+  ParentMenusResponse,
 } from '~/types/MenuProps';
 
 // Re-export types for components to use
-export type { Menu, MenuResponse, MenusResponse, CreateMenuDto, UpdateMenuDto, NavItem };
+export type {
+  Menu,
+  MenuResponse,
+  MenusResponse,
+  CreateMenuDto,
+  UpdateMenuDto,
+  NavItem,
+  ParentMenuItem,
+};
 
 interface MenusPayload {
   token?: string;
@@ -351,6 +362,26 @@ export const getUserMenuBusiness = async (
   } catch (error) {
     console.error('Error in getUserMenuBusiness:', error);
     return { success: false };
+  }
+};
+
+/**
+ * Get parent menus - for use in create/edit menu dropdown
+ * @param token - JWT authentication token
+ * @param app - Application identifier (default: 'admin')
+ * @param isActive - Filter by active status (default: true)
+ */
+export const getParentMenusBusiness = async (
+  token: string,
+  app = 'admin',
+  isActive = true
+): Promise<ParentMenusResponse> => {
+  try {
+    const result = (await getParentMenus(token, app, isActive)) as ParentMenusResponse;
+    return result;
+  } catch (error) {
+    console.error('Error in getParentMenusBusiness:', error);
+    return { success: false, data: [] };
   }
 };
 

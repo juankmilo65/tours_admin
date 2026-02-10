@@ -40,9 +40,18 @@ export interface Role {
   slug: string;
 }
 
+export interface ParentMenuItem {
+  id: string;
+  label_es: string;
+  label_en: string;
+}
+
 export interface CreateMenuDto {
-  path: string;
-  labelKey: string;
+  app: string;
+  path?: string;
+  parentId?: string;
+  label_es: string;
+  label_en: string;
   icon: string;
   sort_order?: number;
   isActive: boolean;
@@ -50,10 +59,24 @@ export interface CreateMenuDto {
 
 export interface UpdateMenuDto {
   path?: string;
+  parentId?: string;
   labelKey?: string;
   icon?: string;
   sort_order?: number;
   isActive?: boolean;
+}
+
+export interface GetParentMenusParams {
+  app: string;
+  isActive?: boolean;
+  token?: string;
+}
+
+export interface ParentMenusResponse {
+  success: boolean;
+  data?: ParentMenuItem[];
+  message?: string;
+  error?: { message?: string };
 }
 
 export interface MenuResponse {

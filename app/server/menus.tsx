@@ -192,7 +192,7 @@ export const associateRolesToMenu = async (
 
 /**
  * Get user's menu based on their role
- * The endpoint automatically extracts the role from the JWT token
+ * The endpoint automatically extracts; role from; JWT token
  * @param token - JWT authentication token
  * @param language - Language code (default: 'es')
  * @param app - Application identifier (default: 'admin')
@@ -223,6 +223,48 @@ export const getUserMenu = async (
     return result;
   } catch (error) {
     console.error('Error in getUserMenu service:', error);
+    return { error, success: false, data: [] };
+  }
+};
+
+/**
+ * Get parent menus for dropdown
+ * @param token - JWT authentication token
+ * @param app - Application identifier (default: 'admin')
+ * @param isActive - Filter by active status (default: true)
+ */
+export const getParentMenus = async (
+  token: string,
+  app = 'admin',
+  isActive = true
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('BACKEND_URL is not configured, returning empty parents');
+    return {
+      success: false,
+      data: [],
+    };
+  }
+
+  try {
+    const queryParams: Record<string, string | boolean> = { app };
+    if (isActive !== undefined) {
+      queryParams.isActive = isActive;
+    }
+
+    const parentsEndpoint = `menus/parents`;
+    const parentsService = createServiceREST(BASE_URL, parentsEndpoint, `Bearer ${token}`);
+
+    const result = await parentsService.get({
+      params: queryParams,
+      headers: {
+        'X-Language': 'es',
+      },
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error in getParentMenus service:', error);
     return { error, success: false, data: [] };
   }
 };

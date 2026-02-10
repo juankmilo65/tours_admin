@@ -16,9 +16,11 @@ import {
   updateMenuBusinessDirect,
   deleteMenuBusinessDirect,
   associateRolesToMenuBusinessDirect,
+  getParentMenusBusiness,
   type Menu,
   type CreateMenuDto,
   type UpdateMenuDto,
+  type ParentMenuItem,
 } from '~/server/businessLogic/menusBusinessLogic';
 import type { Column } from '~/components/ui/Table';
 import { useAppDispatch } from '~/store/hooks';
@@ -46,8 +48,11 @@ export default function Menus(): JSX.Element {
   // Local state for modal and form
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newMenu, setNewMenu] = useState<CreateMenuDto>({
-    path: '/',
-    labelKey: '',
+    app: 'admin',
+    path: undefined,
+    parentId: undefined,
+    label_es: '',
+    label_en: '',
     icon: '',
     isActive: true,
   });
@@ -72,6 +77,10 @@ export default function Menus(): JSX.Element {
   const [isInitialMount, setIsInitialMount] = useState(true);
   const dispatch = useAppDispatch();
 
+  // Parent menus state
+  const [parentMenus, setParentMenus] = useState<ParentMenuItem[]>([]);
+  const [isLoadingParents, setIsLoadingParents] = useState(false);
+
   // Role association state
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [selectedMenuForRoles, setSelectedMenuForRoles] = useState<Menu | null>(null);
@@ -81,6 +90,33 @@ export default function Menus(): JSX.Element {
     { id: 'user', name: 'User' },
   ];
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+
+  // Fetch parent menus
+  useEffect(() => {
+    const fetchParentMenus = async () => {
+      if (token === null || token === '') {
+        setParentMenus([]);
+        return;
+      }
+
+      setIsLoadingParents(true);
+      try {
+        const result = await getParentMenusBusiness(token, 'admin', true);
+
+        if (result.success === true && result.data !== undefined) {
+          setParentMenus(result.data);
+        } else {
+          setParentMenus([]);
+        }
+      } catch {
+        setParentMenus([]);
+      } finally {
+        setIsLoadingParents(false);
+      }
+    };
+
+    void fetchParentMenus();
+  }, [token]);
 
   // Fetch menus when filters or pagination change
   useEffect(() => {
@@ -124,8 +160,11 @@ export default function Menus(): JSX.Element {
 
   const resetForm = () => {
     setNewMenu({
-      path: '/',
-      labelKey: '',
+      app: 'admin',
+      path: undefined,
+      parentId: undefined,
+      label_es: '',
+      label_en: '',
       icon: '',
       isActive: true,
     });
@@ -135,9 +174,17 @@ export default function Menus(): JSX.Element {
   };
 
   const handleOpenEditModal = (menu: Menu) => {
+    // Determine if this menu is a parent menu or submenu
+    // Parent menus don't have paths, submenus do
+    const isParentMenu =
+      menu.path === null || menu.path === undefined || menu.path === '' || menu.path === '/';
+
     setNewMenu({
-      path: menu.path,
-      labelKey: menu.labelKey,
+      app: 'admin',
+      path: isParentMenu ? undefined : menu.path,
+      parentId: isParentMenu ? undefined : '', // Parent menus don't have parentId, submenus need it
+      label_es: menu.labelKey,
+      label_en: menu.labelKey,
       icon: menu.icon,
       sort_order: menu.sortOrder,
       isActive: menu.isActive,
@@ -274,10 +321,29 @@ export default function Menus(): JSX.Element {
 
     // Validation
     const newErrors: Record<string, string> = {};
+    const isParent = newMenu.parentId === undefined;
 
-    if (!newMenu.path.trim()) newErrors.path = 'Path is required';
-    if (!newMenu.labelKey.trim()) newErrors.labelKey = 'Label key is required';
-    if (!newMenu.icon.trim()) newErrors.icon = 'Icon is required';
+    if (!isParent) {
+      // Submenu: path and parent are required
+      if (
+        newMenu.path === null ||
+        newMenu.path === undefined ||
+        newMenu.path === '' ||
+        newMenu.path === '/'
+      ) {
+        newErrors.path = t('menus.pathRequiredForSubmenu');
+      }
+      if (newMenu.parentId === undefined || newMenu.parentId === '') {
+        newErrors.parentId = t('menus.parentRequired');
+      }
+    }
+
+    if (newMenu.label_es !== null && newMenu.label_es !== undefined && !newMenu.label_es.trim())
+      newErrors.label_es = t('menus.labelEsRequired');
+    if (newMenu.label_en !== null && newMenu.label_en !== undefined && !newMenu.label_en.trim())
+      newErrors.label_en = t('menus.labelEnRequired');
+    if (newMenu.icon !== null && newMenu.icon !== undefined && !newMenu.icon.trim())
+      newErrors.icon = t('menus.iconRequired');
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -633,6 +699,8 @@ export default function Menus(): JSX.Element {
     },
   ];
 
+  const isParent = newMenu.parentId === undefined;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       <Card title={t('menus.sectionTitle')}>
@@ -816,6 +884,7 @@ export default function Menus(): JSX.Element {
         )}
       </Card>
 
+      {/* Create/Edit Modal */}
       <Dialog
         isOpen={isCreateModalOpen}
         onClose={() => {
@@ -848,42 +917,183 @@ export default function Menus(): JSX.Element {
             gap: 'var(--space-6)',
           }}
         >
-          <Input
-            label={t('menus.path')}
-            placeholder="/dashboard"
-            value={newMenu.path}
-            onChange={(e) => {
-              setNewMenu({ ...newMenu, path: e.target.value === '' ? '/' : e.target.value });
-              if (errors.path !== undefined && errors.path !== '')
-                setErrors({ ...errors, path: '' });
+          {/* Is Parent Checkbox */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              gridColumn: '1 / -1',
             }}
-            error={errors.path}
+          >
+            <input
+              type="checkbox"
+              id="menu-is-parent"
+              checked={isParent}
+              onChange={(e) => {
+                const isChecked = e.target.checked;
+                if (isChecked) {
+                  // Parent menu: clear parentId and path
+                  setNewMenu({ ...newMenu, parentId: undefined, path: undefined });
+                } else {
+                  // Submenu: prepare to select parent and set default path
+                  setNewMenu({ ...newMenu, parentId: '', path: '/' });
+                }
+                if (
+                  errors.parentId !== null &&
+                  errors.parentId !== undefined &&
+                  errors.parentId !== ''
+                ) {
+                  setErrors({ ...errors, parentId: '' });
+                }
+              }}
+              style={{
+                width: '1.25rem',
+                height: '1.25rem',
+                cursor: 'pointer',
+                accentColor: 'var(--color-primary-600)',
+              }}
+            />
+            <label
+              htmlFor="menu-is-parent"
+              style={{
+                cursor: 'pointer',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--font-weight-medium)',
+                color: 'var(--color-neutral-700)',
+              }}
+            >
+              {t('menus.isParent')}
+            </label>
+          </div>
+
+          {/* Parent Menu Dropdown (only for submenus) */}
+          {!isParent && (
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-700)',
+                  marginBottom: 'var(--space-1)',
+                }}
+              >
+                {t('menus.parentMenu')}
+              </label>
+              {isLoadingParents ? (
+                <div
+                  style={{
+                    padding: 'var(--space-3)',
+                    backgroundColor: 'var(--color-neutral-50)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--color-neutral-500)',
+                  }}
+                >
+                  {t('menus.loadingParents')}
+                </div>
+              ) : (
+                <div>
+                  <Select
+                    options={parentMenus.map((p) => ({
+                      value: p.id,
+                      label: language === 'en' ? p.label_en : p.label_es,
+                    }))}
+                    value={newMenu.parentId ?? ''}
+                    onChange={(v: string) => {
+                      setNewMenu({ ...newMenu, parentId: v || undefined });
+                      if (
+                        errors.parentId !== null &&
+                        errors.parentId !== undefined &&
+                        errors.parentId !== ''
+                      ) {
+                        setErrors({ ...errors, parentId: '' });
+                      }
+                    }}
+                    placeholder={t('menus.selectParent')}
+                    className="w-full"
+                  />
+                  {errors.parentId !== null &&
+                    errors.parentId !== undefined &&
+                    errors.parentId !== '' && (
+                      <p className="text-sm text-red-500 mt-1">{errors.parentId}</p>
+                    )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Path (only for submenus) */}
+          {!isParent && (
+            <Input
+              label={t('menus.path')}
+              placeholder="/tours"
+              value={newMenu.path ?? '/'}
+              onChange={(e) => {
+                setNewMenu({ ...newMenu, path: e.target.value || '/' });
+                if (errors.path !== null && errors.path !== undefined && errors.path !== '') {
+                  setErrors({ ...errors, path: '' });
+                }
+              }}
+              error={errors.path}
+              required={!isParent}
+            />
+          )}
+
+          {/* Spanish Label */}
+          <Input
+            label={t('menus.labelEs')}
+            placeholder="Tours"
+            value={newMenu.label_es}
+            onChange={(e) => {
+              setNewMenu({ ...newMenu, label_es: e.target.value });
+              if (
+                errors.label_es !== null &&
+                errors.label_es !== undefined &&
+                errors.label_es !== ''
+              ) {
+                setErrors({ ...errors, label_es: '' });
+              }
+            }}
+            error={errors.label_es}
             required
           />
+
+          {/* English Label */}
           <Input
-            label={t('menus.labelKey')}
-            placeholder="sidebar.dashboard"
-            value={newMenu.labelKey}
+            label={t('menus.labelEn')}
+            placeholder="Tours"
+            value={newMenu.label_en}
             onChange={(e) => {
-              setNewMenu({ ...newMenu, labelKey: e.target.value });
-              if (errors.labelKey !== undefined && errors.labelKey !== '')
-                setErrors({ ...errors, labelKey: '' });
+              setNewMenu({ ...newMenu, label_en: e.target.value });
+              if (
+                errors.label_en !== null &&
+                errors.label_en !== undefined &&
+                errors.label_en !== ''
+              ) {
+                setErrors({ ...errors, label_en: '' });
+              }
             }}
-            error={errors.labelKey}
+            error={errors.label_en}
             required
           />
+
+          {/* Icon */}
           <Input
             label={t('menus.iconEmoji')}
-            placeholder="📊"
+            placeholder="🏛️"
             value={newMenu.icon}
             onChange={(e) => {
               setNewMenu({ ...newMenu, icon: e.target.value });
-              if (errors.icon !== undefined && errors.icon !== '')
+              if (errors.icon !== null && errors.icon !== undefined && errors.icon !== '') {
                 setErrors({ ...errors, icon: '' });
+              }
             }}
             error={errors.icon}
             required
           />
+
+          {/* Order (only in edit mode) */}
           {isEditMode && (
             <Input
               type="number"
@@ -898,6 +1108,8 @@ export default function Menus(): JSX.Element {
               }}
             />
           )}
+
+          {/* Active Checkbox */}
           <div
             style={{
               display: 'flex',

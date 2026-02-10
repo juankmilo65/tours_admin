@@ -1,13 +1,13 @@
 /**
  * Resource Route for fetching user's menu based on role
- * This endpoint returns the navigation menu items for the authenticated user
+ * This endpoint returns navigation menu items for authenticated user
  */
 
 import { type LoaderFunctionArgs, json } from '@remix-run/node';
 import { getUserMenuBusiness } from '~/server/businessLogic/menusBusinessLogic';
 
 export async function loader({ request }: LoaderFunctionArgs): Promise<ReturnType<typeof json>> {
-  // Get the Authorization header
+  // Get Authorization header
   const authHeader = request.headers.get('Authorization');
 
   if (authHeader === null || authHeader === '' || authHeader.startsWith('Bearer ') === false) {
@@ -17,15 +17,19 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<ReturnTyp
     );
   }
 
-  // Extract the token
+  // Extract token
   const token = authHeader.replace('Bearer ', '');
 
   // Get language from headers or default to 'es'
   const language = request.headers.get('X-Language') ?? 'es';
 
+  // Get app parameter from URL query params or default to 'admin'
+  const url = new URL(request.url);
+  const app = url.searchParams.get('app') ?? 'admin';
+
   try {
-    // Call the business logic to get the menu
-    const result = await getUserMenuBusiness(token, language);
+    // Call business logic to get menu with app parameter
+    const result = await getUserMenuBusiness(token, language, app);
 
     if (result.success === true && result.data !== undefined) {
       return json(result);
