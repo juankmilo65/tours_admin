@@ -62,6 +62,17 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.El
     }
 
     void fetchMenu();
+
+    // Listen for menu update events
+    const handleMenuUpdate = () => {
+      void fetchMenu();
+    };
+
+    window.addEventListener('menu-updated', handleMenuUpdate);
+
+    return () => {
+      window.removeEventListener('menu-updated', handleMenuUpdate);
+    };
   }, [token, currentLanguage]);
 
   // Check if screen is mobile

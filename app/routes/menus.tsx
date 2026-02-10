@@ -210,6 +210,8 @@ export default function Menus(): JSX.Element {
 
       if (result.success) {
         setMenus(menus.map((m) => (m.id === menu.id ? { ...m, isActive: !m.isActive } : m)));
+        // Dispatch custom event to notify Sidebar to reload menu
+        window.dispatchEvent(new CustomEvent('menu-updated'));
       } else {
         setErrorModal({
           isOpen: true,
@@ -248,6 +250,8 @@ export default function Menus(): JSX.Element {
       if (result.success) {
         setMenus(menus.filter((m) => m.id !== menu.id));
         setDeleteConfirmModal({ isOpen: false, menuToDelete: null });
+        // Dispatch custom event to notify Sidebar to reload menu
+        window.dispatchEvent(new CustomEvent('menu-updated'));
       } else {
         setErrorModal({
           isOpen: true,
@@ -381,6 +385,8 @@ export default function Menus(): JSX.Element {
 
         // Update local state
         setMenus(menus.map((m) => (m.id === editingMenuId ? { ...m, ...newMenu } : m)));
+        // Dispatch custom event to notify Sidebar to reload menu
+        window.dispatchEvent(new CustomEvent('menu-updated'));
       } else {
         // Create
         const result = await createMenuBusinessDirect(newMenu, token, language);
@@ -415,6 +421,9 @@ export default function Menus(): JSX.Element {
           setPage(1);
         }
       }
+
+      // Dispatch custom event to notify Sidebar to reload menu
+      window.dispatchEvent(new CustomEvent('menu-updated'));
 
       setIsCreateModalOpen(false);
       resetForm();
