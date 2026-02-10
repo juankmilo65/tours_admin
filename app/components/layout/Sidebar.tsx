@@ -8,7 +8,6 @@ import { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
 import { selectAuthToken } from '~/store/slices/authSlice';
-import { useTranslation } from '~/lib/i18n/utils';
 import type { NavItem } from '~/types/MenuProps';
 import { getUserMenuBusiness } from '~/server/businessLogic/menusBusinessLogic';
 
@@ -24,7 +23,6 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.El
   const location = useLocation();
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
   const currentPath = location.pathname;
   const [isMobile, setIsMobile] = useState(false);
   const [navItems, setNavItems] = useState<NavItem[]>([]);
@@ -49,7 +47,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.El
           return;
         }
 
-        const result = await getUserMenuBusiness(token, language);
+        const result = await getUserMenuBusiness(token, language, 'admin');
 
         if (result.success === true && result.data !== undefined && Array.isArray(result.data)) {
           setNavItems(result.data);
@@ -213,45 +211,120 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.El
             </div>
           ) : (
             navItems.map((item) => {
-              const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
-              const label = t(item.labelKey);
+              const hasSubmenu = item.submenu !== undefined && item.submenu.length > 0;
+              const label = currentLanguage === 'en' ? item.label_en : item.label_es;
+
+              // Check if this item or any of its submenus are active
+              let isActive = false;
+              if (hasSubmenu && item.submenu !== undefined) {
+                isActive = item.submenu.some((sub) => currentPath === sub.path);
+              }
+
               return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => handleLinkClick(item.path)}
-                  style={{
-                    textDecoration: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: isCollapsed ? 0 : 'var(--space-3)',
-                    padding: isCollapsed ? 'var(--space-3)' : 'var(--space-3) var(--space-4)',
-                    borderRadius: 'var(--radius-lg)',
-                    transition: 'all var(--transition-base)',
-                    color: isActive ? 'var(--color-primary-700)' : 'var(--color-neutral-600)',
-                    backgroundColor: isActive ? 'var(--color-primary-50)' : 'transparent',
-                    fontWeight: isActive
-                      ? 'var(--font-weight-semibold)'
-                      : 'var(--font-weight-normal)',
-                    justifyContent: isCollapsed ? 'center' : 'flex-start',
-                  }}
-                  onMouseOver={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
-                      e.currentTarget.style.color = 'var(--color-neutral-800)';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--color-neutral-600)';
-                    }
-                  }}
-                  title={isCollapsed ? label : ''}
-                >
-                  <span style={{ fontSize: 'var(--text-xl)' }}>{item.icon}</span>
-                  {!isCollapsed && <span>{label}</span>}
-                </Link>
+                <div key={item.id}>
+                  {/* Main menu item */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: isCollapsed ? 0 : 'var(--space-3)',
+                      padding: isCollapsed ? 'var(--space-3)' : 'var(--space-3) var(--space-4)',
+                      borderRadius: 'var(--radius-lg)',
+                      transition: 'all var(--transition-base)',
+                      color: isActive ? 'var(--color-primary-700)' : 'var(--color-neutral-600)',
+                      backgroundColor: isActive ? 'var(--color-primary-50)' : 'transparent',
+                      fontWeight: isActive
+                        ? 'var(--font-weight-semibold)'
+                        : 'var(--font-weight-normal)',
+                      justifyContent: isCollapsed ? 'center' : 'flex-start',
+                      cursor: hasSubmenu ? 'pointer' : 'default',
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
+                        e.currentTarget.style.color = 'var(--color-neutral-800)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = 'var(--color-neutral-600)';
+                      }
+                    }}
+                    title={isCollapsed ? label : ''}
+                  >
+                    <span style={{ fontSize: 'var(--text-xl)' }}>{item.icon}</span>
+                    {!isCollapsed && (
+                      <span>
+                        {label}
+                        {hasSubmenu && (
+                          <span
+                            style={{ marginLeft: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
+                          >
+                            ▼
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Submenu items */}
+                  {!isCollapsed && hasSubmenu && (
+                    <div
+                      style={{
+                        paddingLeft: 'var(--space-8)',
+                        marginTop: 'var(--space-1)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 'var(--space-1)',
+                      }}
+                    >
+                      {item.submenu.map((subItem) => {
+                        const isSubActive = currentPath === subItem.path;
+                        const subLabel =
+                          currentLanguage === 'en' ? subItem.label_en : subItem.label_es;
+                        return (
+                          <Link
+                            key={subItem.id}
+                            to={subItem.path}
+                            onClick={() => handleLinkClick(subItem.path)}
+                            style={{
+                              textDecoration: 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-2)',
+                              padding: 'var(--space-2) var(--space-3)',
+                              borderRadius: 'var(--radius-md)',
+                              transition: 'all var(--transition-base)',
+                              color: isSubActive
+                                ? 'var(--color-primary-700)'
+                                : 'var(--color-neutral-600)',
+                              backgroundColor: isSubActive
+                                ? 'var(--color-primary-50)'
+                                : 'transparent',
+                              fontSize: 'var(--text-sm)',
+                            }}
+                            onMouseOver={(e) => {
+                              if (!isSubActive) {
+                                e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
+                                e.currentTarget.style.color = 'var(--color-neutral-800)';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (!isSubActive) {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                                e.currentTarget.style.color = 'var(--color-neutral-600)';
+                              }
+                            }}
+                          >
+                            <span style={{ fontSize: 'var(--text-base)' }}>{subItem.icon}</span>
+                            <span>{subLabel}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })
           )}

@@ -2,10 +2,24 @@
  * Menu Types
  */
 
-export interface NavItem {
+export interface SubMenuItem {
+  id: string;
+  menu: string;
+  label_es: string;
+  label_en: string;
   path: string;
-  labelKey: string;
   icon: string;
+  sortOrder?: number;
+}
+
+export interface NavItem {
+  id: string;
+  menu: string;
+  label_es: string;
+  label_en: string;
+  icon: string;
+  sortOrder?: number;
+  submenu: SubMenuItem[];
 }
 
 export interface Menu {
@@ -13,7 +27,7 @@ export interface Menu {
   path: string;
   labelKey: string;
   icon: string;
-  sort_order: number;
+  sortOrder: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

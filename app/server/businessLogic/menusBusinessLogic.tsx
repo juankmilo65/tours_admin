@@ -333,13 +333,17 @@ export const associateRolesToMenuBusinessDirect = async (
 
 /**
  * Get user's menu - for use in Sidebar component
+ * @param token - JWT authentication token
+ * @param language - Language code (default: 'es')
+ * @param app - Application identifier (default: 'admin')
  */
 export const getUserMenuBusiness = async (
   token: string,
-  language = 'es'
+  language = 'es',
+  app = 'admin'
 ): Promise<{ success: boolean; data?: NavItem[]; error?: { message?: string } }> => {
   try {
-    const result = (await getUserMenu(token, language)) as {
+    const result = (await getUserMenu(token, language, app)) as {
       success: boolean;
       data?: NavItem[];
     };

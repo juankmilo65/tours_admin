@@ -193,8 +193,15 @@ export const associateRolesToMenu = async (
 /**
  * Get user's menu based on their role
  * The endpoint automatically extracts the role from the JWT token
+ * @param token - JWT authentication token
+ * @param language - Language code (default: 'es')
+ * @param app - Application identifier (default: 'admin')
  */
-export const getUserMenu = async (token: string, language = 'es'): Promise<unknown> => {
+export const getUserMenu = async (
+  token: string,
+  language = 'es',
+  app = 'admin'
+): Promise<unknown> => {
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn('BACKEND_URL is not configured, returning empty menu');
     return {
@@ -204,7 +211,7 @@ export const getUserMenu = async (token: string, language = 'es'): Promise<unkno
   }
 
   try {
-    const menuEndpoint = 'menus/my-menu';
+    const menuEndpoint = `menus/my-menu?app=${app}`;
     const menuService = createServiceREST(BASE_URL, menuEndpoint, `Bearer ${token}`);
 
     const result = await menuService.get({

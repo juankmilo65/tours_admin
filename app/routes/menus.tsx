@@ -90,8 +90,6 @@ export default function Menus(): JSX.Element {
         return;
       }
 
-      console.log('Token:', token);
-
       dispatch(setGlobalLoading({ isLoading: true, message: t('common.loading') }));
 
       try {
@@ -141,7 +139,7 @@ export default function Menus(): JSX.Element {
       path: menu.path,
       labelKey: menu.labelKey,
       icon: menu.icon,
-      sort_order: menu.sort_order,
+      sort_order: menu.sortOrder,
       isActive: menu.isActive,
     });
     setIsEditMode(true);
@@ -368,18 +366,20 @@ export default function Menus(): JSX.Element {
 
   // Filter menus by search term
   const filteredMenus = menus.filter((menu) => {
-    const searchLower = searchTerm.toLowerCase();
+    const searchLower = searchTerm?.toLowerCase() ?? '';
+    const path = menu.path?.toLowerCase() ?? '';
+    const labelKey = menu.labelKey?.toLowerCase() ?? '';
+    const icon = menu.icon?.toLowerCase() ?? '';
     return (
-      menu.path.toLowerCase().includes(searchLower) ||
-      menu.labelKey.toLowerCase().includes(searchLower) ||
-      menu.icon.toLowerCase().includes(searchLower)
+      path.includes(searchLower) || labelKey.includes(searchLower) || icon.includes(searchLower)
     );
   });
 
   // Helper function to check if a menu is protected (cannot be modified)
   const isProtectedMenu = (menu: Menu): boolean => {
     const protectedLabelKeys = ['menus', 'configuración', 'configuration', 'settings'];
-    return protectedLabelKeys.includes(menu.labelKey.toLowerCase());
+    const labelKey = menu.labelKey?.toLowerCase() ?? '';
+    return protectedLabelKeys.includes(labelKey);
   };
 
   const columns: Column<Menu>[] = [
@@ -410,7 +410,7 @@ export default function Menus(): JSX.Element {
       ),
     },
     {
-      key: 'sort_order',
+      key: 'sortOrder',
       label: t('menus.order'),
       render: (value: unknown) => (
         <span className="text-sm text-gray-700 font-medium">{value as number}</span>
