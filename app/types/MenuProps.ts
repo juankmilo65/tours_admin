@@ -29,6 +29,7 @@ export interface Menu {
   icon: string;
   sortOrder: number;
   isActive: boolean;
+  parentId?: string;
   createdAt: string;
   updatedAt: string;
   roles?: Role[];

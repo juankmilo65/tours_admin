@@ -209,7 +209,29 @@ export default function Menus(): JSX.Element {
       );
 
       if (result.success) {
-        setMenus(menus.map((m) => (m.id === menu.id ? { ...m, isActive: !m.isActive } : m)));
+        // Check if this menu is a parent menu (no path or empty path)
+        const isParentMenu =
+          menu.path === null || menu.path === undefined || menu.path === '' || menu.path === '/';
+
+        const newStatus = !menu.isActive;
+
+        // Update local state
+        setMenus(
+          menus.map((m) => {
+            // Update menu itself
+            if (m.id === menu.id) {
+              return { ...m, isActive: newStatus };
+            }
+
+            // If it's a parent menu and we're deactivating it, also deactivate all its children
+            if (isParentMenu && !newStatus && m.parentId === menu.id) {
+              return { ...m, isActive: false };
+            }
+
+            return m;
+          })
+        );
+
         // Dispatch custom event to notify Sidebar to reload menu
         window.dispatchEvent(new CustomEvent('menu-updated'));
       } else {
