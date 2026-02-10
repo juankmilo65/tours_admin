@@ -46,16 +46,19 @@ export default function Menus(): JSX.Element {
   // Local state for modal and form
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newMenu, setNewMenu] = useState<CreateMenuDto>({
-    path: '',
+    path: '/',
     labelKey: '',
     icon: '',
-    order: 0,
     isActive: true,
   });
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingMenuId, setEditingMenuId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState({
+    isOpen: false,
+    menuToDelete: null as Menu | null,
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -86,6 +89,8 @@ export default function Menus(): JSX.Element {
         setIsInitialMount(false);
         return;
       }
+
+      console.log('Token:', token);
 
       dispatch(setGlobalLoading({ isLoading: true, message: t('common.loading') }));
 
@@ -121,10 +126,9 @@ export default function Menus(): JSX.Element {
 
   const resetForm = () => {
     setNewMenu({
-      path: '',
+      path: '/',
       labelKey: '',
       icon: '',
-      order: 0,
       isActive: true,
     });
     setErrors({});
@@ -137,7 +141,7 @@ export default function Menus(): JSX.Element {
       path: menu.path,
       labelKey: menu.labelKey,
       icon: menu.icon,
-      order: menu.order,
+      sort_order: menu.sort_order,
       isActive: menu.isActive,
     });
     setIsEditMode(true);
@@ -175,15 +179,21 @@ export default function Menus(): JSX.Element {
     }
   };
 
-  // Handle delete menu
-  const handleDeleteMenu = async (menu: Menu) => {
-    if (token === null || token === '') return;
+  // Handle delete menu - open confirmation modal
+  const handleDeleteMenu = (menu: Menu) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      menuToDelete: menu,
+    });
+  };
 
-    const labelKey = menu.labelKey ?? '';
-    const label = labelKey !== '' ? t(labelKey) : 'this menu';
-    const confirmed = window.confirm(`Are you sure you want to delete menu "${label}"?`);
-
-    if (!confirmed) return;
+  // Confirm and execute delete
+  const handleConfirmDelete = async () => {
+    const menu = deleteConfirmModal.menuToDelete;
+    if (!menu || token === null || token === '') {
+      setDeleteConfirmModal({ isOpen: false, menuToDelete: null });
+      return;
+    }
 
     try {
       dispatch(setGlobalLoading({ isLoading: true, message: 'Deleting...' }));
@@ -192,15 +202,23 @@ export default function Menus(): JSX.Element {
 
       if (result.success) {
         setMenus(menus.filter((m) => m.id !== menu.id));
+        setDeleteConfirmModal({ isOpen: false, menuToDelete: null });
       } else {
         setErrorModal({
           isOpen: true,
           title: 'Error',
           message: result.error?.message ?? 'Failed to delete menu',
         });
+        setDeleteConfirmModal({ isOpen: false, menuToDelete: null });
       }
     } catch (error) {
       console.error('Error deleting menu:', error);
+      setErrorModal({
+        isOpen: true,
+        title: 'Error',
+        message: error instanceof Error ? error.message : 'Failed to delete menu',
+      });
+      setDeleteConfirmModal({ isOpen: false, menuToDelete: null });
     } finally {
       dispatch(setGlobalLoading({ isLoading: false, message: '' }));
     }
@@ -358,15 +376,21 @@ export default function Menus(): JSX.Element {
     );
   });
 
+  // Helper function to check if a menu is protected (cannot be modified)
+  const isProtectedMenu = (menu: Menu): boolean => {
+    const protectedLabelKeys = ['menus', 'configuración', 'configuration', 'settings'];
+    return protectedLabelKeys.includes(menu.labelKey.toLowerCase());
+  };
+
   const columns: Column<Menu>[] = [
     {
       key: 'icon',
-      label: 'Icon',
+      label: t('menus.icon'),
       render: (value: unknown) => <span style={{ fontSize: '24px' }}>{value as string}</span>,
     },
     {
       key: 'labelKey',
-      label: 'Label Key',
+      label: t('menus.labelKey'),
       render: (_: unknown, row: Menu) => (
         <div>
           <div className="font-semibold text-gray-900 text-base">
@@ -378,7 +402,7 @@ export default function Menus(): JSX.Element {
     },
     {
       key: 'path',
-      label: 'Path',
+      label: t('menus.path'),
       render: (value: unknown) => (
         <span className="text-sm text-gray-700 font-mono bg-gray-100 px-2 py-1 rounded">
           {value as string}
@@ -386,15 +410,15 @@ export default function Menus(): JSX.Element {
       ),
     },
     {
-      key: 'order',
-      label: 'Order',
+      key: 'sort_order',
+      label: t('menus.order'),
       render: (value: unknown) => (
         <span className="text-sm text-gray-700 font-medium">{value as number}</span>
       ),
     },
     {
       key: 'isActive',
-      label: 'Status',
+      label: t('menus.status'),
       render: (value: unknown) => (
         <span
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
@@ -408,174 +432,210 @@ export default function Menus(): JSX.Element {
               (value as boolean) ? 'bg-green-600' : 'bg-red-600'
             }`}
           />
-          {(value as boolean) ? 'Active' : 'Inactive'}
+          {(value as boolean) ? t('menus.active') : t('menus.inactive')}
         </span>
       ),
     },
     {
       key: 'id',
-      label: 'Actions',
-      render: (_: unknown, row: Menu) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          {/* Associate Roles Button */}
-          <button
-            type="button"
-            onClick={() => handleOpenRoleModal(row)}
-            style={{
-              padding: '10px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(168, 85, 247, 0.1)',
-              color: '#7c3aed',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.2)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            title="Associate Roles"
-          >
-            <svg
-              style={{ width: '20px', height: '20px' }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
-          </button>
+      label: t('menus.actions'),
+      render: (_: unknown, row: Menu) => {
+        const protectedMenu = isProtectedMenu(row);
 
-          {/* Edit Button */}
-          <button
-            type="button"
-            onClick={() => handleOpenEditModal(row)}
-            style={{
-              padding: '10px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              color: '#2563eb',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            title="Edit Menu"
-          >
-            <svg
-              style={{ width: '20px', height: '20px' }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
-          </button>
-
-          {/* Delete Button */}
-          <button
-            type="button"
-            onClick={() => void handleDeleteMenu(row)}
-            style={{
-              padding: '10px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              color: '#dc2626',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            title="Delete Menu"
-          >
-            <svg
-              style={{ width: '20px', height: '20px' }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-          </button>
-
-          {/* Status Toggle */}
-          <div
-            onClick={() => void handleToggleStatus(row)}
-            style={{
-              position: 'relative',
-              width: '48px',
-              height: '24px',
-              backgroundColor: row.isActive ? '#10b981' : '#e5e7eb',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: row.isActive ? '0 0 10px rgba(16, 185, 129, 0.2)' : 'none',
-            }}
-          >
-            <div
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+            {/* Associate Roles Button */}
+            <button
+              type="button"
+              onClick={() => !protectedMenu && handleOpenRoleModal(row)}
+              disabled={protectedMenu}
               style={{
-                position: 'absolute',
-                top: '2px',
-                left: row.isActive ? '26px' : '2px',
-                width: '20px',
-                height: '20px',
-                backgroundColor: 'white',
-                borderRadius: '50%',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                padding: '10px',
+                borderRadius: '12px',
+                backgroundColor: protectedMenu
+                  ? 'rgba(168, 85, 247, 0.05)'
+                  : 'rgba(168, 85, 247, 0.1)',
+                color: protectedMenu ? 'rgba(124, 58, 237, 0.4)' : '#7c3aed',
+                border: 'none',
+                cursor: protectedMenu ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                opacity: protectedMenu ? 0.5 : 1,
               }}
-            />
+              onMouseOver={(e) => {
+                if (!protectedMenu) {
+                  e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!protectedMenu) {
+                  e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
+              }}
+              title={protectedMenu ? t('menus.protectedMenu') : t('menus.associateRoles')}
+            >
+              <svg
+                style={{ width: '20px', height: '20px' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+            </button>
+
+            {/* Edit Button */}
+            <button
+              type="button"
+              onClick={() => !protectedMenu && handleOpenEditModal(row)}
+              disabled={protectedMenu}
+              style={{
+                padding: '10px',
+                borderRadius: '12px',
+                backgroundColor: protectedMenu
+                  ? 'rgba(59, 130, 246, 0.05)'
+                  : 'rgba(59, 130, 246, 0.1)',
+                color: protectedMenu ? 'rgba(37, 99, 235, 0.4)' : '#2563eb',
+                border: 'none',
+                cursor: protectedMenu ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                opacity: protectedMenu ? 0.5 : 1,
+              }}
+              onMouseOver={(e) => {
+                if (!protectedMenu) {
+                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!protectedMenu) {
+                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
+              }}
+              title={protectedMenu ? t('menus.protectedMenu') : t('menus.edit')}
+            >
+              <svg
+                style={{ width: '20px', height: '20px' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+              </svg>
+            </button>
+
+            {/* Delete Button */}
+            <button
+              type="button"
+              onClick={() => !protectedMenu && handleDeleteMenu(row)}
+              disabled={protectedMenu}
+              style={{
+                padding: '10px',
+                borderRadius: '12px',
+                backgroundColor: protectedMenu
+                  ? 'rgba(239, 68, 68, 0.05)'
+                  : 'rgba(239, 68, 68, 0.1)',
+                color: protectedMenu ? 'rgba(220, 38, 38, 0.4)' : '#dc2626',
+                border: 'none',
+                cursor: protectedMenu ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                opacity: protectedMenu ? 0.5 : 1,
+              }}
+              onMouseOver={(e) => {
+                if (!protectedMenu) {
+                  e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!protectedMenu) {
+                  e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
+              }}
+              title={protectedMenu ? t('menus.protectedMenu') : t('menus.delete')}
+            >
+              <svg
+                style={{ width: '20px', height: '20px' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+
+            {/* Status Toggle */}
+            <div
+              onClick={() => !protectedMenu && void handleToggleStatus(row)}
+              style={{
+                position: 'relative',
+                width: '48px',
+                height: '24px',
+                backgroundColor: protectedMenu
+                  ? row.isActive
+                    ? 'rgba(16, 185, 129, 0.4)'
+                    : 'rgba(229, 231, 235, 0.4)'
+                  : row.isActive
+                    ? '#10b981'
+                    : '#e5e7eb',
+                borderRadius: '12px',
+                cursor: protectedMenu ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: row.isActive ? '0 0 10px rgba(16, 185, 129, 0.2)' : 'none',
+                opacity: protectedMenu ? 0.5 : 1,
+              }}
+              title={protectedMenu ? t('menus.protectedMenu') : undefined}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  left: row.isActive ? '26px' : '2px',
+                  width: '20px',
+                  height: '20px',
+                  backgroundColor: 'white',
+                  borderRadius: '50%',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                }}
+              />
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      <Card title="Menu Management">
+      <Card title={t('menus.sectionTitle')}>
         {/* Filters & Actions Toolbar */}
         <div
           style={{
@@ -618,7 +678,7 @@ export default function Menus(): JSX.Element {
                 type="search"
                 className="form-input"
                 style={{ paddingLeft: '2.5rem' }}
-                placeholder="Search menus..."
+                placeholder={t('menus.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -632,9 +692,9 @@ export default function Menus(): JSX.Element {
           <div style={{ width: '14rem' }}>
             <Select
               options={[
-                { value: '', label: 'All Status' },
-                { value: 'true', label: 'Active' },
-                { value: 'false', label: 'Inactive' },
+                { value: '', label: t('menus.allStatus') },
+                { value: 'true', label: t('menus.active') },
+                { value: 'false', label: t('menus.inactive') },
               ]}
               value={statusFilter}
               onChange={(v: string) => {
@@ -669,7 +729,7 @@ export default function Menus(): JSX.Element {
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              Add Menu
+              {t('menus.addMenu')}
             </span>
           </Button>
         </div>
@@ -685,8 +745,8 @@ export default function Menus(): JSX.Element {
                 d="M4 6h16M4 12h16M4 18h16"
               />
             </svg>
-            <p className="text-lg font-medium">No menus found</p>
-            <p className="text-sm">Create your first menu item to get started</p>
+            <p className="text-lg font-medium">{t('menus.noMenusFound')}</p>
+            <p className="text-sm">{t('menus.createFirstMenu')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -698,9 +758,11 @@ export default function Menus(): JSX.Element {
         {pagination.total > 0 && (
           <div className="mt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="text-sm text-gray-600">
-              Showing <span className="font-medium">{(page - 1) * limit + 1}</span> to{' '}
-              <span className="font-medium">{Math.min(page * limit, pagination.total)}</span> of{' '}
-              <span className="font-medium">{pagination.total}</span> results
+              {t('pagination.showing')}{' '}
+              <span className="font-medium">{(page - 1) * limit + 1}</span> {t('pagination.to')}{' '}
+              <span className="font-medium">{Math.min(page * limit, pagination.total)}</span>{' '}
+              {t('pagination.of')} <span className="font-medium">{pagination.total}</span>{' '}
+              {t('pagination.results')}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -711,7 +773,7 @@ export default function Menus(): JSX.Element {
                   setPage((p) => Math.max(1, p - 1));
                 }}
               >
-                Previous
+                {t('pagination.previous')}
               </Button>
               <div className="flex items-center gap-1">
                 {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
@@ -747,7 +809,7 @@ export default function Menus(): JSX.Element {
                   setPage((p) => Math.min(pagination.totalPages, p + 1));
                 }}
               >
-                Next
+                {t('pagination.next')}
               </Button>
             </div>
           </div>
@@ -760,7 +822,7 @@ export default function Menus(): JSX.Element {
           setIsCreateModalOpen(false);
           resetForm();
         }}
-        title={isEditMode ? 'Edit Menu' : 'Create Menu'}
+        title={isEditMode ? t('menus.editMenuTitle') : t('menus.createMenuTitle')}
         size="md"
         footer={
           <>
@@ -771,10 +833,10 @@ export default function Menus(): JSX.Element {
                 resetForm();
               }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="primary" onClick={() => void handleSaveMenu()}>
-              {isEditMode ? 'Save' : 'Create'}
+              {isEditMode ? t('common.save') : t('menus.createMenu')}
             </Button>
           </>
         }
@@ -787,11 +849,11 @@ export default function Menus(): JSX.Element {
           }}
         >
           <Input
-            label="Path"
+            label={t('menus.path')}
             placeholder="/dashboard"
             value={newMenu.path}
             onChange={(e) => {
-              setNewMenu({ ...newMenu, path: e.target.value });
+              setNewMenu({ ...newMenu, path: e.target.value === '' ? '/' : e.target.value });
               if (errors.path !== undefined && errors.path !== '')
                 setErrors({ ...errors, path: '' });
             }}
@@ -799,7 +861,7 @@ export default function Menus(): JSX.Element {
             required
           />
           <Input
-            label="Label Key"
+            label={t('menus.labelKey')}
             placeholder="sidebar.dashboard"
             value={newMenu.labelKey}
             onChange={(e) => {
@@ -811,7 +873,7 @@ export default function Menus(): JSX.Element {
             required
           />
           <Input
-            label="Icon (Emoji)"
+            label={t('menus.iconEmoji')}
             placeholder="📊"
             value={newMenu.icon}
             onChange={(e) => {
@@ -822,15 +884,20 @@ export default function Menus(): JSX.Element {
             error={errors.icon}
             required
           />
-          <Input
-            type="number"
-            label="Order"
-            placeholder="0"
-            value={newMenu.order.toString()}
-            onChange={(e) => {
-              setNewMenu({ ...newMenu, order: Number.parseInt(e.target.value, 10) || 0 });
-            }}
-          />
+          {isEditMode && (
+            <Input
+              type="number"
+              label={t('menus.order')}
+              placeholder="0"
+              value={newMenu.sort_order?.toString() ?? '0'}
+              onChange={(e) => {
+                setNewMenu({
+                  ...newMenu,
+                  sort_order: Number.parseInt(e.target.value, 10) || 0,
+                });
+              }}
+            />
+          )}
           <div
             style={{
               display: 'flex',
@@ -860,7 +927,7 @@ export default function Menus(): JSX.Element {
                 color: 'var(--color-neutral-700)',
               }}
             >
-              Active
+              {t('menus.isActive')}
             </label>
           </div>
         </div>
@@ -874,7 +941,7 @@ export default function Menus(): JSX.Element {
           setSelectedMenuForRoles(null);
           setSelectedRoles([]);
         }}
-        title="Associate Roles"
+        title={t('menus.associateRolesTitle')}
         size="md"
         footer={
           <>
@@ -886,10 +953,10 @@ export default function Menus(): JSX.Element {
                 setSelectedRoles([]);
               }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="primary" onClick={() => void handleSaveRoles()}>
-              Save Roles
+              {t('menus.saveRoles')}
             </Button>
           </>
         }
@@ -911,7 +978,7 @@ export default function Menus(): JSX.Element {
                   color: 'var(--color-neutral-700)',
                 }}
               >
-                Menu: {selectedMenuForRoles.labelKey}
+                {t('menus.menu')}: {selectedMenuForRoles.labelKey}
               </p>
               <p
                 style={{
@@ -920,7 +987,7 @@ export default function Menus(): JSX.Element {
                   color: 'var(--color-neutral-600)',
                 }}
               >
-                Select the roles that should have access to this menu:
+                {t('menus.selectRoles')}
               </p>
             </div>
           )}
@@ -982,6 +1049,82 @@ export default function Menus(): JSX.Element {
         </div>
       </Dialog>
 
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        isOpen={deleteConfirmModal.isOpen}
+        onClose={() => setDeleteConfirmModal({ isOpen: false, menuToDelete: null })}
+        title={t('menus.confirmDeleteTitle')}
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => setDeleteConfirmModal({ isOpen: false, menuToDelete: null })}
+            >
+              {t('menus.cancelDelete')}
+            </Button>
+            <Button variant="danger" onClick={() => void handleConfirmDelete()}>
+              {t('menus.confirmDeleteButton')}
+            </Button>
+          </>
+        }
+      >
+        <div style={{ padding: 'var(--space-2)' }}>
+          {deleteConfirmModal.menuToDelete && (
+            <>
+              <p
+                style={{
+                  margin: 0,
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-900)',
+                  marginBottom: 'var(--space-4)',
+                }}
+              >
+                {t('menus.confirmDelete')}
+              </p>
+              <div
+                style={{
+                  padding: 'var(--space-4)',
+                  backgroundColor: 'var(--color-neutral-50)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-neutral-200)',
+                  marginBottom: 'var(--space-4)',
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--color-neutral-700)',
+                    fontSize: 'var(--text-sm)',
+                  }}
+                >
+                  <strong>{t('menus.label')}:</strong> {deleteConfirmModal.menuToDelete.labelKey}
+                </p>
+                <p
+                  style={{
+                    margin: 'var(--space-2) 0 0 0',
+                    color: 'var(--color-neutral-700)',
+                    fontSize: 'var(--text-sm)',
+                  }}
+                >
+                  <strong>Path:</strong> {deleteConfirmModal.menuToDelete.path}
+                </p>
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  color: 'var(--color-danger-600)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--font-weight-medium)',
+                }}
+              >
+                {t('menus.deleteWarning')}
+              </p>
+            </>
+          )}
+        </div>
+      </Dialog>
+
       {/* Error Modal */}
       <Dialog
         isOpen={errorModal.isOpen}
@@ -996,7 +1139,7 @@ export default function Menus(): JSX.Element {
               setIsCreateModalOpen(false);
             }}
           >
-            Accept
+            {t('common.accept')}
           </Button>
         }
       >

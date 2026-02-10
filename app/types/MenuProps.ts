@@ -13,7 +13,7 @@ export interface Menu {
   path: string;
   labelKey: string;
   icon: string;
-  order: number;
+  sort_order: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -30,7 +30,7 @@ export interface CreateMenuDto {
   path: string;
   labelKey: string;
   icon: string;
-  order: number;
+  sort_order?: number;
   isActive: boolean;
 }
 
@@ -38,7 +38,7 @@ export interface UpdateMenuDto {
   path?: string;
   labelKey?: string;
   icon?: string;
-  order?: number;
+  sort_order?: number;
   isActive?: boolean;
 }
 
