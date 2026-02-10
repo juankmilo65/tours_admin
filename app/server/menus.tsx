@@ -140,13 +140,12 @@ export const updateMenu = async (
   }
 
   const menusEndpoint = `menus/${menuId}`;
-  const menusService = createServiceREST(BASE_URL, 'menus', `Bearer ${token}`);
+  const menusService = createServiceREST(BASE_URL, menusEndpoint, `Bearer ${token}`);
 
   const result = await menusService.update(data, {
     headers: {
       'X-Language': language,
     },
-    url: `/${menusEndpoint}`,
   });
   return result;
 };
