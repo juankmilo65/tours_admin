@@ -37,6 +37,7 @@ export default function Roles(): JSX.Element {
   const token = useAppSelector(selectAuthToken) ?? undefined;
 
   const [roles, setRoles] = useState<Role[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
@@ -77,7 +78,13 @@ export default function Roles(): JSX.Element {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
+    // Don't fetch if token is not available yet
+    if (token === undefined) {
+      return;
+    }
+
     const fetchRoles = async () => {
+      setIsLoading(true);
       dispatch(setGlobalLoading({ isLoading: true, message: t('common.loading') ?? 'Loading' }));
 
       try {
@@ -115,7 +122,6 @@ export default function Roles(): JSX.Element {
             to: 1,
           });
         }
-        dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       } catch (error) {
         console.error('Error fetching roles:', error);
         setRoles([]);
@@ -129,12 +135,14 @@ export default function Roles(): JSX.Element {
           from: 1,
           to: 1,
         });
+      } finally {
         dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+        setIsLoading(false);
       }
     };
 
     void fetchRoles();
-  }, [page, language, dispatch, t, token, limit]);
+  }, [page, language, token, limit]);
 
   const resetForm = () => {
     setNewRole({
@@ -510,7 +518,12 @@ export default function Roles(): JSX.Element {
           </Button>
         </div>
 
-        {roles.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
+            <p className="text-base font-medium">{t('common.loading')}</p>
+          </div>
+        ) : roles.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <p className="text-lg font-medium">{t('roles.noRolesFound')}</p>
             <p className="text-sm">{t('roles.noRolesDescription')}</p>
