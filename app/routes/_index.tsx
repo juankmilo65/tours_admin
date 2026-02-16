@@ -125,15 +125,64 @@ export default function IndexRoute(): JSX.Element {
     dispatch(setGlobalLoading({ isLoading: true, message: t('auth.loggingIn') }));
 
     try {
+      // eslint-disable-next-line no-console
+      console.log('🔐 [LOGIN] Starting login process for email:', email);
       const result = await loginUserBusinessLogic({ email, password });
+      // eslint-disable-next-line no-console
+      console.log('🔐 [LOGIN] Full result from backend:', JSON.stringify(result, null, 2));
+      // eslint-disable-next-line no-console
+      console.log('🔐 [LOGIN] Result success:', result.success);
+      // eslint-disable-next-line no-console
+      console.log('🔐 [LOGIN] Result data:', result.data);
+      // eslint-disable-next-line no-console
+      console.log('🔐 [LOGIN] Result error:', result.error);
 
-      if (result.success === true && result.data) {
+      const isSuccess = result.success === true;
+      const hasData = result.data !== undefined && result.data !== null;
+      if (isSuccess && hasData) {
+        const data = result.data as { user: unknown; accessToken: string };
+        // eslint-disable-next-line no-console
+        console.log('🔐 [LOGIN] Login successful. User data:', JSON.stringify(data.user, null, 2));
+        // eslint-disable-next-line no-console
+        console.log('🔐 [LOGIN] accessToken:', data.accessToken);
+        const userKeys = Object.keys(data.user ?? {});
+        // eslint-disable-next-line no-console
+        console.log('🔐 [LOGIN] User object keys:', userKeys);
+        // eslint-disable-next-line no-console
+        console.log(
+          '🔐 [LOGIN] emailVerified:',
+          (data.user as { emailVerified?: boolean })?.emailVerified
+        );
+
+        // Check if email is verified
+        const user = data.user as { emailVerified?: boolean };
+        const emailVerified = Boolean(user.emailVerified ?? true);
+
+        if (!emailVerified) {
+          // eslint-disable-next-line no-console
+          console.log('🔐 [LOGIN] Email NOT verified. Redirecting to /verify-email');
+          // Email not verified, redirect to verification page
+          // Save credentials temporarily in Redux
+          dispatch(
+            loginSuccess({
+              user: data.user as never,
+              token: data.accessToken,
+            })
+          );
+          // Redirect to email verification page
+          navigate('/verify-email');
+          return;
+        }
+
+        // eslint-disable-next-line no-console
+        console.log('🔐 [LOGIN] Email IS verified. Continuing with OTP flow');
+
         // Login successful, save to Redux
         // Note: Backend returns 'accessToken', not 'token'
         dispatch(
           loginSuccess({
-            user: result.data.user as never,
-            token: result.data.accessToken,
+            user: data.user as never,
+            token: data.accessToken,
           })
         );
 

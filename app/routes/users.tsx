@@ -508,7 +508,7 @@ export default function Users(): JSX.Element {
       },
     },
     {
-      key: 'isEmailVerified',
+      key: 'emailVerified',
       label: t('users.isEmailVerified') ?? 'Verified',
       render: (value: unknown) => {
         const isVerifiedValue = value as boolean;

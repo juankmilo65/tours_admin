@@ -8,13 +8,17 @@ import { createSlice } from '@reduxjs/toolkit';
 
 export interface User {
   id: string;
-  name: string;
   email: string;
-  role: 'admin' | 'manager' | 'user';
-  avatar?: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber?: string;
+  avatarUrl?: string | null;
+  role: string;
   isActive: boolean;
+  emailVerified: boolean;
   createdAt: string;
   updatedAt: string;
+  lastLoginAt?: string;
 }
 
 interface UsersState {

@@ -29,7 +29,7 @@ export interface User {
   avatarUrl?: string | null;
   role: string;
   isActive: boolean;
-  isEmailVerified: boolean;
+  emailVerified: boolean;
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string;

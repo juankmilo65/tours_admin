@@ -968,6 +968,23 @@ export const en: Translation = {
     selectAll: 'Select All',
     deselectAll: 'Deselect All',
   },
+  verifyEmail: {
+    title: 'Verify Your Email',
+    description:
+      'We have sent a 6-digit verification code to your email address. Please enter it below to verify your email.',
+    otpLabel: 'Verification Code',
+    otpRequired: 'Please enter the verification code',
+    otpInvalidLength: 'The code must be 6 digits',
+    verifyButton: 'Verify Email',
+    verifying: 'Verifying...',
+    error: 'Failed to verify email',
+    resendCode: "Didn't receive the code? Resend",
+    verifiedTitle: 'Email Verified',
+    verifiedMessage:
+      'Your email has been successfully verified. You can now log in to your account.',
+    loginButton: 'Go to Login',
+    backToLogin: 'Back to Login',
+  },
   termsConditions: {
     allTerms: 'All Terms and Conditions',
     addNewTerms: 'Add New Terms',

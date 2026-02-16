@@ -988,6 +988,23 @@ export const es: Translation = {
     deselectAll: 'Deseleccionar Todos',
     labelEnRequired: 'La etiqueta en inglés es requerida',
   },
+  verifyEmail: {
+    title: 'Verifica tu Correo Electrónico',
+    description:
+      'Hemos enviado un código de verificación de 6 dígitos a tu dirección de correo electrónico. Por favor, ingrésalo a continuación para verificar tu correo.',
+    otpLabel: 'Código de Verificación',
+    otpRequired: 'Por favor ingresa el código de verificación',
+    otpInvalidLength: 'El código debe tener 6 dígitos',
+    verifyButton: 'Verificar Correo',
+    verifying: 'Verificando...',
+    error: 'Error al verificar el correo',
+    resendCode: '¿No recibiste el código? Reenviar',
+    verifiedTitle: 'Correo Verificado',
+    verifiedMessage:
+      'Tu correo electrónico ha sido verificado exitosamente. Ahora puedes iniciar sesión en tu cuenta.',
+    loginButton: 'Ir a Iniciar Sesión',
+    backToLogin: 'Volver al Inicio de Sesión',
+  },
   termsConditions: {
     allTerms: 'Todos los Términos y Condiciones',
     addNewTerms: 'Agregar Nuevos Términos',
