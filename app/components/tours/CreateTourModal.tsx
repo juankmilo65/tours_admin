@@ -16,7 +16,7 @@ import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
 import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
-import { openModal, closeModal } from '~/store/slices/uiSlice';
+import { openModal, closeModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { getCachedLanguages, setLanguages as setLanguagesCache } from '~/store/slices/cacheSlice';
 import Select from '~/components/ui/Select';
 
@@ -628,6 +628,14 @@ export function CreateTourModal({
     setIsSubmitting(true);
     setUploadProgress(0);
 
+    // Show global spinner
+    dispatch(
+      setGlobalLoading({
+        isLoading: true,
+        message: isEditMode ? t('tours.updatingTour') : t('tours.creatingTour'),
+      })
+    );
+
     try {
       const payload = {
         userId: formData.userId,
@@ -666,6 +674,8 @@ export function CreateTourModal({
 
       if (result !== null && typeof result === 'object' && 'error' in result) {
         const error = result.error as { message?: string; statusCode?: number };
+        // Hide global spinner on error
+        dispatch(setGlobalLoading({ isLoading: false }));
         dispatch(
           openModal({
             id: isEditMode ? 'update-tour-error' : 'create-tour-error',
@@ -733,6 +743,8 @@ export function CreateTourModal({
       );
     } catch (error) {
       console.error(isEditMode ? 'Error updating tour:' : 'Error creating tour:', error);
+      // Hide global spinner on error
+      dispatch(setGlobalLoading({ isLoading: false }));
       dispatch(
         openModal({
           id: isEditMode ? 'update-tour-error' : 'create-tour-error',
@@ -748,6 +760,8 @@ export function CreateTourModal({
     } finally {
       setIsSubmitting(false);
       setUploadProgress(0);
+      // Note: Don't hide global spinner here - on success, page reloads and handles it
+      // On error, spinner is already hidden in catch block
     }
   };
 

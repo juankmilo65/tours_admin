@@ -4,6 +4,7 @@ import {
   getToursDropdown,
   createTour,
   updateTour,
+  cloneTour,
   uploadTourImages,
   setImageAsCover,
   deleteTourImage,
@@ -194,6 +195,55 @@ const updateTourBusiness = async (
 };
 
 /**
+ * Business logic for cloning a tour
+ */
+const cloneTourBusiness = async (
+  tourId: string,
+  data: {
+    targetUserId: string;
+    customTitleEs?: string;
+    customTitleEn?: string;
+    cloneImages?: boolean;
+  },
+  token = ''
+): Promise<ServiceResult<{ success: boolean; data?: unknown; message?: string }>> => {
+  try {
+    if (token === '' || token === undefined) {
+      return Promise.resolve({
+        error: {
+          status: 401,
+          message: 'Access token is required',
+        },
+      });
+    }
+
+    if (tourId === '' || tourId === undefined) {
+      return Promise.resolve({
+        error: {
+          status: 400,
+          message: 'Tour ID is required',
+        },
+      });
+    }
+
+    if (data.targetUserId === '' || data.targetUserId === undefined) {
+      return Promise.resolve({
+        error: {
+          status: 400,
+          message: 'Target user ID is required',
+        },
+      });
+    }
+
+    const result = await cloneTour(tourId, data, token);
+    return result;
+  } catch (error) {
+    console.error('Error in cloneTourBusiness:', error);
+    return Promise.resolve({ error });
+  }
+};
+
+/**
  * Main export function
  */
 const tours = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> => {
@@ -212,6 +262,7 @@ export {
   getTourByIdBusiness,
   createTourBusiness,
   updateTourBusiness,
+  cloneTourBusiness,
   uploadTourImages,
   setImageAsCover,
   deleteTourImage,

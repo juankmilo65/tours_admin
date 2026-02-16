@@ -243,6 +243,68 @@ export const updateTour = async (
 };
 
 /**
+ * Clone tour in backend API
+ */
+export const cloneTour = async (
+  tourId: string,
+  payload: {
+    targetUserId: string;
+    customTitleEs?: string;
+    customTitleEn?: string;
+    cloneImages?: boolean;
+  },
+  token: string
+): Promise<{ success: boolean; data?: unknown; message?: string; error?: unknown }> => {
+  console.warn('🎯 [CLONE TOUR] Starting cloneTour with params:', {
+    tourId,
+    payload,
+    hasToken: !!token,
+    BASE_URL,
+  });
+
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('⚠️ [CLONE TOUR] BACKEND_URL is not configured, returning error');
+    return { success: false, error: 'Backend URL not configured' };
+  }
+
+  try {
+    const fullUrl = `${BASE_URL}/api/tours/${tourId}/clone`;
+    console.warn('🌐 [CLONE TOUR] Full URL to call:', fullUrl);
+
+    // Use POST method directly via axios
+    const response = await axios.post<{ success: boolean; data?: unknown; message?: string }>(
+      fullUrl,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 30000, // 30s timeout for clone (images may take time)
+      }
+    );
+
+    const result = response.data;
+
+    console.warn('✅ [CLONE TOUR] Success! Result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    console.error('❌ [CLONE TOUR] Error caught:', error);
+    if (error instanceof Error) {
+      console.error('❌ [CLONE TOUR] Error message:', error.message);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          '⚠️ [CLONE TOUR] Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    }
+    return { error, success: false };
+  }
+};
+
+/**
  * Upload multiple images for a tour using multipart/form-data
  */
 

@@ -15,6 +15,7 @@ interface TourCardProps {
   onViewDetails?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onClone?: () => void;
 }
 
 export function TourCard({
@@ -22,6 +23,7 @@ export function TourCard({
   onViewDetails,
   onEdit,
   onDelete,
+  onClone,
 }: TourCardProps): React.JSX.Element {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -312,6 +314,33 @@ export function TourCard({
             title={t('common.edit')}
           >
             ✏️
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onClone !== undefined) {
+                onClone();
+              }
+            }}
+            style={{
+              padding: 'var(--space-2) var(--space-3)',
+              backgroundColor: 'var(--color-neutral-100)',
+              color: 'var(--color-neutral-700)',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: 'var(--font-weight-medium)',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
+            }}
+            title={t('common.clone')}
+          >
+            📋
           </button>
           {onDelete && (
             <button

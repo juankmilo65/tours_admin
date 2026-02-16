@@ -8,6 +8,7 @@ import { translateTours } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
 import { CreateTourModal } from '~/components/tours/CreateTourModal';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
+import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
 import { selectSelectedCountry, selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import {
@@ -19,6 +20,7 @@ import {
 import { selectLanguage, setGlobalLoading, openModal } from '~/store/slices/uiSlice';
 import type { City } from '~/server/cities';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
+import { cloneTourBusiness } from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
 import citiesBL from '~/server/businessLogic/citiesBusinessLogic';
@@ -441,6 +443,8 @@ function ToursClient(): JSX.Element {
   const rawCities = useAppSelector(selectCities);
   const categories = useAppSelector(selectCategories);
   const currentLanguage = useAppSelector(selectLanguage) as Language;
+  const authToken = useAppSelector(selectAuthToken);
+  const currentUser = useAppSelector(selectCurrentUser);
   const { t } = useTranslation();
   const currencyCode = useAppSelector(selectSelectedCurrencyCode);
 
@@ -507,6 +511,10 @@ function ToursClient(): JSX.Element {
 
   // Edit tour modal state
   const [editingTour, setEditingTour] = useState<TranslatedTour | null>(null);
+
+  // Clone tour confirmation modal state
+  const [tourToClone, setTourToClone] = useState<TranslatedTour | null>(null);
+  const [cloneImagesOption, setCloneImagesOption] = useState(true);
 
   // Fetcher for loading tour details via BL
   const tourDetailsFetcher = useFetcher<{
@@ -669,6 +677,98 @@ function ToursClient(): JSX.Element {
 
     return { isOpen: true, initialData, tourId: editingTour.id, isLoading: false };
   }, [editingTour, rawTours, fullTourData, isLoadingFullTour, currentLanguage]);
+
+  // Clone tour handler - opens confirmation modal
+  const handleCloneTour = (tour: TranslatedTour): void => {
+    setTourToClone(tour);
+    setCloneImagesOption(true); // Reset to default when opening modal
+  };
+
+  // Execute clone tour - called when user confirms
+  const executeCloneTour = async (): Promise<void> => {
+    if (tourToClone === null) return;
+
+    const tour = tourToClone;
+    setTourToClone(null);
+
+    // Show global loading spinner
+    dispatch(
+      setGlobalLoading({
+        isLoading: true,
+        message: t('tours.cloningTour'),
+      })
+    );
+
+    try {
+      // Get current date for custom title
+      const today = new Date();
+      const dateStr = `${today.getDate().toString().padStart(2, '0')}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getFullYear()}`;
+
+      // Find the raw tour to get both language titles
+      const rawTour = rawTours.find((rt) => rt.id === tour.id);
+
+      const result = await cloneTourBusiness(
+        tour.id,
+        {
+          targetUserId: currentUser?.id ?? '',
+          customTitleEs: `${rawTour?.title_es ?? tour.title}-${dateStr}`,
+          customTitleEn: `${rawTour?.title_en ?? tour.title}-${dateStr}`,
+          cloneImages: cloneImagesOption,
+        },
+        authToken ?? ''
+      );
+
+      dispatch(setGlobalLoading({ isLoading: false }));
+
+      if ('error' in result) {
+        dispatch(
+          openModal({
+            id: 'clone-tour-error',
+            type: 'confirm',
+            title: t('common.error'),
+            isOpen: true,
+            data: {
+              message: t('tours.cloneTourError'),
+              icon: 'alert',
+            },
+          })
+        );
+        return;
+      }
+
+      // Success - show message and reload
+      dispatch(
+        openModal({
+          id: 'clone-tour-success',
+          type: 'confirm',
+          title: t('common.success'),
+          isOpen: true,
+          data: {
+            message: t('tours.cloneTourSuccess'),
+            icon: 'success',
+          },
+        })
+      );
+
+      // Reload page to show updated list
+      window.location.reload();
+    } catch (error) {
+      console.error('Error cloning tour:', error);
+      dispatch(setGlobalLoading({ isLoading: false }));
+      dispatch(
+        openModal({
+          id: 'clone-tour-error',
+          type: 'confirm',
+          title: t('common.error'),
+          isOpen: true,
+          data: {
+            message: t('tours.cloneTourError'),
+            icon: 'alert',
+          },
+        })
+      );
+    }
+  };
 
   // Price range state
   const [priceRange, setPriceRange] = useState<PriceRange | null>(loaderData.priceRange);
@@ -1400,6 +1500,9 @@ function ToursClient(): JSX.Element {
                   setEditingTour(tour);
                   console.warn('[tours._index] editingTour should now be set');
                 }}
+                onClone={() => {
+                  handleCloneTour(tour);
+                }}
               />
             ))}
           </div>
@@ -1562,6 +1665,159 @@ function ToursClient(): JSX.Element {
               window.location.reload();
             }}
           />
+        )}
+
+        {/* Clone Tour Confirmation Modal */}
+        {tourToClone !== null && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={() => setTourToClone(null)}
+          >
+            <div
+              style={{
+                backgroundColor: 'white',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-6)',
+                maxWidth: '480px',
+                width: '90%',
+                boxShadow: 'var(--shadow-lg)',
+                pointerEvents: 'auto',
+              }}
+              onClick={(e): void => {
+                e.stopPropagation();
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 16,
+                  alignItems: 'flex-start',
+                  marginBottom: 'var(--space-4)',
+                }}
+              >
+                <div style={{ fontSize: 34 }}>📋</div>
+                <div style={{ flex: 1 }}>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 'var(--text-lg)',
+                      fontWeight: '600',
+                      color: 'var(--color-neutral-900)',
+                    }}
+                  >
+                    {t('tours.cloneTour')}
+                  </h3>
+                  <p
+                    style={{
+                      marginTop: 'var(--space-2)',
+                      color: 'var(--color-neutral-700)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {t('tours.cloneTourConfirm')}
+                  </p>
+                  <p
+                    style={{
+                      marginTop: 'var(--space-2)',
+                      padding: 'var(--space-2) var(--space-3)',
+                      backgroundColor: 'var(--color-neutral-100)',
+                      borderRadius: 'var(--radius-md)',
+                      fontWeight: '500',
+                      color: 'var(--color-neutral-800)',
+                    }}
+                  >
+                    {tourToClone.title}
+                  </p>
+                  <p
+                    style={{
+                      marginTop: 'var(--space-2)',
+                      color: 'var(--color-neutral-600)',
+                      fontSize: 'var(--text-sm)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {t('tours.cloneTourInfo')}
+                  </p>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)',
+                      marginTop: 'var(--space-3)',
+                      cursor: 'pointer',
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--color-neutral-700)',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={cloneImagesOption}
+                      onChange={(e) => setCloneImagesOption(e.target.checked)}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        cursor: 'pointer',
+                        accentColor: 'var(--color-primary-500)',
+                      }}
+                    />
+                    {t('tours.cloneImages')}
+                  </label>
+                </div>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 'var(--space-3)',
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <button
+                  onClick={() => setTourToClone(null)}
+                  style={{
+                    padding: 'var(--space-2) var(--space-4)',
+                    backgroundColor: 'var(--color-neutral-200)',
+                    color: 'var(--color-neutral-700)',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: '500',
+                  }}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={() => {
+                    void executeCloneTour();
+                  }}
+                  style={{
+                    padding: 'var(--space-2) var(--space-4)',
+                    backgroundColor: 'var(--color-primary-500)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: '500',
+                  }}
+                >
+                  {t('tours.cloneTour')}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>
