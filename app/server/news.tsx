@@ -30,6 +30,7 @@ export interface News {
   excerpt_es?: string;
   excerpt_en?: string;
   author: string;
+  userId?: string; // User ID for editing
   isActive: boolean;
   isPublished: boolean;
   newsImages: NewsImage[];
@@ -164,7 +165,7 @@ export interface CreateNewsDto {
   content_en: string;
   excerpt_es?: string;
   excerpt_en?: string;
-  author: string;
+  userId: string;
   isActive: boolean;
   isPublished: boolean;
 }

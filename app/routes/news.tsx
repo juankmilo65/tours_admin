@@ -3,7 +3,8 @@
  */
 
 import type { JSX } from 'react';
-import type { LoaderFunctionArgs } from '@remix-run/node';
+import { data, type LoaderFunctionArgs } from '@remix-run/node';
+import { useLoaderData } from '@remix-run/react';
 import { requireAuth } from '~/utilities/auth.loader';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from '~/components/ui/Card';
@@ -30,19 +31,68 @@ import { setGlobalLoading } from '~/store/slices/uiSlice';
 import { useTranslation } from '~/lib/i18n/utils';
 import { Input } from '~/components/ui/Input';
 import { Dialog } from '~/components/ui/Dialog';
-import { selectAuthToken } from '~/store/slices/authSlice';
+import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
 import { useAppSelector } from '~/store/hooks';
+import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
+import { getSession } from '~/utilities/sessions';
 
-export async function loader(args: LoaderFunctionArgs): Promise<null> {
+// User type for dropdown
+interface DropdownUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeof data>> {
   await requireAuth(args);
-  return null;
+
+  // Load session to get auth token
+  const session = await getSession(args.request.headers.get('Cookie'));
+  const authToken = session.get('authToken') as string | undefined;
+
+  console.warn('[news.tsx loader] authToken exists:', authToken !== undefined);
+
+  // Fetch users for dropdown
+  const usersResult = await getUsersDropdownBusiness(authToken, 'es');
+  console.warn('[news.tsx loader] usersResult:', usersResult);
+
+  const users: DropdownUser[] =
+    usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
+
+  console.warn('[news.tsx loader] users count:', users.length);
+
+  return data({ users });
+}
+
+// Extract loader data handling DataWithResponseInit wrapper from Remix
+function extractLoaderData(loaderData: unknown): { users: DropdownUser[] } {
+  const innerData = (
+    typeof loaderData === 'object' &&
+    loaderData !== null &&
+    'type' in loaderData &&
+    (loaderData as { type?: string }).type === 'DataWithResponseInit'
+      ? (loaderData as { data?: unknown }).data
+      : loaderData
+  ) as { users?: DropdownUser[] } | undefined;
+
+  return {
+    users: innerData?.users ?? [],
+  };
 }
 
 export default function NewsRoute(): JSX.Element {
   const { t, language } = useTranslation();
+  const rawLoaderData = useLoaderData<typeof loader>();
+  const { users } = extractLoaderData(rawLoaderData);
+
+  console.warn('[NewsRoute] users from loader:', users);
 
   // Auth token for API calls
   const token = useAppSelector(selectAuthToken);
+  const currentUser = useAppSelector(selectCurrentUser);
+
+  // Check if current user is admin (role === 'admin')
+  const isAdmin = currentUser?.role?.toLowerCase() === 'admin';
 
   // Local state for news and pagination
   const [news, setNews] = useState<News[]>([]);
@@ -56,7 +106,7 @@ export default function NewsRoute(): JSX.Element {
     content_en: '',
     excerpt_es: '',
     excerpt_en: '',
-    author: '',
+    userId: currentUser?.id ?? '',
     isActive: true,
     isPublished: false,
   });
@@ -137,7 +187,7 @@ export default function NewsRoute(): JSX.Element {
       content_en: '',
       excerpt_es: '',
       excerpt_en: '',
-      author: '',
+      userId: currentUser?.id ?? '',
       isActive: true,
       isPublished: false,
     });
@@ -156,7 +206,7 @@ export default function NewsRoute(): JSX.Element {
       content_en: article.content_en,
       excerpt_es: article.excerpt_es ?? '',
       excerpt_en: article.excerpt_en ?? '',
-      author: article.author,
+      userId: article.userId ?? currentUser?.id ?? '',
       isActive: article.isActive,
       isPublished: article.isPublished,
     });
@@ -350,7 +400,7 @@ export default function NewsRoute(): JSX.Element {
     if (!newArticle.title_en.trim()) newErrors.title_en = t('news.validation.titleRequired');
     if (!newArticle.content_es.trim()) newErrors.content_es = t('news.validation.contentRequired');
     if (!newArticle.content_en.trim()) newErrors.content_en = t('news.validation.contentRequired');
-    if (!newArticle.author.trim()) newErrors.author = t('news.validation.authorRequired');
+    if (!newArticle.userId) newErrors.userId = t('news.validation.authorRequired');
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -1022,19 +1072,54 @@ export default function NewsRoute(): JSX.Element {
             }}
             required={false}
           />
-          <Input
-            label={t('news.author')}
-            placeholder="Autor del artículo"
-            value={newArticle.author}
-            onChange={(e) => {
-              setNewArticle({ ...newArticle, author: e.target.value });
-              if (errors.author !== undefined && errors.author !== '')
-                setErrors({ ...errors, author: '' });
-            }}
-            error={errors.author}
-            required
-            style={{ gridColumn: '1 / -1' }}
-          />
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 'var(--space-1)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--font-weight-medium)',
+                color: 'var(--color-neutral-700)',
+              }}
+            >
+              {t('news.author')} <span style={{ color: 'var(--color-error-500)' }}>*</span>
+            </label>
+            <Select
+              options={
+                isAdmin
+                  ? [{ value: '', label: t('common.select') }].concat(
+                      users.map((u) => ({ value: u.id, label: u.name }))
+                    )
+                  : currentUser !== null
+                    ? [
+                        {
+                          value: currentUser.id,
+                          label: `${currentUser.firstName} ${currentUser.lastName}`,
+                        },
+                      ]
+                    : []
+              }
+              value={newArticle.userId}
+              onChange={(value) => {
+                setNewArticle({ ...newArticle, userId: value });
+                if (errors.userId !== undefined && errors.userId !== '')
+                  setErrors({ ...errors, userId: '' });
+              }}
+              disabled={!isAdmin}
+            />
+            {errors.userId !== undefined && errors.userId !== '' && (
+              <span
+                style={{
+                  color: 'var(--color-error-500)',
+                  fontSize: 'var(--text-xs)',
+                  marginTop: 'var(--space-1)',
+                  display: 'block',
+                }}
+              >
+                {errors.userId}
+              </span>
+            )}
+          </div>
           <div
             style={{
               display: 'flex',
