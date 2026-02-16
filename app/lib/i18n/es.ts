@@ -318,6 +318,14 @@ export const es: Translation = {
     cloneTourInfo:
       'Se creará una copia del tour con todas sus actividades. El tour clonado estará inactivo.',
     cloneImages: 'Clonar imágenes del tour',
+    deleteTourConfirm: '¿Estás seguro de que deseas eliminar este tour?',
+    deleteTourWarning:
+      'Esta acción es PERMANENTE e IRREVERSIBLE. El tour y todos sus datos serán eliminados definitivamente.',
+    deleteTourSuccess: 'Tour eliminado exitosamente',
+    deleteTourError: 'Error al eliminar el tour',
+    deletingTour: 'Eliminando tour...',
+    tourCreatedSuccess: 'Tour creado exitosamente',
+    tourUpdatedSuccess: 'Tour actualizado exitosamente',
     providerCannotBeChanged: 'El proveedor no puede ser modificado en modo edición',
     saving: 'Guardando...',
     activitiesRequired: 'Al menos una actividad es requerida',

@@ -5,6 +5,7 @@ import {
   createTour,
   updateTour,
   cloneTour,
+  deleteTourPhysical,
   uploadTourImages,
   setImageAsCover,
   deleteTourImage,
@@ -256,6 +257,22 @@ const cloneTourBusiness = async (
 };
 
 /**
+ * Business logic for permanently deleting a tour (physical deletion)
+ */
+const deleteTourBusiness = async (
+  tourId: string,
+  token: string
+): Promise<{ success: boolean; message?: string; error?: unknown }> => {
+  try {
+    const result = await deleteTourPhysical(tourId, token);
+    return result;
+  } catch (error) {
+    console.error('Error in deleteTourBusiness:', error);
+    return { success: false, error };
+  }
+};
+
+/**
  * Main export function
  */
 const tours = (formData: FormData, token = ''): Promise<ServiceResult<unknown>> => {
@@ -275,6 +292,7 @@ export {
   createTourBusiness,
   updateTourBusiness,
   cloneTourBusiness,
+  deleteTourBusiness,
   uploadTourImages,
   setImageAsCover,
   deleteTourImage,

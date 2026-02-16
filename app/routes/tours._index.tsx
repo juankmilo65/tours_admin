@@ -20,7 +20,7 @@ import {
 import { selectLanguage, setGlobalLoading, openModal } from '~/store/slices/uiSlice';
 import type { City } from '~/server/cities';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
-import { cloneTourBusiness } from '~/server/businessLogic/toursBusinessLogic';
+import { cloneTourBusiness, deleteTourBusiness } from '~/server/businessLogic/toursBusinessLogic';
 import categoriesBL from '~/server/businessLogic/categoriesBusinessLogic';
 import { priceRangeBL } from '~/server/businessLogic/priceRangeBusinessLogic';
 import citiesBL from '~/server/businessLogic/citiesBusinessLogic';
@@ -529,6 +529,9 @@ function ToursClient(): JSX.Element {
   const [tourToClone, setTourToClone] = useState<TranslatedTour | null>(null);
   const [cloneImagesOption, setCloneImagesOption] = useState(true);
 
+  // Delete tour confirmation modal state
+  const [tourToDelete, setTourToDelete] = useState<TranslatedTour | null>(null);
+
   // Fetcher for loading tour details via BL
   const tourDetailsFetcher = useFetcher<{
     success: boolean;
@@ -583,6 +586,44 @@ function ToursClient(): JSX.Element {
       dispatch(setGlobalLoading({ isLoading: false }));
     }
   }, [tourDetailsFetcher.state, tourDetailsFetcher.data, dispatch]);
+
+  // Check for deferred success messages after page reload
+  useEffect(() => {
+    const successType = window.sessionStorage.getItem('tours_success_message');
+    if (successType !== null && successType !== '') {
+      window.sessionStorage.removeItem('tours_success_message');
+      let messageKey = '';
+      switch (successType) {
+        case 'clone':
+          messageKey = 'tours.cloneTourSuccess';
+          break;
+        case 'delete':
+          messageKey = 'tours.deleteTourSuccess';
+          break;
+        case 'create':
+          messageKey = 'tours.tourCreatedSuccess';
+          break;
+        case 'update':
+          messageKey = 'tours.tourUpdatedSuccess';
+          break;
+        default:
+          return;
+      }
+      dispatch(
+        openModal({
+          id: `${successType}-tour-success`,
+          type: 'confirm',
+          title: t('common.success'),
+          isOpen: true,
+          data: {
+            message: t(messageKey),
+            icon: 'success',
+          },
+        })
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Loading state from fetcher
   const isLoadingFullTour = tourDetailsFetcher.state === 'loading';
@@ -731,9 +772,8 @@ function ToursClient(): JSX.Element {
         authToken ?? ''
       );
 
-      dispatch(setGlobalLoading({ isLoading: false }));
-
       if ('error' in result) {
+        dispatch(setGlobalLoading({ isLoading: false }));
         dispatch(
           openModal({
             id: 'clone-tour-error',
@@ -749,21 +789,8 @@ function ToursClient(): JSX.Element {
         return;
       }
 
-      // Success - show message and reload
-      dispatch(
-        openModal({
-          id: 'clone-tour-success',
-          type: 'confirm',
-          title: t('common.success'),
-          isOpen: true,
-          data: {
-            message: t('tours.cloneTourSuccess'),
-            icon: 'success',
-          },
-        })
-      );
-
-      // Reload page to show updated list
+      // Success - save flag and reload, modal will show after page refreshes
+      window.sessionStorage.setItem('tours_success_message', 'clone');
       window.location.reload();
     } catch (error) {
       console.error('Error cloning tour:', error);
@@ -776,6 +803,67 @@ function ToursClient(): JSX.Element {
           isOpen: true,
           data: {
             message: t('tours.cloneTourError'),
+            icon: 'alert',
+          },
+        })
+      );
+    }
+  };
+
+  // Delete tour handler - opens confirmation modal
+  const handleDeleteTour = (tour: TranslatedTour): void => {
+    setTourToDelete(tour);
+  };
+
+  // Execute delete tour - called when user confirms
+  const executeDeleteTour = async (): Promise<void> => {
+    if (tourToDelete === null) return;
+
+    const tour = tourToDelete;
+    setTourToDelete(null);
+
+    // Show global loading spinner
+    dispatch(
+      setGlobalLoading({
+        isLoading: true,
+        message: t('tours.deletingTour'),
+      })
+    );
+
+    try {
+      const result = await deleteTourBusiness(tour.id, authToken ?? '');
+
+      if (!result.success) {
+        dispatch(setGlobalLoading({ isLoading: false }));
+        dispatch(
+          openModal({
+            id: 'delete-tour-error',
+            type: 'confirm',
+            title: t('common.error'),
+            isOpen: true,
+            data: {
+              message: typeof result.error === 'string' ? result.error : t('tours.deleteTourError'),
+              icon: 'alert',
+            },
+          })
+        );
+        return;
+      }
+
+      // Success - save flag and reload, modal will show after page refreshes
+      window.sessionStorage.setItem('tours_success_message', 'delete');
+      window.location.reload();
+    } catch (error) {
+      console.error('Error deleting tour:', error);
+      dispatch(setGlobalLoading({ isLoading: false }));
+      dispatch(
+        openModal({
+          id: 'delete-tour-error',
+          type: 'confirm',
+          title: t('common.error'),
+          isOpen: true,
+          data: {
+            message: t('tours.deleteTourError'),
             icon: 'alert',
           },
         })
@@ -1555,6 +1643,9 @@ function ToursClient(): JSX.Element {
                 onClone={() => {
                   handleCloneTour(tour);
                 }}
+                onDelete={() => {
+                  handleDeleteTour(tour);
+                }}
               />
             ))}
           </div>
@@ -1692,7 +1783,8 @@ function ToursClient(): JSX.Element {
           activities={loaderData.activities}
           onClose={() => setIsCreateTourModalOpen(false)}
           onSuccess={() => {
-            // Reload page to fetch updated tours
+            // Save flag and reload, modal will show after page refreshes
+            window.sessionStorage.setItem('tours_success_message', 'create');
             window.location.reload();
           }}
         />
@@ -1713,7 +1805,8 @@ function ToursClient(): JSX.Element {
             onSuccess={() => {
               console.warn('[tours._index] Edit modal onSuccess called');
               setEditingTour(null);
-              // Reload page to fetch updated tours
+              // Save flag and reload, modal will show after page refreshes
+              window.sessionStorage.setItem('tours_success_message', 'update');
               window.location.reload();
             }}
           />
@@ -1866,6 +1959,139 @@ function ToursClient(): JSX.Element {
                   }}
                 >
                   {t('tours.cloneTour')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Tour Confirmation Modal */}
+        {tourToDelete !== null && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={() => setTourToDelete(null)}
+          >
+            <div
+              style={{
+                backgroundColor: 'white',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-6)',
+                maxWidth: '480px',
+                width: '90%',
+                boxShadow: 'var(--shadow-lg)',
+                pointerEvents: 'auto',
+              }}
+              onClick={(e): void => {
+                e.stopPropagation();
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 16,
+                  alignItems: 'flex-start',
+                  marginBottom: 'var(--space-4)',
+                }}
+              >
+                <div style={{ fontSize: 34 }}>⚠️</div>
+                <div style={{ flex: 1 }}>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 'var(--text-lg)',
+                      fontWeight: '600',
+                      color: 'var(--color-error-600)',
+                    }}
+                  >
+                    {t('tours.deleteTour')}
+                  </h3>
+                  <p
+                    style={{
+                      marginTop: 'var(--space-2)',
+                      color: 'var(--color-neutral-700)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {t('tours.deleteTourConfirm')}
+                  </p>
+                  <p
+                    style={{
+                      marginTop: 'var(--space-2)',
+                      padding: 'var(--space-2) var(--space-3)',
+                      backgroundColor: 'var(--color-neutral-100)',
+                      borderRadius: 'var(--radius-md)',
+                      fontWeight: '500',
+                      color: 'var(--color-neutral-800)',
+                    }}
+                  >
+                    {tourToDelete.title}
+                  </p>
+                  <p
+                    style={{
+                      marginTop: 'var(--space-3)',
+                      padding: 'var(--space-2) var(--space-3)',
+                      backgroundColor: 'var(--color-error-50)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--color-error-700)',
+                      fontSize: 'var(--text-sm)',
+                      lineHeight: 1.5,
+                      fontWeight: '500',
+                    }}
+                  >
+                    ⛔ {t('tours.deleteTourWarning')}
+                  </p>
+                </div>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 'var(--space-3)',
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <button
+                  onClick={() => setTourToDelete(null)}
+                  style={{
+                    padding: 'var(--space-2) var(--space-4)',
+                    backgroundColor: 'var(--color-neutral-200)',
+                    color: 'var(--color-neutral-700)',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: '500',
+                  }}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={() => {
+                    void executeDeleteTour();
+                  }}
+                  style={{
+                    padding: 'var(--space-2) var(--space-4)',
+                    backgroundColor: 'var(--color-error-600)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: '500',
+                  }}
+                >
+                  {t('tours.deleteTour')}
                 </button>
               </div>
             </div>

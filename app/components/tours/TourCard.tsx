@@ -342,35 +342,33 @@ export function TourCard({
           >
             📋
           </button>
-          {onDelete && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (window.confirm(t('common.confirm'))) {
-                  onDelete?.();
-                }
-              }}
-              style={{
-                padding: 'var(--space-2) var(--space-3)',
-                backgroundColor: 'var(--color-error-50)',
-                color: 'var(--color-error-600)',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                fontWeight: 'var(--font-weight-medium)',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-error-100)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
-              }}
-              title={t('common.delete')}
-            >
-              🗑️
-            </button>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onDelete !== undefined) {
+                onDelete();
+              }
+            }}
+            style={{
+              padding: 'var(--space-2) var(--space-3)',
+              backgroundColor: 'var(--color-error-50)',
+              color: 'var(--color-error-600)',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: 'var(--font-weight-medium)',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-error-100)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
+            }}
+            title={t('common.delete')}
+          >
+            🗑️
+          </button>
         </div>
       </div>
     </div>

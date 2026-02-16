@@ -305,6 +305,64 @@ export const cloneTour = async (
 };
 
 /**
+ * Permanently delete a tour (physical deletion)
+ */
+export const deleteTourPhysical = async (
+  tourId: string,
+  token: string
+): Promise<{ success: boolean; message?: string; error?: unknown }> => {
+  console.warn('🎯 [DELETE TOUR] Starting deleteTourPhysical with params:', {
+    tourId,
+    hasToken: !!token,
+    BASE_URL,
+  });
+
+  // Check if backend URL is configured
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('⚠️ [DELETE TOUR] BACKEND_URL is not configured, returning error');
+    return { success: false, error: 'Backend URL not configured' };
+  }
+
+  try {
+    const fullUrl = `${BASE_URL}/api/tours/${tourId}/physical`;
+    console.warn('🌐 [DELETE TOUR] Full URL to call:', fullUrl);
+
+    // Use DELETE method directly via axios
+    const response = await axios.delete<{ success: boolean; message?: string }>(fullUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      timeout: 15000, // 15s timeout
+    });
+
+    const result = response.data;
+
+    console.warn('✅ [DELETE TOUR] Success! Result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    console.error('❌ [DELETE TOUR] Error caught:', error);
+    if (axios.isAxiosError(error) && error.response !== undefined) {
+      const errorData = error.response.data as { error?: string; message?: string };
+      return {
+        success: false,
+        error: errorData.error ?? errorData.message ?? 'Failed to delete tour',
+      };
+    }
+    if (error instanceof Error) {
+      console.error('❌ [DELETE TOUR] Error message:', error.message);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          '⚠️ [DELETE TOUR] Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    }
+    return { error, success: false };
+  }
+};
+
+/**
  * Upload multiple images for a tour using multipart/form-data
  */
 
