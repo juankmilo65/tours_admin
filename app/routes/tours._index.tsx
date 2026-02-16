@@ -89,6 +89,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   const category = url.searchParams.get('category') ?? '';
   const minPrice = url.searchParams.get('minPrice') ?? '';
   const maxPrice = url.searchParams.get('maxPrice') ?? '';
+  const isActiveParam = url.searchParams.get('isActive'); // null if not set, 'true' or 'false' if set
 
   // Fetch categories
   const categoriesFormData = new FormData();
@@ -212,11 +213,16 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   }
 
   // Build filters object - userId and countryId are mandatory
-  const filters: Record<string, string | number> = {
+  const filters: Record<string, string | number | boolean> = {
     userId: userId ?? '',
     countryId: countryId ?? '',
     page: parseInt(page, 10),
   };
+
+  // Add isActive filter if specified
+  if (isActiveParam !== null) {
+    filters.isActive = isActiveParam === 'true';
+  }
 
   if (cityId !== null && cityId !== undefined && cityId !== '') {
     filters.cityId = cityId;
@@ -467,6 +473,13 @@ function ToursClient(): JSX.Element {
   const [selectedCategory, setSelectedCategory] = useState<string>(
     searchParams.get('category') ?? ''
   );
+  // Active status filter - 'all' | 'active' | 'inactive'
+  const [activeStatusFilter, setActiveStatusFilter] = useState<string>(() => {
+    const isActiveParam = searchParams.get('isActive');
+    if (isActiveParam === 'false') return 'inactive';
+    if (isActiveParam === 'true') return 'active';
+    return 'all';
+  });
 
   // Raw tours data (with both languages) - only updated on filter/pagination
   const [rawTours, setRawTours] = useState<Tour[]>(loaderData.tours?.data ?? []);
@@ -977,6 +990,15 @@ function ToursClient(): JSX.Element {
         params.maxPrice = selectedMaxPrice.toString();
       }
     }
+
+    // Include isActive filter based on dropdown selection
+    if (activeStatusFilter === 'active') {
+      params.isActive = 'true';
+    } else if (activeStatusFilter === 'inactive') {
+      params.isActive = 'false';
+    }
+    // If 'all', don't send isActive param (show all tours)
+
     // Reset filters changed flag
     setFiltersChanged(false);
     setSearchParams(params);
@@ -995,6 +1017,7 @@ function ToursClient(): JSX.Element {
     setSelectedUserId('');
     setSelectedCityId('');
     setSelectedCategory('');
+    setActiveStatusFilter('all'); // Reset to show all tours
     // Reset filters changed flag
     setFiltersChanged(false);
     // Reset price to default range
@@ -1368,6 +1391,35 @@ function ToursClient(): JSX.Element {
                   </span>
                 </div>
               )}
+            </div>
+
+            {/* Active Status Filter Dropdown */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-700)',
+                  marginBottom: 'var(--space-1)',
+                }}
+              >
+                {t('common.status')}
+              </label>
+              <Select
+                options={[
+                  { value: 'all', label: t('common.all') },
+                  { value: 'active', label: t('common.active') },
+                  { value: 'inactive', label: t('common.inactive') },
+                ]}
+                value={activeStatusFilter}
+                onChange={(v: string) => {
+                  setActiveStatusFilter(v);
+                  setFiltersChanged(true);
+                }}
+                placeholder={t('common.all')}
+                id="select-active-status"
+              />
             </div>
 
             {/* Filter Button (primary) - Smaller */}

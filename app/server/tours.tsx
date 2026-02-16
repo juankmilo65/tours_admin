@@ -480,6 +480,7 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
       difficulty,
       minPrice,
       maxPrice,
+      isActive,
       language = 'es',
       currency = 'MXN',
       token,
@@ -530,6 +531,11 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
     }
     if (maxPrice !== null && maxPrice !== undefined && maxPrice !== 0) {
       params.maxPrice = maxPrice;
+    }
+
+    // Optional isActive filter - only add if explicitly set (not undefined)
+    if (isActive !== null && isActive !== undefined) {
+      params.isActive = isActive.toString();
     }
 
     const toursEndpoint = 'tours/cards';

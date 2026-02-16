@@ -267,6 +267,7 @@ export interface ServicePayload {
   maxPrice?: number;
   language?: string;
   currency?: string;
+  isActive?: boolean;
 }
 
 /**
