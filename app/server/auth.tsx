@@ -98,7 +98,7 @@ export const registerUser = async (payload: {
   termsConditionsId: string;
 }): Promise<RegisterUserResponse> => {
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/register', '');
+    const authService = createServiceREST(BASE_URL, 'users/register', '');
 
     const result = await authService.create(payload);
 
@@ -281,7 +281,7 @@ export const resetPassword = async (payload: {
  */
 export const logout = async (payload: { token: string }): Promise<LogoutResponse> => {
   try {
-    const authService = createServiceREST(BASE_URL, 'auth/logout', `Bearer ${payload.token}`);
+    const authService = createServiceREST(BASE_URL, 'users/logout', `Bearer ${payload.token}`);
 
     const result = await authService.create({}); // Empty payload for logout
 

@@ -22,6 +22,18 @@ export interface NavItem {
   submenu: SubMenuItem[];
 }
 
+export interface MenuRoleItem {
+  id: string;
+  menuId: string;
+  roleId: string;
+  role?: {
+    id: string;
+    name: string;
+    name_es: string;
+    name_en: string;
+  };
+}
+
 export interface Menu {
   id: string;
   path: string;
@@ -33,6 +45,7 @@ export interface Menu {
   createdAt: string;
   updatedAt: string;
   roles?: Role[];
+  menuRoles?: MenuRoleItem[];
 }
 
 export interface Role {

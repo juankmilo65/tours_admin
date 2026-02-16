@@ -16,11 +16,13 @@ import {
   updateMenuBusinessDirect,
   associateRolesToMenuBusinessDirect,
   getParentMenusBusiness,
+  getMenuByIdBusinessDirect,
   type Menu,
   type CreateMenuDto,
   type UpdateMenuDto,
   type ParentMenuItem,
 } from '~/server/businessLogic/menusBusinessLogic';
+import { getRolesBusiness, type Role } from '~/server/businessLogic/rolesBusinessLogic';
 import type { Column } from '~/components/ui/Table';
 import { useAppDispatch } from '~/store/hooks';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
@@ -78,12 +80,10 @@ export default function Menus(): JSX.Element {
   // Role association state
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [selectedMenuForRoles, setSelectedMenuForRoles] = useState<Menu | null>(null);
-  const availableRoles = [
-    { id: 'admin', name: 'Admin' },
-    { id: 'staff', name: 'Staff' },
-    { id: 'user', name: 'User' },
-  ];
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false);
+  const [successModal, setSuccessModal] = useState({ isOpen: false, title: '', message: '' });
 
   // Fetch parent menus
   useEffect(() => {
@@ -234,10 +234,43 @@ export default function Menus(): JSX.Element {
   };
 
   // Handle open role association modal
-  const handleOpenRoleModal = (menu: Menu) => {
+  const handleOpenRoleModal = async (menu: Menu) => {
+    if (token === null || token === '') return;
+
     setSelectedMenuForRoles(menu);
-    setSelectedRoles([]); // Reset selected roles
+    setSelectedRoles([]);
+    setAvailableRoles([]);
     setIsRoleModalOpen(true);
+    setIsLoadingRoles(true);
+
+    try {
+      // Fetch available roles and current menu roles in parallel
+      const [rolesResult, menuResult] = await Promise.all([
+        getRolesBusiness({ token, language }),
+        getMenuByIdBusinessDirect(menu.id, token, language),
+      ]);
+
+      // Set available roles
+      if (rolesResult.success && rolesResult.data) {
+        setAvailableRoles(rolesResult.data);
+      }
+
+      // Set currently assigned roles
+      if (menuResult.success && menuResult.data) {
+        const menuData = menuResult.data as { menuRoles?: Array<{ roleId: string }> };
+        const currentRoleIds: string[] = menuData.menuRoles?.map((mr) => mr.roleId) ?? [];
+        setSelectedRoles(currentRoleIds);
+      }
+    } catch (error) {
+      console.error('Error loading roles:', error);
+      setErrorModal({
+        isOpen: true,
+        title: t('common.error'),
+        message: t('menus.rolesLoadError') ?? 'Error loading roles',
+      });
+    } finally {
+      setIsLoadingRoles(false);
+    }
   };
 
   // Handle save roles association
@@ -245,7 +278,12 @@ export default function Menus(): JSX.Element {
     if (token === null || token === '' || selectedMenuForRoles === null) return;
 
     try {
-      dispatch(setGlobalLoading({ isLoading: true, message: 'Associating roles...' }));
+      dispatch(
+        setGlobalLoading({
+          isLoading: true,
+          message: t('menus.associating') ?? 'Associating roles...',
+        })
+      );
 
       const result = await associateRolesToMenuBusinessDirect(
         selectedMenuForRoles.id,
@@ -254,22 +292,45 @@ export default function Menus(): JSX.Element {
       );
 
       if (result.success) {
+        setSuccessModal({
+          isOpen: true,
+          title: t('common.success') ?? 'Success',
+          message: t('menus.successAssociateRoles') ?? 'Roles associated successfully',
+        });
         setIsRoleModalOpen(false);
         setSelectedMenuForRoles(null);
         setSelectedRoles([]);
+        setAvailableRoles([]);
+
+        // Refetch menus to update the list
+        const refreshResult = await getMenusBusiness({
+          page,
+          limit,
+          isActive: statusFilter === '' ? undefined : statusFilter === 'true',
+          language,
+          token,
+        });
+
+        if (refreshResult.success && refreshResult.data !== undefined) {
+          setMenus(refreshResult.data);
+        }
       } else {
         setErrorModal({
           isOpen: true,
-          title: 'Error',
-          message: result.error?.message ?? 'Failed to associate roles',
+          title: t('common.error') ?? 'Error',
+          message:
+            result.error?.message ?? t('menus.errorAssociateRoles') ?? 'Failed to associate roles',
         });
       }
     } catch (error) {
       console.error('Error associating roles:', error);
       setErrorModal({
         isOpen: true,
-        title: 'Error',
-        message: error instanceof Error ? error.message : 'Failed to associate roles',
+        title: t('common.error') ?? 'Error',
+        message:
+          error instanceof Error
+            ? error.message
+            : (t('menus.errorAssociateRoles') ?? 'Failed to associate roles'),
       });
     } finally {
       dispatch(setGlobalLoading({ isLoading: false, message: '' }));
@@ -482,7 +543,11 @@ export default function Menus(): JSX.Element {
             {/* Associate Roles Button */}
             <button
               type="button"
-              onClick={() => !protectedMenu && handleOpenRoleModal(row)}
+              onClick={() => {
+                if (!protectedMenu) {
+                  void handleOpenRoleModal(row);
+                }
+              }}
               disabled={protectedMenu}
               style={{
                 padding: '10px',
@@ -1072,6 +1137,7 @@ export default function Menus(): JSX.Element {
           setIsRoleModalOpen(false);
           setSelectedMenuForRoles(null);
           setSelectedRoles([]);
+          setAvailableRoles([]);
         }}
         title={t('menus.associateRolesTitle')}
         size="md"
@@ -1083,11 +1149,16 @@ export default function Menus(): JSX.Element {
                 setIsRoleModalOpen(false);
                 setSelectedMenuForRoles(null);
                 setSelectedRoles([]);
+                setAvailableRoles([]);
               }}
             >
               {t('common.cancel')}
             </Button>
-            <Button variant="primary" onClick={() => void handleSaveRoles()}>
+            <Button
+              variant="primary"
+              onClick={() => void handleSaveRoles()}
+              disabled={isLoadingRoles}
+            >
               {t('menus.saveRoles')}
             </Button>
           </>
@@ -1124,60 +1195,131 @@ export default function Menus(): JSX.Element {
             </div>
           )}
 
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-2)',
-            }}
-          >
-            {availableRoles.map((role) => (
+          {isLoadingRoles ? (
+            <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+              <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
+              <p className="text-sm font-medium">{t('menus.loadingRoles')}</p>
+            </div>
+          ) : availableRoles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+              <p className="text-sm font-medium">{t('menus.noRolesAvailable')}</p>
+            </div>
+          ) : (
+            <>
+              {/* Select/Deselect All buttons */}
               <div
-                key={role.id}
+                style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedRoles(availableRoles.map((r) => r.id))}
+                >
+                  {t('menus.selectAll')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedRoles([])}>
+                  {t('menus.deselectAll')}
+                </Button>
+              </div>
+
+              <div
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
+                  flexDirection: 'column',
                   gap: 'var(--space-2)',
-                  padding: 'var(--space-3)',
-                  backgroundColor: selectedRoles.includes(role.id)
-                    ? 'rgba(59, 130, 246, 0.1)'
-                    : 'var(--color-neutral-50)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid',
-                  borderColor: selectedRoles.includes(role.id)
-                    ? 'var(--color-primary-300)'
-                    : 'var(--color-neutral-200)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-                onClick={() => {
-                  setSelectedRoles((prev) =>
-                    prev.includes(role.id) ? prev.filter((r) => r !== role.id) : [...prev, role.id]
-                  );
+                  maxHeight: '300px',
+                  overflowY: 'auto',
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={selectedRoles.includes(role.id)}
-                  onChange={() => {}}
-                  style={{
-                    width: '1.25rem',
-                    height: '1.25rem',
-                    cursor: 'pointer',
-                    accentColor: 'var(--color-primary-600)',
-                  }}
-                />
-                <span
-                  style={{
-                    fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
-                  }}
-                >
-                  {role.name}
-                </span>
+                {availableRoles.map((role) => (
+                  <div
+                    key={role.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-3)',
+                      padding: 'var(--space-3)',
+                      backgroundColor: selectedRoles.includes(role.id)
+                        ? 'rgba(59, 130, 246, 0.1)'
+                        : 'var(--color-neutral-50)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid',
+                      borderColor: selectedRoles.includes(role.id)
+                        ? 'var(--color-primary-300)'
+                        : 'var(--color-neutral-200)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onClick={() => {
+                      setSelectedRoles((prev) =>
+                        prev.includes(role.id)
+                          ? prev.filter((r) => r !== role.id)
+                          : [...prev, role.id]
+                      );
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedRoles.includes(role.id)}
+                      onChange={() => {}}
+                      style={{
+                        width: '1.25rem',
+                        height: '1.25rem',
+                        cursor: 'pointer',
+                        accentColor: 'var(--color-primary-600)',
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <span
+                        style={{
+                          fontWeight: 'var(--font-weight-medium)',
+                          color: 'var(--color-neutral-700)',
+                        }}
+                      >
+                        {language === 'es' ? role.name_es : role.name_en}
+                      </span>
+                      <span
+                        style={{
+                          marginLeft: 'var(--space-2)',
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--color-neutral-500)',
+                          fontFamily: 'monospace',
+                        }}
+                      >
+                        ({role.name})
+                      </span>
+                    </div>
+                    {selectedRoles.includes(role.id) && (
+                      <svg
+                        style={{ width: '20px', height: '20px', color: 'var(--color-primary-600)' }}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+
+              {/* Selected count */}
+              <div
+                style={{
+                  marginTop: 'var(--space-2)',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-neutral-600)',
+                  textAlign: 'right',
+                }}
+              >
+                {selectedRoles.length} / {availableRoles.length}{' '}
+                {t('menus.associateRoles').toLowerCase()}
+              </div>
+            </>
+          )}
         </div>
       </Dialog>
 
@@ -1217,6 +1359,79 @@ export default function Menus(): JSX.Element {
             }}
           >
             {errorModal.message}
+          </p>
+        </div>
+      </Dialog>
+
+      {/* Success Modal */}
+      <Dialog
+        isOpen={successModal.isOpen}
+        onClose={() => setSuccessModal({ ...successModal, isOpen: false })}
+        title={successModal.title}
+        size="sm"
+        footer={
+          <Button
+            variant="primary"
+            onClick={() => setSuccessModal({ ...successModal, isOpen: false })}
+          >
+            {t('common.accept')}
+          </Button>
+        }
+      >
+        <div style={{ padding: 'var(--space-2)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <svg
+                style={{ width: '24px', height: '24px', color: '#10b981' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+          </div>
+          <p
+            style={{
+              margin: 0,
+              textAlign: 'center',
+              fontWeight: 'var(--font-weight-medium)',
+              color: 'var(--color-neutral-900)',
+              marginBottom: 'var(--space-2)',
+            }}
+          >
+            {successModal.title}
+          </p>
+          <p
+            style={{
+              textAlign: 'center',
+              color: 'var(--color-neutral-700)',
+              lineHeight: 'var(--leading-relaxed)',
+            }}
+          >
+            {successModal.message}
           </p>
         </div>
       </Dialog>

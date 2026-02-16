@@ -177,15 +177,11 @@ export const associateRolesToMenu = async (
     throw new Error('BACKEND_URL is not configured');
   }
 
+  // Use the full endpoint path for the POST request
   const menusEndpoint = `menus/${menuId}/roles`;
-  const menusService = createServiceREST(BASE_URL, 'menus', `Bearer ${token}`);
+  const menusService = createServiceREST(BASE_URL, menusEndpoint, `Bearer ${token}`);
 
-  const result = await menusService.create(
-    { roleIds },
-    {
-      url: `/${menusEndpoint}`,
-    }
-  );
+  const result = await menusService.create({ roleIds });
   return result;
 };
 

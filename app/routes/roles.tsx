@@ -631,6 +631,7 @@ export default function Roles(): JSX.Element {
             }}
             error={errors.name}
             required
+            disabled={isEditMode}
           />
 
           <Input
