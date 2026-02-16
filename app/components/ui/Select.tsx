@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from '~/lib/i18n/utils';
 
 export interface Option {
@@ -18,6 +19,12 @@ interface SelectProps {
   id?: string;
 }
 
+interface DropdownPosition {
+  top: number;
+  left: number;
+  width: number;
+}
+
 export default function Select({
   options,
   value,
@@ -29,11 +36,53 @@ export default function Select({
 }: SelectProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const dropdownRef = useRef<HTMLUListElement | null>(null);
   const isOpeningRef = useRef(false);
   const { t } = useTranslation();
 
+  // Calculate dropdown position based on button location
+  const updateDropdownPosition = useCallback(() => {
+    if (rootRef.current) {
+      const rect = rootRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8, // 8px gap
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  }, []);
+
   const selected = options.find((o) => o.value === value);
+
+  // Update position when dropdown opens
+  useEffect(() => {
+    if (open) {
+      updateDropdownPosition();
+    }
+  }, [open, updateDropdownPosition]);
+
+  // Handle scroll and resize events to reposition dropdown
+  useEffect(() => {
+    if (!open) return;
+
+    const handleScrollOrResize = () => {
+      updateDropdownPosition();
+    };
+
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [open, updateDropdownPosition]);
 
   useEffect(() => {
     function handleOutside(e: Event) {
@@ -41,7 +90,12 @@ export default function Select({
         isOpeningRef.current = false;
         return;
       }
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      // Check if click is outside both the button and the dropdown
+      const target = e.target as Node;
+      const isInsideRoot = rootRef.current?.contains(target) === true;
+      const isInsideDropdown = dropdownRef.current?.contains(target) === true;
+
+      if (!isInsideRoot && !isInsideDropdown) {
         setOpen(false);
         setHighlightedIndex(-1);
       }
@@ -93,7 +147,7 @@ export default function Select({
 
   useEffect(() => {
     if (open && highlightedIndex >= 0) {
-      const el = rootRef.current?.querySelectorAll('[data-select-item]')[highlightedIndex] as
+      const el = dropdownRef.current?.querySelectorAll('[data-select-item]')[highlightedIndex] as
         | HTMLElement
         | undefined;
       el?.scrollIntoView({ block: 'nearest' });
@@ -135,57 +189,63 @@ export default function Select({
         <span style={{ color: 'var(--color-neutral-500)', marginLeft: '8px' }}>▾</span>
       </button>
 
-      {open && (
-        <ul
-          role="listbox"
-          tabIndex={-1}
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 8px)',
-            left: 0,
-            right: 0,
-            background: 'white',
-            border: '1px solid var(--color-neutral-200)',
-            borderRadius: '8px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-            maxHeight: '280px',
-            overflow: 'auto',
-            zIndex: 10000,
-            padding: '8px 0',
-            margin: 0,
-            listStyle: 'none',
-          }}
-        >
-          {options.map((opt, idx) => {
-            const isHighlighted = highlightedIndex === idx;
-            const isSelected = opt.value === value;
-            return (
-              <li
-                key={opt.value}
-                role="option"
-                aria-selected={isSelected}
-                data-select-item
-                onClick={() => handleSelect(opt)}
-                onMouseEnter={() => setHighlightedIndex(idx)}
-                className={`select-item${isHighlighted ? ' highlighted' : ''}${isSelected ? ' selected' : ''}`}
-                style={{
-                  padding: '8px 12px',
-                  cursor: opt.disabled === true ? 'not-allowed' : 'pointer',
-                  color:
-                    opt.disabled === true ? 'var(--color-neutral-400)' : 'var(--color-neutral-900)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  justifyContent: 'flex-start',
-                  textAlign: 'left',
-                }}
-              >
-                <span style={{ flex: '1 1 auto' }}>{opt.label}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      {open &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <ul
+            ref={dropdownRef}
+            role="listbox"
+            tabIndex={-1}
+            style={{
+              position: 'fixed',
+              top: dropdownPosition.top,
+              left: dropdownPosition.left,
+              width: dropdownPosition.width,
+              background: 'white',
+              border: '1px solid var(--color-neutral-200)',
+              borderRadius: '8px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+              maxHeight: '280px',
+              overflow: 'auto',
+              zIndex: 99999,
+              padding: '8px 0',
+              margin: 0,
+              listStyle: 'none',
+            }}
+          >
+            {options.map((opt, idx) => {
+              const isHighlighted = highlightedIndex === idx;
+              const isSelected = opt.value === value;
+              return (
+                <li
+                  key={opt.value}
+                  role="option"
+                  aria-selected={isSelected}
+                  data-select-item
+                  onClick={() => handleSelect(opt)}
+                  onMouseEnter={() => setHighlightedIndex(idx)}
+                  className={`select-item${isHighlighted ? ' highlighted' : ''}${isSelected ? ' selected' : ''}`}
+                  style={{
+                    padding: '8px 12px',
+                    cursor: opt.disabled === true ? 'not-allowed' : 'pointer',
+                    color:
+                      opt.disabled === true
+                        ? 'var(--color-neutral-400)'
+                        : 'var(--color-neutral-900)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    justifyContent: 'flex-start',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{ flex: '1 1 auto' }}>{opt.label}</span>
+                </li>
+              );
+            })}
+          </ul>,
+          document.body
+        )}
     </div>
   );
 }

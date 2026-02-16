@@ -44,6 +44,13 @@ interface CreateTourModalProps {
   initialData?: Partial<TourFormData>;
 }
 
+interface TourActivity {
+  activityId: string;
+  activityName: string; // nombre para mostrar en la UI
+  hora: string; // formato "09:00" o "09:00 AM"
+  sortOrder: number; // orden en el itinerario
+}
+
 interface TourFormData {
   userId: string;
   categoryId: string;
@@ -63,7 +70,7 @@ interface TourFormData {
   existingImageUrls: string[]; // URLs of existing images (for edit mode)
   difficulty: 'easy' | 'medium' | 'hard';
   language: string[];
-  activities: string[];
+  activities: TourActivity[];
   isActive: boolean;
 }
 
@@ -145,6 +152,123 @@ export function CreateTourModal({
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
+
+  // Activity drag and drop state
+  const [draggedActivityIndex, setDraggedActivityIndex] = useState<number | null>(null);
+
+  // Generate time options (12:00 AM - 11:00 PM)
+  const generateTimeOptions = (): Array<{ value: string; label: string }> => {
+    const options: Array<{ value: string; label: string }> = [];
+    const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+    // First all AM hours (12:00 AM, 01:00 AM, ..., 11:00 AM)
+    hours.forEach((hour) => {
+      options.push({
+        value: `${hour.toString().padStart(2, '0')}:00 AM`,
+        label: `${hour.toString().padStart(2, '0')}:00 AM`,
+      });
+    });
+
+    // Then all PM hours (12:00 PM, 01:00 PM, ..., 11:00 PM)
+    hours.forEach((hour) => {
+      options.push({
+        value: `${hour.toString().padStart(2, '0')}:00 PM`,
+        label: `${hour.toString().padStart(2, '0')}:00 PM`,
+      });
+    });
+
+    return options;
+  };
+
+  const timeOptions = generateTimeOptions();
+
+  // Get available time options for a specific activity (excluding times used by other activities)
+  const getAvailableTimeOptions = useCallback(
+    (currentActivityIndex: number): Array<{ value: string; label: string }> => {
+      // Get all hours used by other activities (not the current one)
+      const usedHours = formData.activities
+        .filter((_, index) => index !== currentActivityIndex)
+        .map((activity) => activity.hora);
+
+      // Filter out used hours from the options
+      return timeOptions.filter((option) => !usedHours.includes(option.value));
+    },
+    [formData.activities, timeOptions]
+  );
+
+  // Get the first available hour for a new activity
+  const getFirstAvailableHour = useCallback((): string => {
+    const usedHours = formData.activities.map((activity) => activity.hora);
+    const availableOption = timeOptions.find((option) => !usedHours.includes(option.value));
+    return availableOption?.value ?? '09:00 AM';
+  }, [formData.activities, timeOptions]);
+
+  // Convert time string "HH:MM AM/PM" to minutes from midnight
+  const timeToMinutes = useCallback((timeStr: string): number => {
+    const match = timeStr.match(/^(\d{2}):(\d{2})\s*(AM|PM)$/i);
+    const hourStr = match?.[1];
+    const minStr = match?.[2];
+    const periodStr = match?.[3];
+
+    if (hourStr === undefined || minStr === undefined || periodStr === undefined) {
+      return 0;
+    }
+
+    let hours = parseInt(hourStr, 10);
+    const minutes = parseInt(minStr, 10);
+    const period = periodStr.toUpperCase();
+
+    // Convert to 24-hour format
+    if (period === 'AM' && hours === 12) {
+      hours = 0;
+    } else if (period === 'PM' && hours !== 12) {
+      hours += 12;
+    }
+
+    return hours * 60 + minutes;
+  }, []);
+
+  // Calculate total duration based on activities
+  const calculateDuration = useCallback((): string => {
+    if (formData.activities.length === 0) {
+      return '0 hours';
+    }
+
+    if (formData.activities.length === 1) {
+      return '1 hour';
+    }
+
+    // Get all times and sort them
+    const times = formData.activities.map((a) => timeToMinutes(a.hora)).sort((a, b) => a - b);
+
+    // Calculate duration from first to last activity (assuming 1 hour per activity minimum)
+    const firstTime = times[0] ?? 0;
+    const lastTime = times[times.length - 1] ?? 0;
+
+    // Duration is the difference plus 1 hour for the last activity
+    let durationMinutes = lastTime - firstTime + 60;
+
+    // Handle case where activities span past midnight
+    if (durationMinutes < 0) {
+      durationMinutes += 24 * 60;
+    }
+
+    const hours = Math.floor(durationMinutes / 60);
+    const mins = durationMinutes % 60;
+
+    if (mins === 0) {
+      return hours === 1 ? '1 hour' : `${hours} hours`;
+    }
+    return `${hours}h ${mins}m`;
+  }, [formData.activities, timeToMinutes]);
+
+  // Auto-update duration when activities change
+  useEffect(() => {
+    const newDuration = calculateDuration();
+    if (newDuration !== formData.duration) {
+      setFormData((prev) => ({ ...prev, duration: newDuration }));
+    }
+  }, [formData.activities, calculateDuration, formData.duration]);
 
   // Fetch languages on mount with caching
   useEffect(() => {
@@ -375,6 +499,74 @@ export function CreateTourModal({
     }));
   };
 
+  // Activity handlers
+  const handleAddActivity = (activityId: string): void => {
+    const activity = activities.find((a) => a.id === activityId);
+    if (!activity) return;
+
+    const newActivity: TourActivity = {
+      activityId,
+      activityName: currentLanguage === 'en' ? activity.activityEn : activity.activityEs,
+      hora: getFirstAvailableHour(),
+      sortOrder: formData.activities.length + 1,
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      activities: [...prev.activities, newActivity],
+    }));
+    setSelectedActivityId('');
+    if (errors.activities !== undefined) {
+      setErrors((prev) => ({ ...prev, activities: undefined }));
+    }
+  };
+
+  const handleRemoveActivity = (index: number): void => {
+    setFormData((prev) => ({
+      ...prev,
+      activities: prev.activities.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleActivityTimeChange = (index: number, time: string): void => {
+    setFormData((prev) => ({
+      ...prev,
+      activities: prev.activities.map((activity, i) =>
+        i === index ? { ...activity, hora: time } : activity
+      ),
+    }));
+  };
+
+  // Activity drag and drop handlers
+  const handleActivityDragStart = (index: number): void => {
+    setDraggedActivityIndex(index);
+  };
+
+  const handleActivityDragOver = (e: React.DragEvent<HTMLDivElement>, index: number): void => {
+    e.preventDefault();
+    if (draggedActivityIndex === null || draggedActivityIndex === index) return;
+
+    const reorderedActivities = [...formData.activities];
+    const [draggedActivity] = reorderedActivities.splice(draggedActivityIndex, 1);
+
+    if (draggedActivity === undefined) return;
+
+    reorderedActivities.splice(index, 0, draggedActivity);
+
+    // Update sortOrder for all activities
+    const updatedActivities = reorderedActivities.map((activity, i) => ({
+      ...activity,
+      sortOrder: i + 1,
+    }));
+
+    setFormData((prev) => ({ ...prev, activities: updatedActivities }));
+    setDraggedActivityIndex(index);
+  };
+
+  const handleActivityDragEnd = (): void => {
+    setDraggedActivityIndex(null);
+  };
+
   const handleLanguageToggle = (lang: string): void => {
     setFormData((prev) => ({
       ...prev,
@@ -405,8 +597,6 @@ export function CreateTourModal({
     if (!formData.shortDescriptionEn)
       newErrors.shortDescriptionEn =
         t('tours.shortDescriptionEnRequired') ?? 'Short description (EN) is required';
-    if (!formData.duration || formData.duration.trim() === '')
-      newErrors.duration = t('tours.durationRequired') ?? 'Duration is required';
     if (formData.maxCapacity <= 0)
       newErrors.maxCapacity = t('tours.maxCapacityRequired') ?? 'Max capacity is required';
     if (formData.basePrice <= 0)
@@ -415,8 +605,9 @@ export function CreateTourModal({
     if (formData.activities.length === 0) {
       newErrors.activities = t('tours.activitiesRequired') ?? 'Al menos una actividad es requerida';
     }
-    // Validate that at least one image is provided
-    if (formData.images.length === 0) {
+    // Validate that at least one image is provided (new or existing)
+    const totalImages = formData.images.length + formData.existingImageUrls.length;
+    if (totalImages === 0) {
       const imagesRequiredMsg = t('tours.imagesRequired');
       newErrors.images = imagesRequiredMsg ?? 'Al menos una imagen es requerida';
     }
@@ -455,6 +646,11 @@ export function CreateTourModal({
         difficulty: formData.difficulty,
         language: formData.language,
         isActive: formData.isActive,
+        activities: formData.activities.map((activity) => ({
+          activityId: activity.activityId,
+          hora: activity.hora,
+          sortOrder: activity.sortOrder,
+        })),
       };
 
       let result: unknown;
@@ -968,7 +1164,7 @@ export function CreateTourModal({
                     options={[
                       { value: '', label: t('tours.selectActivity') ?? 'Seleccionar actividad' },
                       ...activities
-                        .filter((a) => !formData.activities.includes(a.id))
+                        .filter((a) => !formData.activities.some((act) => act.activityId === a.id))
                         .map((activity) => ({
                           value: activity.id,
                           label:
@@ -977,15 +1173,8 @@ export function CreateTourModal({
                     ]}
                     value={selectedActivityId}
                     onChange={(value: string) => {
-                      if (value !== '' && !formData.activities.includes(value)) {
-                        setFormData((prev) => ({
-                          ...prev,
-                          activities: [...prev.activities, value],
-                        }));
-                        setSelectedActivityId(''); // Reset dropdown value
-                        if (errors.activities !== undefined) {
-                          setErrors((prev) => ({ ...prev, activities: undefined }));
-                        }
+                      if (value !== '') {
+                        handleAddActivity(value);
                       }
                     }}
                     placeholder={t('tours.selectActivity')}
@@ -993,63 +1182,168 @@ export function CreateTourModal({
                   />
                 </div>
               </div>
+
+              {/* Activities List with Drag and Drop */}
               {formData.activities.length > 0 && (
                 <div
                   style={{
-                    marginTop: 'var(--space-2)',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 'var(--space-2)',
+                    marginTop: 'var(--space-4)',
+                    border: '1px solid var(--color-neutral-200)',
+                    borderRadius: 'var(--radius-md)',
+                    overflow: 'visible',
                   }}
                 >
-                  {formData.activities.map((activityId) => {
-                    const activity = activities.find((a) => a.id === activityId);
-                    return (
-                      activity && (
-                        <span
-                          key={activityId}
+                  <div
+                    style={{
+                      padding: 'var(--space-3)',
+                      backgroundColor: 'var(--color-neutral-50)',
+                      borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '40px 1fr 200px 40px',
+                        gap: 'var(--space-3)',
+                        fontSize: 'var(--text-sm)',
+                        fontWeight: 'var(--font-weight-semibold)',
+                        color: 'var(--color-neutral-600)',
+                      }}
+                    >
+                      <div>#</div>
+                      <div>{t('tours.activity') ?? 'Actividad'}</div>
+                      <div>{t('tours.time') ?? 'Hora'}</div>
+                      <div />
+                    </div>
+                  </div>
+
+                  <div style={{ maxHeight: '300px', overflowY: 'auto', overflowX: 'visible' }}>
+                    {formData.activities.map((activity, index) => (
+                      <div
+                        key={`${activity.activityId}-${index}`}
+                        draggable
+                        onDragStart={() => handleActivityDragStart(index)}
+                        onDragOver={(e) => handleActivityDragOver(e, index)}
+                        onDragEnd={handleActivityDragEnd}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '40px 1fr 200px 40px',
+                          gap: 'var(--space-3)',
+                          padding: 'var(--space-3)',
+                          alignItems: 'center',
+                          borderBottom:
+                            index < formData.activities.length - 1
+                              ? '1px solid var(--color-neutral-200)'
+                              : 'none',
+                          backgroundColor:
+                            draggedActivityIndex === index ? 'var(--color-primary-50)' : 'white',
+                          cursor: 'move',
+                          transition: 'background-color 0.2s',
+                        }}
+                        onMouseOver={(e) => {
+                          if (draggedActivityIndex !== index) {
+                            e.currentTarget.style.backgroundColor = 'var(--color-neutral-50)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (draggedActivityIndex !== index) {
+                            e.currentTarget.style.backgroundColor = 'white';
+                          }
+                        }}
+                      >
+                        {/* Drag Handle */}
+                        <div
                           style={{
-                            display: 'inline-flex',
+                            display: 'flex',
                             alignItems: 'center',
-                            gap: 'var(--space-1)',
-                            padding: 'var(--space-2) var(--space-3)',
-                            backgroundColor: 'var(--color-primary-50)',
-                            color: 'var(--color-primary-700)',
-                            borderRadius: 'var(--radius-md)',
-                            fontSize: 'var(--text-sm)',
-                            border: '1px solid var(--color-primary-200)',
+                            justifyContent: 'center',
+                            color: 'var(--color-neutral-400)',
+                            cursor: 'grab',
                           }}
                         >
-                          {currentLanguage === 'en' ? activity.activityEn : activity.activityEs}
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <circle cx="9" cy="12" r="1" />
+                            <circle cx="9" cy="5" r="1" />
+                            <circle cx="9" cy="19" r="1" />
+                            <circle cx="15" cy="12" r="1" />
+                            <circle cx="15" cy="5" r="1" />
+                            <circle cx="15" cy="19" r="1" />
+                          </svg>
+                        </div>
+
+                        {/* Activity Name */}
+                        <div
+                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-900)' }}
+                        >
+                          {activity.activityName}
+                        </div>
+
+                        {/* Time Selector */}
+                        <div>
+                          <Select
+                            options={getAvailableTimeOptions(index)}
+                            value={activity.hora}
+                            onChange={(value: string) => {
+                              handleActivityTimeChange(index, value);
+                            }}
+                            id={`activity-time-${index}`}
+                            className="w-full"
+                          />
+                        </div>
+
+                        {/* Remove Button */}
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
                           <button
                             type="button"
-                            onClick={() => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                activities: prev.activities.filter((a) => a !== activityId),
-                              }));
-                            }}
+                            onClick={() => handleRemoveActivity(index)}
                             style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              color: 'var(--color-primary-700)',
-                              fontSize: '18px',
-                              lineHeight: 1,
-                              padding: 0,
                               display: 'flex',
                               alignItems: 'center',
-                              marginLeft: 'var(--space-1)',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: 'var(--radius-md)',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                              color: 'var(--color-error-600)',
+                              border: 'none',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
                             }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                            }}
+                            title={t('common.remove') ?? 'Eliminar'}
                           >
-                            ×
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M3 6h18" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
                           </button>
-                        </span>
-                      )
-                    );
-                  })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
+
               {errors.activities !== undefined && (
                 <span
                   style={{
@@ -1274,7 +1568,7 @@ export function CreateTourModal({
                 )}
               </div>
 
-              {/* Duration */}
+              {/* Duration - Auto calculated from activities */}
               <div>
                 <label
                   style={{
@@ -1290,24 +1584,30 @@ export function CreateTourModal({
                   type="text"
                   name="duration"
                   value={formData.duration}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="1 hour"
+                  readOnly
+                  disabled
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
-                    border:
-                      errors.duration !== undefined
-                        ? '1px solid red'
-                        : '1px solid var(--color-neutral-300)',
+                    border: '1px solid var(--color-neutral-300)',
                     borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--color-neutral-100)',
+                    color: 'var(--color-neutral-600)',
+                    cursor: 'not-allowed',
                   }}
                 />
-                {errors.duration !== undefined && (
-                  <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
-                    {errors.duration}
-                  </span>
-                )}
+                <span
+                  style={{
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--color-neutral-500)',
+                    marginTop: 'var(--space-1)',
+                    display: 'block',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {t('tours.durationAutoCalculated') ??
+                    'Calculado automáticamente desde las actividades'}
+                </span>
               </div>
 
               {/* Max Capacity */}

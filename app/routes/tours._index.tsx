@@ -408,6 +408,31 @@ function EmptyState({ icon, title, description }: EmptyStateProps): JSX.Element 
   );
 }
 
+// Utility to convert 24h time (from API) to 12h format (for UI)
+// e.g., "09:00" -> "09:00 AM", "14:30" -> "02:00 PM"
+const convertTo12HourFormat = (time24: string): string => {
+  // If already in 12h format, return as-is
+  if (time24.includes('AM') || time24.includes('PM')) {
+    return time24;
+  }
+
+  const match = time24.match(/^(\d{1,2}):(\d{2})$/);
+  if (match?.[1] === undefined) {
+    return '09:00 AM'; // Default fallback
+  }
+
+  let hours = parseInt(match[1], 10);
+  const period = hours >= 12 ? 'PM' : 'AM';
+
+  if (hours === 0) {
+    hours = 12;
+  } else if (hours > 12) {
+    hours = hours - 12;
+  }
+
+  return `${hours.toString().padStart(2, '0')}:00 ${period}`;
+};
+
 // Client-only component that uses Redux
 function ToursClient(): JSX.Element {
   const rawLoaderData = useLoaderData<typeof loader>();
@@ -618,12 +643,32 @@ function ToursClient(): JSX.Element {
         'easy',
       language: (fullData.language as string[]) ?? rawTourForEdit.language ?? ['es'],
       isActive: (fullData.isActive as boolean) ?? rawTourForEdit.isActive ?? true,
+      // Map activities from API format to CreateTourModal format
+      activities: Array.isArray(fullData.activities)
+        ? (
+            fullData.activities as Array<{
+              activityId: string;
+              activity_es?: string;
+              activity_en?: string;
+              hora?: string;
+              sortOrder?: number;
+            }>
+          ).map((act, index) => ({
+            activityId: act.activityId ?? '',
+            activityName:
+              currentLanguage === 'en'
+                ? (act.activity_en ?? act.activity_es ?? '')
+                : (act.activity_es ?? act.activity_en ?? ''),
+            hora: convertTo12HourFormat(act.hora ?? '09:00'),
+            sortOrder: act.sortOrder ?? index + 1,
+          }))
+        : [],
     };
 
     console.warn('[tours._index] editInitialData computed:', initialData);
 
     return { isOpen: true, initialData, tourId: editingTour.id, isLoading: false };
-  }, [editingTour, rawTours, fullTourData, isLoadingFullTour]);
+  }, [editingTour, rawTours, fullTourData, isLoadingFullTour, currentLanguage]);
 
   // Price range state
   const [priceRange, setPriceRange] = useState<PriceRange | null>(loaderData.priceRange);

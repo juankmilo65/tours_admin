@@ -53,6 +53,25 @@ async function translateText(
 }
 
 // Generate time slots from 12:00 AM to 11:00 PM
+const generateTimeOptions = (): Array<{ value: string; label: string }> => {
+  const options: Array<{ value: string; label: string }> = [];
+  const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  hours.forEach((hour) => {
+    // AM
+    options.push({
+      value: `${hour.toString().padStart(2, '0')}:00 AM`,
+      label: `${hour.toString().padStart(2, '0')}:00 AM`,
+    });
+    // PM
+    options.push({
+      value: `${hour.toString().padStart(2, '0')}:00 PM`,
+      label: `${hour.toString().padStart(2, '0')}:00 PM`,
+    });
+  });
+  return options;
+};
+
+const TIME_OPTIONS = generateTimeOptions();
 
 // Hardcoded options (will be replaced with API calls later)
 const DIFFICULTY_OPTIONS = [
@@ -65,6 +84,14 @@ const LANGUAGE_OPTIONS = [
   { value: 'es', label: 'Español' },
   { value: 'en', label: 'English' },
 ];
+
+// Activity interface
+interface TourActivity {
+  activityId: string;
+  activityName: string;
+  hora: string;
+  sortOrder: number;
+}
 
 interface TourEditFormProps {
   tourId: string;
