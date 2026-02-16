@@ -46,7 +46,18 @@ const getToursBusiness = async (data: ToursPayload): Promise<ServiceResult<unkno
       maxPrice,
       userId,
       countryId,
-    } = filters;
+      isActive,
+    } = filters as {
+      cityId?: string;
+      page?: string | number;
+      category?: string;
+      difficulty?: string;
+      minPrice?: string | number;
+      maxPrice?: string | number;
+      userId?: string;
+      countryId?: string;
+      isActive?: boolean;
+    };
 
     const payload = {
       cityId,
@@ -57,6 +68,7 @@ const getToursBusiness = async (data: ToursPayload): Promise<ServiceResult<unkno
       difficulty,
       minPrice: typeof minPrice === 'string' ? Number.parseFloat(minPrice) : minPrice,
       maxPrice: typeof maxPrice === 'string' ? Number.parseFloat(maxPrice) : maxPrice,
+      isActive,
       token,
       language,
       currency: 'MXN',

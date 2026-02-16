@@ -223,6 +223,7 @@ export interface TourFilters {
   maxPrice?: string;
   page?: string;
   limit?: string;
+  isActive?: boolean;
 }
 
 // API Response Types
