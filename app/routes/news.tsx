@@ -153,6 +153,11 @@ export default function NewsRoute(): JSX.Element {
         })) as NewsResponse;
 
         if (result.success === true && result.data !== undefined) {
+          console.log('[useEffect] Fetched news data:', result.data);
+          console.log(
+            '[useEffect] All articles with isApproved:',
+            result.data.map((n) => ({ id: n.id, title: n.title_es, isApproved: n.isApproved }))
+          );
           setNews(result.data);
           setPagination(result.pagination);
           // Hide loader after state is updated (React will render before this)
@@ -191,7 +196,7 @@ export default function NewsRoute(): JSX.Element {
       userId: currentUser?.id ?? '',
       isActive: true,
       isPublished: false,
-      isApproved: isAdmin,
+      isApproved: false,
     });
     setSelectedImages([]);
     setExistingImages([]);
@@ -201,6 +206,9 @@ export default function NewsRoute(): JSX.Element {
   };
 
   const handleOpenEditModal = (article: News) => {
+    console.log('[handleOpenEditModal] Opening edit modal for article:', article.id);
+    console.log('[handleOpenEditModal] Article isApproved:', article.isApproved);
+
     setNewArticle({
       title_es: article.title_es,
       title_en: article.title_en,
@@ -211,7 +219,7 @@ export default function NewsRoute(): JSX.Element {
       userId: article.userId ?? currentUser?.id ?? '',
       isActive: article.isActive,
       isPublished: article.isPublished,
-      isApproved: article.isApproved,
+      isApproved: article.isApproved ?? false,
     });
     // Map imageUrl to url for display
     const mappedImages = article.newsImages.map((img) => ({
@@ -524,6 +532,14 @@ export default function NewsRoute(): JSX.Element {
       setIsCreateModalOpen(false);
       resetForm();
 
+      // Update loader message to indicate refresh
+      dispatch(
+        setGlobalLoading({
+          isLoading: true,
+          message: t('common.loading') ?? 'Loading...',
+        })
+      );
+
       // Refetch
       const params = {
         page: 1,
@@ -533,21 +549,25 @@ export default function NewsRoute(): JSX.Element {
         language,
       };
 
+      console.log('[handleSaveNews] Refetching news with params:', params);
       const refreshResult = (await getNews(params)) as NewsResponse;
+      console.log('[handleSaveNews] Refetch result:', refreshResult);
+
       if (refreshResult.success === true && refreshResult.data !== undefined) {
+        console.log('[handleSaveNews] Setting news data:', refreshResult.data);
+        console.log(
+          '[handleSaveNews] First article isApproved:',
+          refreshResult.data[0]?.isApproved
+        );
         setNews(refreshResult.data);
         setPagination(refreshResult.pagination);
         setPage(1);
-        // Hide loader after React finishes rendering
-        window.requestAnimationFrame(() => {
-          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
-        });
-      } else {
-        // Hide loader even if refetch fails after React renders
-        window.requestAnimationFrame(() => {
-          dispatch(setGlobalLoading({ isLoading: false, message: '' }));
-        });
       }
+
+      // Hide loader after all operations complete and React renders
+      window.requestAnimationFrame(() => {
+        dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+      });
     } catch (error) {
       console.error('Error in news saving flow:', error);
       window.requestAnimationFrame(() => {
@@ -636,7 +656,7 @@ export default function NewsRoute(): JSX.Element {
       ),
     },
     {
-      key: 'isApproved',
+      key: 'isPublished',
       label: t('news.approvedStatus'),
       render: (value: unknown) => (
         <span
@@ -651,7 +671,7 @@ export default function NewsRoute(): JSX.Element {
               (value as boolean) ? 'bg-purple-600' : 'bg-gray-600'
             }`}
           />
-          {(value as boolean) ? t('news.isApproved') : t('news.notApproved')}
+          {(value as boolean) ? t('news.isPublished') : t('news.notPublished')}
         </span>
       ),
     },
@@ -1288,10 +1308,10 @@ export default function NewsRoute(): JSX.Element {
             <input
               type="checkbox"
               id="news-approved"
-              checked={newArticle.isApproved}
+              checked={newArticle.isPublished}
               onChange={(e) => {
                 if (isAdmin === true) {
-                  setNewArticle({ ...newArticle, isApproved: e.target.checked });
+                  setNewArticle({ ...newArticle, isPublished: e.target.checked });
                 }
               }}
               disabled={!isAdmin}
@@ -1312,7 +1332,7 @@ export default function NewsRoute(): JSX.Element {
                 color: isAdmin ? 'var(--color-neutral-700)' : 'var(--color-neutral-400)',
               }}
             >
-              {t('news.isApproved')}
+              {t('news.isPublished')}
               {!isAdmin && (
                 <span
                   style={{

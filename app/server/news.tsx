@@ -63,6 +63,8 @@ export interface GetNewsParams {
  * Get news from backend API with pagination and filters
  */
 export const getNews = async (params: GetNewsParams = {}): Promise<unknown> => {
+  console.log('[getNews] Fetching news with params:', params);
+
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn('BACKEND_URL is not configured, returning empty for news');
     return {
@@ -98,13 +100,14 @@ export const getNews = async (params: GetNewsParams = {}): Promise<unknown> => {
       },
     });
 
+    console.log('[getNews] Response from backend:', result);
     return result;
   } catch (error) {
     if (error instanceof Error) {
       console.error('Error in getNews service:', error.message);
       if (error.message.includes('ECONNREFUSED')) {
         console.warn(
-          'Backend API is not available. Please ensure the backend server is running at:',
+          'Backend API is not available. Please ensure that backend server is running at:',
           BASE_URL
         );
       }
@@ -180,6 +183,15 @@ export const createNews = async (
   token: string,
   language = 'es'
 ): Promise<unknown> => {
+  console.log('[createNews] Creating news with data:', {
+    title_es: data.title_es,
+    title_en: data.title_en,
+    userId: data.userId,
+    isActive: data.isActive,
+    isPublished: data.isPublished,
+    isApproved: data.isApproved,
+  });
+
   if (BASE_URL === '' || BASE_URL === undefined) {
     throw new Error('BACKEND_URL is not configured');
   }
@@ -192,6 +204,8 @@ export const createNews = async (
       'X-Language': language,
     },
   });
+
+  console.log('[createNews] Response from backend:', result);
   return result;
 };
 
@@ -241,6 +255,15 @@ export const updateNews = async (
   token: string,
   language = 'es'
 ): Promise<unknown> => {
+  console.log('[updateNews] Updating news:', newsId, 'with data:', {
+    title_es: data.title_es,
+    title_en: data.title_en,
+    userId: data.userId,
+    isActive: data.isActive,
+    isPublished: data.isPublished,
+    isApproved: data.isApproved,
+  });
+
   if (BASE_URL === '' || BASE_URL === undefined) {
     throw new Error('BACKEND_URL is not configured');
   }
@@ -252,8 +275,11 @@ export const updateNews = async (
         'X-Language': language,
       },
     });
+
+    console.log('[updateNews] Response from backend:', response.data);
     return response.data;
   } catch (error) {
+    console.error('[updateNews] Error:', error);
     if (axios.isAxiosError(error) && error.response) {
       return { error: error.response.data as unknown };
     }
