@@ -109,7 +109,6 @@ export default function NewsRoute(): JSX.Element {
     userId: currentUser?.id ?? '',
     isActive: true,
     isPublished: false,
-    isApproved: false,
   });
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [existingImages, setExistingImages] = useState<NewsImage[]>([]);
@@ -154,10 +153,6 @@ export default function NewsRoute(): JSX.Element {
 
         if (result.success === true && result.data !== undefined) {
           console.log('[useEffect] Fetched news data:', result.data);
-          console.log(
-            '[useEffect] All articles with isApproved:',
-            result.data.map((n) => ({ id: n.id, title: n.title_es, isApproved: n.isApproved }))
-          );
           setNews(result.data);
           setPagination(result.pagination);
           // Hide loader after state is updated (React will render before this)
@@ -196,7 +191,6 @@ export default function NewsRoute(): JSX.Element {
       userId: currentUser?.id ?? '',
       isActive: true,
       isPublished: false,
-      isApproved: false,
     });
     setSelectedImages([]);
     setExistingImages([]);
@@ -207,7 +201,6 @@ export default function NewsRoute(): JSX.Element {
 
   const handleOpenEditModal = (article: News) => {
     console.log('[handleOpenEditModal] Opening edit modal for article:', article.id);
-    console.log('[handleOpenEditModal] Article isApproved:', article.isApproved);
 
     setNewArticle({
       title_es: article.title_es,
@@ -219,7 +212,6 @@ export default function NewsRoute(): JSX.Element {
       userId: article.userId ?? currentUser?.id ?? '',
       isActive: article.isActive,
       isPublished: article.isPublished,
-      isApproved: article.isApproved ?? false,
     });
     // Map imageUrl to url for display
     const mappedImages = article.newsImages.map((img) => ({
@@ -555,10 +547,6 @@ export default function NewsRoute(): JSX.Element {
 
       if (refreshResult.success === true && refreshResult.data !== undefined) {
         console.log('[handleSaveNews] Setting news data:', refreshResult.data);
-        console.log(
-          '[handleSaveNews] First article isApproved:',
-          refreshResult.data[0]?.isApproved
-        );
         setNews(refreshResult.data);
         setPagination(refreshResult.pagination);
         setPage(1);
@@ -652,26 +640,6 @@ export default function NewsRoute(): JSX.Element {
             : row.publishedAt !== undefined
               ? t('news.scheduled')
               : t('news.draft')}
-        </span>
-      ),
-    },
-    {
-      key: 'isPublished',
-      label: t('news.approvedStatus'),
-      render: (value: unknown) => (
-        <span
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
-            (value as boolean)
-              ? 'bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 border border-purple-200'
-              : 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-700 border border-gray-200'
-          }`}
-        >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              (value as boolean) ? 'bg-purple-600' : 'bg-gray-600'
-            }`}
-          />
-          {(value as boolean) ? t('news.isPublished') : t('news.notPublished')}
         </span>
       ),
     },
@@ -1295,56 +1263,6 @@ export default function NewsRoute(): JSX.Element {
               }}
             >
               {t('news.isActive')}
-            </label>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
-              gridColumn: '1 / -1',
-            }}
-          >
-            <input
-              type="checkbox"
-              id="news-approved"
-              checked={newArticle.isPublished}
-              onChange={(e) => {
-                if (isAdmin === true) {
-                  setNewArticle({ ...newArticle, isPublished: e.target.checked });
-                }
-              }}
-              disabled={!isAdmin}
-              style={{
-                width: '1.25rem',
-                height: '1.25rem',
-                cursor: isAdmin ? 'pointer' : 'not-allowed',
-                accentColor: 'var(--color-primary-600)',
-                opacity: isAdmin ? 1 : 0.6,
-              }}
-            />
-            <label
-              htmlFor="news-approved"
-              style={{
-                cursor: isAdmin ? 'pointer' : 'not-allowed',
-                fontSize: 'var(--text-sm)',
-                fontWeight: 'var(--font-weight-medium)',
-                color: isAdmin ? 'var(--color-neutral-700)' : 'var(--color-neutral-400)',
-              }}
-            >
-              {t('news.isPublished')}
-              {!isAdmin && (
-                <span
-                  style={{
-                    marginLeft: 'var(--space-1)',
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-neutral-500)',
-                    fontWeight: 'var(--font-weight-normal)',
-                  }}
-                >
-                  {t('news.adminOnly')}
-                </span>
-              )}
             </label>
           </div>
           <div style={{ gridColumn: '1 / -1' }}>

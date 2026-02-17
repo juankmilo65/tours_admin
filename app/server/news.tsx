@@ -33,7 +33,6 @@ export interface News {
   userId?: string; // User ID for editing
   isActive: boolean;
   isPublished: boolean;
-  isApproved: boolean;
   newsImages: NewsImage[];
   createdAt: string;
   updatedAt: string;
@@ -172,7 +171,6 @@ export interface CreateNewsDto {
   userId: string;
   isActive: boolean;
   isPublished: boolean;
-  isApproved: boolean;
 }
 
 /**
@@ -189,7 +187,6 @@ export const createNews = async (
     userId: data.userId,
     isActive: data.isActive,
     isPublished: data.isPublished,
-    isApproved: data.isApproved,
   });
 
   if (BASE_URL === '' || BASE_URL === undefined) {
@@ -261,7 +258,6 @@ export const updateNews = async (
     userId: data.userId,
     isActive: data.isActive,
     isPublished: data.isPublished,
-    isApproved: data.isApproved,
   });
 
   if (BASE_URL === '' || BASE_URL === undefined) {
