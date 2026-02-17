@@ -33,6 +33,7 @@ export interface News {
   userId?: string; // User ID for editing
   isActive: boolean;
   isPublished: boolean;
+  isApproved: boolean;
   newsImages: NewsImage[];
   createdAt: string;
   updatedAt: string;
@@ -168,6 +169,7 @@ export interface CreateNewsDto {
   userId: string;
   isActive: boolean;
   isPublished: boolean;
+  isApproved: boolean;
 }
 
 /**

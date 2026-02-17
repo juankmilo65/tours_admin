@@ -109,6 +109,7 @@ export default function NewsRoute(): JSX.Element {
     userId: currentUser?.id ?? '',
     isActive: true,
     isPublished: false,
+    isApproved: false,
   });
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [existingImages, setExistingImages] = useState<NewsImage[]>([]);
@@ -190,6 +191,7 @@ export default function NewsRoute(): JSX.Element {
       userId: currentUser?.id ?? '',
       isActive: true,
       isPublished: false,
+      isApproved: isAdmin,
     });
     setSelectedImages([]);
     setExistingImages([]);
@@ -209,6 +211,7 @@ export default function NewsRoute(): JSX.Element {
       userId: article.userId ?? currentUser?.id ?? '',
       isActive: article.isActive,
       isPublished: article.isPublished,
+      isApproved: article.isApproved,
     });
     // Map imageUrl to url for display
     const mappedImages = article.newsImages.map((img) => ({
@@ -456,11 +459,9 @@ export default function NewsRoute(): JSX.Element {
           error?: { message?: string };
         };
 
-        if (
-          result.error !== undefined ||
-          result.success === false ||
-          result.data?.id === undefined
-        ) {
+        // Only show error if there's an explicit error or success is false
+        // Don't require data.id since backend might return success without it
+        if (result.error !== undefined || result.success === false) {
           console.error('Error creating news:', result.error ?? result);
           window.requestAnimationFrame(() => {
             dispatch(setGlobalLoading({ isLoading: false, message: '' }));
@@ -472,7 +473,9 @@ export default function NewsRoute(): JSX.Element {
           });
           return;
         }
-        articleId = result.data.id;
+
+        // Get articleId if available in response
+        articleId = result.data?.id ?? '';
       }
 
       // Step 2: Upload Images if selected
@@ -629,6 +632,26 @@ export default function NewsRoute(): JSX.Element {
             : row.publishedAt !== undefined
               ? t('news.scheduled')
               : t('news.draft')}
+        </span>
+      ),
+    },
+    {
+      key: 'isApproved',
+      label: t('news.approvedStatus'),
+      render: (value: unknown) => (
+        <span
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+            (value as boolean)
+              ? 'bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 border border-purple-200'
+              : 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-700 border border-gray-200'
+          }`}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              (value as boolean) ? 'bg-purple-600' : 'bg-gray-600'
+            }`}
+          />
+          {(value as boolean) ? t('news.isApproved') : t('news.notApproved')}
         </span>
       ),
     },
@@ -1252,6 +1275,56 @@ export default function NewsRoute(): JSX.Element {
               }}
             >
               {t('news.isActive')}
+            </label>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              gridColumn: '1 / -1',
+            }}
+          >
+            <input
+              type="checkbox"
+              id="news-approved"
+              checked={newArticle.isApproved}
+              onChange={(e) => {
+                if (isAdmin === true) {
+                  setNewArticle({ ...newArticle, isApproved: e.target.checked });
+                }
+              }}
+              disabled={!isAdmin}
+              style={{
+                width: '1.25rem',
+                height: '1.25rem',
+                cursor: isAdmin ? 'pointer' : 'not-allowed',
+                accentColor: 'var(--color-primary-600)',
+                opacity: isAdmin ? 1 : 0.6,
+              }}
+            />
+            <label
+              htmlFor="news-approved"
+              style={{
+                cursor: isAdmin ? 'pointer' : 'not-allowed',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--font-weight-medium)',
+                color: isAdmin ? 'var(--color-neutral-700)' : 'var(--color-neutral-400)',
+              }}
+            >
+              {t('news.isApproved')}
+              {!isAdmin && (
+                <span
+                  style={{
+                    marginLeft: 'var(--space-1)',
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--color-neutral-500)',
+                    fontWeight: 'var(--font-weight-normal)',
+                  }}
+                >
+                  {t('news.adminOnly')}
+                </span>
+              )}
             </label>
           </div>
           <div style={{ gridColumn: '1 / -1' }}>
