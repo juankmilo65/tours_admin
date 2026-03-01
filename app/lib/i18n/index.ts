@@ -11,6 +11,10 @@ export { languages, defaultLanguage } from './types';
 export { en } from './en';
 export { es } from './es';
 
+// Component-specific translations
+export { bookingEn } from './booking/en';
+export { bookingEs } from './booking/es';
+
 // Utils
 export {
   translations,

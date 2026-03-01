@@ -175,6 +175,13 @@ export default function Select({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '8px',
+          height: '40px',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          border: '1px solid #d1d5db',
+          fontSize: '14px',
+          color: '#111827',
+          backgroundColor: 'white',
         }}
       >
         <span

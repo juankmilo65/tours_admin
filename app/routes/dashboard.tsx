@@ -3,8 +3,22 @@
  */
 
 import type { JSX } from 'react';
+import { useEffect } from 'react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { requireAuth } from '~/utilities/auth.loader';
+import { useAppDispatch, useAppSelector } from '~/store/hooks';
+import { selectAuthToken } from '~/store/slices/authSlice';
+import {
+  fetchBookingsStart,
+  fetchBookingsSuccess,
+  fetchStatsStart,
+  fetchStatsSuccess,
+  fetchStatsFailure,
+} from '~/store/slices/bookingsSlice';
+import {
+  getBookingStatsBusiness,
+  getAllBookingsBusiness,
+} from '~/server/businessLogic/bookingsBusinessLogic';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 
@@ -14,6 +28,67 @@ export async function loader(args: LoaderFunctionArgs): Promise<null> {
 }
 
 export default function Dashboard(): JSX.Element {
+  const dispatch = useAppDispatch();
+  const token = useAppSelector(selectAuthToken);
+  const { bookings, stats } = useAppSelector((state) => state.bookings);
+
+  const loadDashboardData = async () => {
+    // Load stats
+    try {
+      dispatch(fetchStatsStart());
+      const statsResponse = await getBookingStatsBusiness(token ?? undefined);
+
+      if (statsResponse.success === true && statsResponse.data !== undefined) {
+        dispatch(fetchStatsSuccess(statsResponse.data));
+      } else {
+        dispatch(fetchStatsFailure(statsResponse.error ?? 'Failed to load stats'));
+      }
+    } catch (err) {
+      dispatch(fetchStatsFailure(err instanceof Error ? err.message : 'Failed to load stats'));
+    }
+
+    // Load recent bookings
+    try {
+      dispatch(fetchBookingsStart());
+      const bookingsResponse = await getAllBookingsBusiness({
+        page: 1,
+        limit: 5,
+        user_id: '',
+        tour_id: '',
+        booking_date: '',
+        start_date: '',
+        end_date: '',
+        status: '',
+        confirmation_code: '',
+        country: '',
+        city_id: '',
+        token: token ?? undefined,
+        language: 'es',
+        currency: 'MXN',
+      });
+
+      if (bookingsResponse.success === true && bookingsResponse.data !== undefined) {
+        dispatch(
+          fetchBookingsSuccess({
+            bookings: bookingsResponse.data,
+            pagination: bookingsResponse.pagination ?? {
+              page: 1,
+              limit: 10,
+              total: 0,
+              totalPages: 0,
+            },
+          })
+        );
+      }
+    } catch {
+      // Silently fail for recent bookings
+    }
+  };
+
+  useEffect(() => {
+    void loadDashboardData();
+  }, [token]);
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -24,67 +99,70 @@ export default function Dashboard(): JSX.Element {
         <KPICard title="Total Users" value="1,847" change="+15%" positive />
       </div>
 
+      {/* Booking KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KPICard
+          title="Total Bookings"
+          value={stats?.totalBookings?.toString() ?? '0'}
+          change="+5%"
+          positive
+        />
+        <KPICard
+          title="Paid Bookings"
+          value={stats?.paidBookings?.toString() ?? '0'}
+          change="+8%"
+          positive
+        />
+        <KPICard
+          title="Pending Bookings"
+          value={stats?.pendingBookings?.toString() ?? '0'}
+          change="-3%"
+        />
+        <KPICard
+          title="Total Revenue"
+          value={`$${stats?.totalRevenueUSD?.toFixed(2) ?? '0.00'} USD`}
+          change="+12%"
+          positive
+        />
+      </div>
+
       {/* Recent Activity */}
-      <Card title="Recent Reservations">
+      <Card title="Recent Bookings">
         <div className="space-y-4">
-          {[
-            {
-              id: 1,
-              tour: 'City Tour',
-              customer: 'John Doe',
-              date: '2025-01-02',
-              status: 'Confirmed',
-            },
-            {
-              id: 2,
-              tour: 'Museum Visit',
-              customer: 'Jane Smith',
-              date: '2025-01-02',
-              status: 'Pending',
-            },
-            {
-              id: 3,
-              tour: 'Food Tour',
-              customer: 'Bob Johnson',
-              date: '2025-01-01',
-              status: 'Completed',
-            },
-            {
-              id: 4,
-              tour: 'Beach Walk',
-              customer: 'Alice Brown',
-              date: '2025-01-01',
-              status: 'Confirmed',
-            },
-          ].map((reservation) => (
+          {bookings.slice(0, 5).map((booking) => (
             <div
-              key={reservation.id}
+              key={booking.id}
               className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
             >
               <div>
-                <p className="font-medium text-gray-900">{reservation.tour}</p>
-                <p className="text-sm text-gray-500">{reservation.customer}</p>
+                <p className="font-medium text-gray-900">{booking.confirmationCode}</p>
+                <p className="text-sm text-gray-500">
+                  {booking.firstName1} {booking.lastName1}
+                </p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-500">{reservation.date}</p>
+                <p className="text-sm text-gray-500">{booking.startDate}</p>
                 <span
                   className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                    reservation.status === 'Confirmed'
+                    booking.status === 'paid'
                       ? 'bg-green-100 text-green-800'
-                      : reservation.status === 'Completed'
-                        ? 'bg-blue-100 text-blue-800'
+                      : booking.status === 'cancelled'
+                        ? 'bg-red-100 text-red-800'
                         : 'bg-yellow-100 text-yellow-800'
                   }`}
                 >
-                  {reservation.status}
+                  {booking.status}
                 </span>
               </div>
             </div>
           ))}
+          {bookings.length === 0 && (
+            <div className="text-center text-gray-500 py-8">No recent bookings</div>
+          )}
         </div>
         <div className="mt-4">
           <Button variant="secondary" className="w-full">
-            View All Reservations
+            View All Bookings
           </Button>
         </div>
       </Card>

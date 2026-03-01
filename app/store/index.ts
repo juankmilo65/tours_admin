@@ -22,6 +22,7 @@ import languagesReducer from '~/store/slices/languagesSlice';
 import uiReducer from '~/store/slices/uiSlice';
 import authReducer from '~/store/slices/authSlice';
 import cacheReducer from '~/store/slices/cacheSlice';
+import bookingsReducer from '~/store/slices/bookingsSlice';
 /* import toursReducer from '~/store/slices/toursSlice';
 import usersReducer from '~/store/slices/usersSlice';
 import reservationsReducer from '~/store/slices/reservationsSlice';
@@ -44,6 +45,7 @@ const rootReducer = combineReducers({
   ui: uiReducer,
   auth: authReducer,
   cache: cacheReducer,
+  bookings: bookingsReducer,
   /* offers: offersReducer, */
 });
 
