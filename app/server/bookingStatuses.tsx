@@ -25,14 +25,7 @@ export const getBookingStatusesService = async (
   token?: string,
   language = 'es'
 ): Promise<BookingStatusResponse> => {
-  console.warn('🎯 [GET BOOKING STATUSES] Starting getBookingStatusesService with params:', {
-    hasToken: token !== undefined,
-    language,
-    BASE_URL,
-  });
-
   if (BASE_URL === '' || BASE_URL === undefined) {
-    console.warn('⚠️ [GET BOOKING STATUSES] BACKEND_URL is not configured, returning empty');
     return {
       success: false,
       data: null,
@@ -51,12 +44,9 @@ export const getBookingStatusesService = async (
       },
     });
 
-    console.warn('✅ [GET BOOKING STATUSES] Success! Result:', JSON.stringify(result, null, 2));
     return result as BookingStatusResponse;
   } catch (error) {
-    console.error('❌ [GET BOOKING STATUSES] Error caught:', error);
     if (error instanceof Error) {
-      console.error('❌ [GET BOOKING STATUSES] Error message:', error.message);
       if (error.message.includes('ECONNREFUSED')) {
         console.warn(
           '⚠️ [GET BOOKING STATUSES] Backend API is not available. Please ensure that backend server is running at:',

@@ -782,6 +782,11 @@ export const es: Translation = {
     pendingBookings: 'Reservas Pendientes',
     paidBookings: 'Reservas Pagadas',
     urgentBookings: 'Reservas Urgentes',
+    tours: {
+      selectTour: 'Seleccionar tour',
+      tour: 'Tour',
+      tourRequired: 'El tour es requerido',
+    },
   },
   users: {
     sectionTitle: 'Usuarios',

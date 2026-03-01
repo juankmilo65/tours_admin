@@ -17,12 +17,14 @@ import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLo
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
 
+// The dropdown endpoint returns minimal tour info (same as offers)
+// so we only care about localized titles and the id.  Pricing/capacity
+// aren't available here and were causing lots of `undefined` values in the
+// select options when we tried to reference them.
 interface TourOption {
   id: string;
-  title: string;
-  basePrice: number;
-  currency: string;
-  maxCapacity: number;
+  title_es: string;
+  title_en: string;
 }
 
 interface CountryOption {
@@ -64,7 +66,7 @@ export function CreateBookingModal({
   onSuccess,
   onClose,
 }: CreateBookingModalProps): JSX.Element | null {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectCurrentUser);
@@ -96,12 +98,18 @@ export function CreateBookingModal({
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // ask backend for same language that the UI is using so titles are
+        // already localized (matches the logic in the offers route)
         const [toursData, countriesData, usersData] = await Promise.all([
-          getToursDropdownBusiness(),
+          getToursDropdownBusiness(null, language),
           getCountries(),
-          getUsersDropdownBusiness(token ?? undefined, 'es'),
+          getUsersDropdownBusiness(token ?? undefined, language),
         ]);
 
+        // the backend response for dropdown contains objects with
+        // id/title_es/title_en (not the custom shape we previously
+        // defined).  Cast accordingly and then store the raw results so
+        // our select mapping can use the right properties.
         const toursResult = toursData as { success?: boolean; data?: TourOption[] };
         const usersResult = usersData as { success?: boolean; data?: UserOption[] };
 
@@ -128,7 +136,7 @@ export function CreateBookingModal({
     };
 
     void fetchData();
-  }, [token]);
+  }, [token, language]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
     const { name, value, type } = e.target;
@@ -347,7 +355,7 @@ export function CreateBookingModal({
                   { value: '', label: t('tours.selectTour') ?? 'Select tour' },
                   ...tours.map((tour) => ({
                     value: tour.id,
-                    label: `${tour.title} - $${tour.basePrice} ${tour.currency} (Max: ${tour.maxCapacity})`,
+                    label: language === 'en' ? tour.title_en : tour.title_es,
                   })),
                 ]}
                 value={formData.tourId}

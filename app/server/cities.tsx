@@ -89,11 +89,6 @@ export const getCities = async (params: GetCitiesParams = {}): Promise<unknown> 
   const now = Date.now();
 
   if (cachedEntry !== undefined && now - cachedEntry.timestamp < CACHE_TTL) {
-    console.log(
-      '✅ [CITIES] Using cached data (cache age:',
-      Math.floor((now - cachedEntry.timestamp) / 1000),
-      'seconds)'
-    );
     return cachedEntry.data;
   }
 
@@ -145,7 +140,6 @@ export const getCities = async (params: GetCitiesParams = {}): Promise<unknown> 
         console.warn('Rate limit exceeded (429) for cities. Please wait before retrying.');
         // Return cached data if available, even if expired
         if (cachedEntry !== undefined) {
-          console.log('⚠️ [CITIES] Using stale cached data due to rate limit');
           return cachedEntry.data;
         }
         return {

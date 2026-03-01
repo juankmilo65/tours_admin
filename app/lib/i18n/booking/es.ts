@@ -63,4 +63,9 @@ export const bookingEs = {
   urgentBookings: 'Reservas Urgentes',
   allUsers: 'Todos los Usuarios',
   allCities: 'Todas las Ciudades',
+  tours: {
+    selectTour: 'Seleccionar tour',
+    tour: 'Tour',
+    tourRequired: 'El tour es requerido',
+  },
 };

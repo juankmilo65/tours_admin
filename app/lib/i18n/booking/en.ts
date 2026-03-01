@@ -63,4 +63,9 @@ export const bookingEn = {
   urgentBookings: 'Urgent Bookings',
   allUsers: 'All Users',
   allCities: 'All Cities',
+  tours: {
+    selectTour: 'Select tour',
+    tour: 'Tour',
+    tourRequired: 'Tour is required',
+  },
 };

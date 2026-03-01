@@ -758,6 +758,11 @@ export const en: Translation = {
     pendingBookings: 'Pending Bookings',
     paidBookings: 'Paid Bookings',
     urgentBookings: 'Urgent Bookings',
+    tours: {
+      selectTour: 'Select tour',
+      tour: 'Tour',
+      tourRequired: 'Tour is required',
+    },
   },
   users: {
     sectionTitle: 'Users',
