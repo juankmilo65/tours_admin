@@ -147,15 +147,14 @@ export interface CreateBookingDto {
   tourId: string;
   startDate: string;
   endDate: string;
-  numberOfPeople: number;
-  offerId?: string;
-  firstName1?: string;
-  firstName2?: string;
-  lastName1?: string;
-  lastName2?: string;
-  email?: string;
-  phone?: string;
-  countryId?: string;
+  clients: Client[];
+  currency: string;
+}
+
+export interface Client {
+  clientName: string;
+  clientAge: number;
+  [key: string]: string | number;
 }
 
 export interface UpdateBookingDto {

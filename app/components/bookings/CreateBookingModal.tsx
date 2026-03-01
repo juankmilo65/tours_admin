@@ -1,6 +1,6 @@
 /**
  * Create Booking Modal Component
- * Follows the same pattern as CreateTourModal
+ * Follows the same pattern as CreateTourModal with dynamic client list
  */
 
 import React from 'react';
@@ -9,34 +9,18 @@ import type { JSX } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 import { createBookingBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
-import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
+import { selectAuthToken } from '~/store/slices/authSlice';
 import { openModal, closeModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { getToursDropdownBusiness } from '~/server/businessLogic/toursBusinessLogic';
-import { getCountries } from '~/server/countries';
-import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
+import type { Client } from '~/types/booking';
 
 // The dropdown endpoint returns minimal tour info (same as offers)
-// so we only care about localized titles and the id.  Pricing/capacity
-// aren't available here and were causing lots of `undefined` values in the
-// select options when we tried to reference them.
 interface TourOption {
   id: string;
   title_es: string;
   title_en: string;
-}
-
-interface CountryOption {
-  id: string;
-  name: string;
-  code: string;
-}
-
-interface UserOption {
-  id: string;
-  name: string;
-  email: string;
 }
 
 interface CreateBookingModalProps {
@@ -47,18 +31,10 @@ interface CreateBookingModalProps {
 
 interface BookingFormData {
   tourId: string;
-  userId: string;
   startDate: string;
   endDate: string;
-  numberOfPeople: number;
-  firstName1: string;
-  lastName1: string;
-  firstName2: string;
-  lastName2: string;
-  email: string;
-  phone: string;
-  countryId: string;
-  offerId?: string;
+  currency: string;
+  clients: Client[];
 }
 
 export function CreateBookingModal({
@@ -69,74 +45,37 @@ export function CreateBookingModal({
   const { t, language } = useTranslation();
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
-  const currentUser = useAppSelector(selectCurrentUser);
 
   const [tours, setTours] = useState<TourOption[]>([]);
-  const [countries, setCountries] = useState<CountryOption[]>([]);
-  const [users, setUsers] = useState<UserOption[]>([]);
 
   const [formData, setFormData] = useState<BookingFormData>({
     tourId: '',
-    userId: currentUser?.id ?? '',
     startDate: '',
     endDate: '',
-    numberOfPeople: 1,
-    firstName1: '',
-    lastName1: '',
-    firstName2: '',
-    lastName2: '',
-    email: '',
-    phone: '',
-    countryId: '',
-    offerId: '',
+    currency: 'MXN',
+    clients: [{ clientName: '', clientAge: 0 }],
   });
 
-  const [errors, setErrors] = useState<Partial<Record<keyof BookingFormData, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch dropdown data on mount
+  // Fetch tours on mount
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchTours = async () => {
       try {
-        // ask backend for same language that the UI is using so titles are
-        // already localized (matches the logic in the offers route)
-        const [toursData, countriesData, usersData] = await Promise.all([
-          getToursDropdownBusiness(null, language),
-          getCountries(),
-          getUsersDropdownBusiness(token ?? undefined, language),
-        ]);
-
-        // the backend response for dropdown contains objects with
-        // id/title_es/title_en (not the custom shape we previously
-        // defined).  Cast accordingly and then store the raw results so
-        // our select mapping can use the right properties.
+        const toursData = await getToursDropdownBusiness(null, language);
         const toursResult = toursData as { success?: boolean; data?: TourOption[] };
-        const usersResult = usersData as { success?: boolean; data?: UserOption[] };
 
         if (toursResult.success === true && toursResult.data !== undefined) {
           setTours(toursResult.data);
         }
-
-        if (
-          countriesData !== undefined &&
-          typeof countriesData === 'object' &&
-          countriesData !== null &&
-          'data' in countriesData &&
-          Array.isArray(countriesData.data)
-        ) {
-          setCountries(countriesData.data as CountryOption[]);
-        }
-
-        if (usersResult.success === true && usersResult.data !== undefined) {
-          setUsers(usersResult.data);
-        }
       } catch (error) {
-        console.error('Error fetching dropdown data:', error);
+        console.error('Error fetching tours:', error);
       }
     };
 
-    void fetchData();
-  }, [token, language]);
+    void fetchTours();
+  }, [language]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
     const { name, value, type } = e.target;
@@ -147,24 +86,89 @@ export function CreateBookingModal({
     }));
 
     // Clear error for this field
-    if (errors[name as keyof BookingFormData] !== undefined) {
+    if (errors[name] !== undefined) {
       setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: Partial<Record<keyof BookingFormData, string>> = {};
+  // Handle client field changes
+  const handleClientChange = (index: number, field: keyof Client, value: string | number): void => {
+    const newClients = [...formData.clients];
+    const currentClient = newClients[index];
+    if (currentClient !== undefined) {
+      const updatedClient: Client = {
+        clientName: currentClient.clientName,
+        clientAge: currentClient.clientAge,
+        [field]: field === 'clientAge' ? Number(value) : value,
+      };
+      newClients[index] = updatedClient;
+    }
 
-    if (!formData.tourId) newErrors.tourId = t('bookings.tours.tourRequired') ?? 'Tour is required';
-    if (!formData.userId) newErrors.userId = t('validation.required') ?? 'Required';
-    if (!formData.startDate) newErrors.startDate = t('validation.required') ?? 'Required';
-    if (!formData.endDate) newErrors.endDate = t('validation.required') ?? 'Required';
-    if (!formData.numberOfPeople || formData.numberOfPeople < 1)
-      newErrors.numberOfPeople = t('validation.required') ?? 'Required';
-    if (!formData.firstName1) newErrors.firstName1 = t('validation.required') ?? 'Required';
-    if (!formData.lastName1) newErrors.lastName1 = t('validation.required') ?? 'Required';
-    if (!formData.email) newErrors.email = t('auth.emailRequired') ?? 'Email is required';
-    if (!formData.countryId) newErrors.countryId = t('common.selectCountry') ?? 'Select country';
+    setFormData((prev) => ({ ...prev, clients: newClients }));
+
+    // Clear error for this client field
+    const errorKey = `clients.${index}.${field}`;
+    if (errors[errorKey] !== undefined) {
+      setErrors((prev) => ({ ...prev, [errorKey]: undefined }));
+    }
+  };
+
+  // Add a new client
+  const handleAddClient = (): void => {
+    const newClient: Client = {
+      clientName: '',
+      clientAge: 0,
+    };
+    setFormData((prev) => ({
+      ...prev,
+      clients: [...prev.clients, newClient],
+    }));
+
+    // Clear any clients error
+    if (errors.clients !== undefined) {
+      setErrors((prev) => ({ ...prev, clients: undefined }));
+    }
+  };
+
+  // Remove a client
+  const handleRemoveClient = (index: number): void => {
+    if (formData.clients.length <= 1) {
+      // Don't remove the last client
+      return;
+    }
+
+    const newClients = formData.clients.filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, clients: newClients }));
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Partial<Record<string, string>> = {};
+
+    if (!formData.tourId) {
+      newErrors.tourId = t('bookings.tours.tourRequired') ?? 'Tour is required';
+    }
+
+    if (!formData.startDate) {
+      newErrors.startDate = t('validation.required') ?? 'Required';
+    }
+
+    if (!formData.endDate) {
+      newErrors.endDate = t('validation.required') ?? 'Required';
+    }
+
+    // Validate clients
+    if (formData.clients.length === 0) {
+      newErrors.clients = t('bookings.clientsRequired') ?? 'At least one client is required';
+    } else {
+      formData.clients.forEach((client, index) => {
+        if (!client.clientName || client.clientName.trim() === '') {
+          newErrors[`clients.${index}.clientName`] = t('validation.required') ?? 'Required';
+        }
+        if (!client.clientAge || client.clientAge < 0) {
+          newErrors[`clients.${index}.clientAge`] = t('validation.required') ?? 'Required';
+        }
+      });
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -193,6 +197,14 @@ export function CreateBookingModal({
       if (!result.success) {
         // Hide global spinner on error
         dispatch(setGlobalLoading({ isLoading: false }));
+
+        // Extract error details if available
+        const errorMessage =
+          (result as { error?: { message?: string } }).error?.message ??
+          result.message ??
+          t('bookings.createError') ??
+          'Error creating booking';
+
         dispatch(
           openModal({
             id: 'create-booking-error',
@@ -200,7 +212,7 @@ export function CreateBookingModal({
             title: t('common.error'),
             isOpen: true,
             data: {
-              message: result.message ?? t('bookings.newBooking') ?? 'Error creating booking',
+              message: errorMessage,
               icon: 'alert',
             },
           })
@@ -222,7 +234,7 @@ export function CreateBookingModal({
           title: t('common.success'),
           isOpen: true,
           data: {
-            message: t('bookings.sectionTitle') ?? 'Booking created successfully',
+            message: t('bookings.createSuccess') ?? 'Booking created successfully',
             icon: 'success',
           },
         })
@@ -238,7 +250,7 @@ export function CreateBookingModal({
           title: t('common.error'),
           isOpen: true,
           data: {
-            message: t('bookings.newBooking') ?? 'Error creating booking',
+            message: t('bookings.createError') ?? 'Error creating booking',
             icon: 'alert',
           },
         })
@@ -382,50 +394,6 @@ export function CreateBookingModal({
               )}
             </div>
 
-            {/* User Selection */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: 'var(--space-2)',
-                  fontWeight: 'var(--font-weight-medium)',
-                  color: 'var(--color-neutral-700)',
-                }}
-              >
-                {t('users.user')} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <Select
-                options={[
-                  { value: '', label: t('users.allUsers') ?? 'Select user' },
-                  ...users.map((user) => ({
-                    value: user.id,
-                    label: `${user.name} (${user.email})`,
-                  })),
-                ]}
-                value={formData.userId}
-                onChange={(value: string) => {
-                  setFormData((prev) => ({ ...prev, userId: value }));
-                  if (errors.userId !== undefined) {
-                    setErrors((prev) => ({ ...prev, userId: undefined }));
-                  }
-                }}
-                placeholder={t('users.allUsers') ?? 'Select user'}
-                id="select-user"
-              />
-              {errors.userId !== undefined && (
-                <span
-                  style={{
-                    color: 'red',
-                    fontSize: 'var(--text-xs)',
-                    marginTop: 'var(--space-1)',
-                    display: 'block',
-                  }}
-                >
-                  {errors.userId}
-                </span>
-              )}
-            </div>
-
             {/* Dates */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
               <div>
@@ -440,7 +408,7 @@ export function CreateBookingModal({
                   {t('bookings.startDate')} <span style={{ color: 'red' }}>*</span>
                 </label>
                 <Input
-                  type="date"
+                  type="datetime-local"
                   name="startDate"
                   value={formData.startDate}
                   onChange={handleInputChange}
@@ -461,7 +429,7 @@ export function CreateBookingModal({
                   {t('bookings.endDate')} <span style={{ color: 'red' }}>*</span>
                 </label>
                 <Input
-                  type="date"
+                  type="datetime-local"
                   name="endDate"
                   value={formData.endDate}
                   onChange={handleInputChange}
@@ -471,7 +439,7 @@ export function CreateBookingModal({
               </div>
             </div>
 
-            {/* Number of People */}
+            {/* Currency */}
             <div>
               <label
                 style={{
@@ -481,206 +449,233 @@ export function CreateBookingModal({
                   color: 'var(--color-neutral-700)',
                 }}
               >
-                {t('bookings.numberOfPeople')} <span style={{ color: 'red' }}>*</span>
+                {t('bookings.currency')} <span style={{ color: 'red' }}>*</span>
               </label>
-              <Input
-                type="number"
-                name="numberOfPeople"
-                value={formData.numberOfPeople}
-                onChange={handleInputChange}
-                min={1}
-                required
-                error={errors.numberOfPeople}
+              <Select
+                options={[
+                  { value: 'MXN', label: 'MXN - Mexican Peso' },
+                  { value: 'USD', label: 'USD - US Dollar' },
+                  { value: 'EUR', label: 'EUR - Euro' },
+                ]}
+                value={formData.currency}
+                onChange={(value: string) => {
+                  setFormData((prev) => ({ ...prev, currency: value }));
+                }}
+                placeholder={t('bookings.selectCurrency') ?? 'Select currency'}
+                id="select-currency"
               />
             </div>
 
-            {/* Customer Information */}
+            {/* Clients */}
             <div style={{ marginTop: 'var(--space-2)' }}>
-              <h3
+              <div
                 style={{
-                  fontSize: 'var(--text-lg)',
-                  fontWeight: 'var(--font-weight-semibold)',
-                  color: 'var(--color-neutral-900)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                   marginBottom: 'var(--space-4)',
-                  margin: 0,
                 }}
               >
-                {t('bookings.customer') ?? 'Customer Information'}
-              </h3>
-
-              <div
-                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}
-              >
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: 'var(--space-2)',
-                      fontWeight: 'var(--font-weight-medium)',
-                      color: 'var(--color-neutral-700)',
-                    }}
+                <h3
+                  style={{
+                    fontSize: 'var(--text-lg)',
+                    fontWeight: 'var(--font-weight-semibold)',
+                    color: 'var(--color-neutral-900)',
+                    margin: 0,
+                  }}
+                >
+                  {t('bookings.clients') ?? 'Clients'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleAddClient}
+                  style={{
+                    padding: 'var(--space-2) var(--space-4)',
+                    backgroundColor: 'var(--color-primary-500)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    fontWeight: 'var(--font-weight-medium)',
+                    fontSize: 'var(--text-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-1)',
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-primary-600)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-primary-500)';
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
                   >
-                    {t('users.firstName')} 1 <span style={{ color: 'red' }}>*</span>
-                  </label>
-                  <Input
-                    type="text"
-                    name="firstName1"
-                    value={formData.firstName1}
-                    onChange={handleInputChange}
-                    required
-                    error={errors.firstName1}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: 'var(--space-2)',
-                      fontWeight: 'var(--font-weight-medium)',
-                      color: 'var(--color-neutral-700)',
-                    }}
-                  >
-                    {t('users.lastName')} 1 <span style={{ color: 'red' }}>*</span>
-                  </label>
-                  <Input
-                    type="text"
-                    name="lastName1"
-                    value={formData.lastName1}
-                    onChange={handleInputChange}
-                    required
-                    error={errors.lastName1}
-                  />
-                </div>
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  {t('bookings.addClient') ?? 'Add Client'}
+                </button>
               </div>
 
+              {/* Clients List */}
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--space-4)',
-                  marginTop: 'var(--space-4)',
+                  border: '1px solid var(--color-neutral-200)',
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden',
                 }}
               >
-                <div>
-                  <label
+                <div
+                  style={{
+                    padding: 'var(--space-3)',
+                    backgroundColor: 'var(--color-neutral-50)',
+                    borderBottom: '1px solid var(--color-neutral-200)',
+                  }}
+                >
+                  <div
                     style={{
-                      display: 'block',
-                      marginBottom: 'var(--space-2)',
-                      fontWeight: 'var(--font-weight-medium)',
-                      color: 'var(--color-neutral-700)',
+                      display: 'grid',
+                      gridTemplateColumns: '40px 1fr 150px 40px',
+                      gap: 'var(--space-3)',
+                      fontSize: 'var(--text-sm)',
+                      fontWeight: 'var(--font-weight-semibold)',
+                      color: 'var(--color-neutral-600)',
                     }}
                   >
-                    {t('users.firstName')} 2
-                  </label>
-                  <Input
-                    type="text"
-                    name="firstName2"
-                    value={formData.firstName2}
-                    onChange={handleInputChange}
-                  />
+                    <div>#</div>
+                    <div>{t('bookings.clientName') ?? 'Client Name'}</div>
+                    <div>{t('bookings.clientAge') ?? 'Age'}</div>
+                    <div />
+                  </div>
                 </div>
 
-                <div>
-                  <label
+                {formData.clients.map((client, index) => (
+                  <div
+                    key={`client-${index}`}
                     style={{
-                      display: 'block',
-                      marginBottom: 'var(--space-2)',
-                      fontWeight: 'var(--font-weight-medium)',
-                      color: 'var(--color-neutral-700)',
+                      display: 'grid',
+                      gridTemplateColumns: '40px 1fr 150px 40px',
+                      gap: 'var(--space-3)',
+                      padding: 'var(--space-3)',
+                      alignItems: 'center',
+                      borderBottom:
+                        index < formData.clients.length - 1
+                          ? '1px solid var(--color-neutral-200)'
+                          : 'none',
+                      backgroundColor: index % 2 === 0 ? 'white' : 'var(--color-neutral-50)',
                     }}
                   >
-                    {t('users.lastName')} 2
-                  </label>
-                  <Input
-                    type="text"
-                    name="lastName2"
-                    value={formData.lastName2}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
+                    {/* Index */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 'var(--text-sm)',
+                        color: 'var(--color-neutral-600)',
+                        fontWeight: 'var(--font-weight-medium)',
+                      }}
+                    >
+                      {index + 1}
+                    </div>
 
-              <div style={{ marginTop: 'var(--space-4)' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 'var(--space-2)',
-                    fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
-                  }}
-                >
-                  {t('common.email')} <span style={{ color: 'red' }}>*</span>
-                </label>
-                <Input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                  error={errors.email}
-                />
-              </div>
+                    {/* Client Name */}
+                    <div>
+                      <Input
+                        type="text"
+                        value={client.clientName}
+                        onChange={(e) => handleClientChange(index, 'clientName', e.target.value)}
+                        placeholder={t('bookings.clientNamePlaceholder') ?? 'Enter name'}
+                        error={errors[`clients.${index}.clientName`]}
+                        required
+                      />
+                    </div>
 
-              <div style={{ marginTop: 'var(--space-4)' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 'var(--space-2)',
-                    fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
-                  }}
-                >
-                  {t('common.phone')}
-                </label>
-                <Input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                />
-              </div>
+                    {/* Client Age */}
+                    <div>
+                      <Input
+                        type="number"
+                        value={client.clientAge}
+                        onChange={(e) => handleClientChange(index, 'clientAge', e.target.value)}
+                        placeholder={t('bookings.clientAgePlaceholder') ?? 'Age'}
+                        min={0}
+                        max={120}
+                        error={errors[`clients.${index}.clientAge`]}
+                        required
+                      />
+                    </div>
 
-              <div style={{ marginTop: 'var(--space-4)' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 'var(--space-2)',
-                    fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
-                  }}
-                >
-                  {t('common.country')} <span style={{ color: 'red' }}>*</span>
-                </label>
-                <Select
-                  options={[
-                    { value: '', label: t('common.selectCountry') ?? 'Select country' },
-                    ...countries.map((country) => ({
-                      value: country.id,
-                      label: country.name,
-                    })),
-                  ]}
-                  value={formData.countryId}
-                  onChange={(value: string) => {
-                    setFormData((prev) => ({ ...prev, countryId: value }));
-                    if (errors.countryId !== undefined) {
-                      setErrors((prev) => ({ ...prev, countryId: undefined }));
-                    }
-                  }}
-                  placeholder={t('common.selectCountry') ?? 'Select country'}
-                  id="select-country"
-                />
-                {errors.countryId !== undefined && (
-                  <span
+                    {/* Remove Button */}
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveClient(index)}
+                        disabled={formData.clients.length <= 1}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: 'var(--radius-md)',
+                          backgroundColor:
+                            formData.clients.length <= 1
+                              ? 'var(--color-neutral-200)'
+                              : 'rgba(239, 68, 68, 0.1)',
+                          color:
+                            formData.clients.length <= 1
+                              ? 'var(--color-neutral-400)'
+                              : 'var(--color-error-600)',
+                          border: 'none',
+                          cursor: formData.clients.length <= 1 ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseOver={(e) => {
+                          if (formData.clients.length > 1) {
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (formData.clients.length > 1) {
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                          }
+                        }}
+                        title={t('common.remove') ?? 'Remove'}
+                      >
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {errors.clients !== undefined && (
+                  <div
                     style={{
-                      color: 'red',
-                      fontSize: 'var(--text-xs)',
-                      marginTop: 'var(--space-1)',
-                      display: 'block',
+                      padding: 'var(--space-2)',
+                      backgroundColor: 'var(--color-error-50)',
+                      color: 'var(--color-error-700)',
+                      fontSize: 'var(--text-sm)',
                     }}
                   >
-                    {errors.countryId}
-                  </span>
+                    {errors.clients}
+                  </div>
                 )}
               </div>
             </div>
