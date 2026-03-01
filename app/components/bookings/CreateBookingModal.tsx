@@ -155,7 +155,7 @@ export function CreateBookingModal({
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof BookingFormData, string>> = {};
 
-    if (!formData.tourId) newErrors.tourId = t('tours.tourRequired') ?? 'Tour is required';
+    if (!formData.tourId) newErrors.tourId = t('bookings.tours.tourRequired') ?? 'Tour is required';
     if (!formData.userId) newErrors.userId = t('validation.required') ?? 'Required';
     if (!formData.startDate) newErrors.startDate = t('validation.required') ?? 'Required';
     if (!formData.endDate) newErrors.endDate = t('validation.required') ?? 'Required';
@@ -352,7 +352,7 @@ export function CreateBookingModal({
               </label>
               <Select
                 options={[
-                  { value: '', label: t('tours.selectTour') ?? 'Select tour' },
+                  { value: '', label: t('bookings.tours.selectTour') ?? 'Select tour' },
                   ...tours.map((tour) => ({
                     value: tour.id,
                     label: language === 'en' ? tour.title_en : tour.title_es,
@@ -365,7 +365,7 @@ export function CreateBookingModal({
                     setErrors((prev) => ({ ...prev, tourId: undefined }));
                   }
                 }}
-                placeholder={t('tours.selectTour') ?? 'Select tour'}
+                placeholder={t('bookings.tours.selectTour') ?? 'Select tour'}
                 id="select-tour"
               />
               {errors.tourId !== undefined && (
