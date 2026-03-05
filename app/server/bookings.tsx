@@ -3,6 +3,7 @@
  */
 
 import { createServiceREST } from './_index';
+import { logCurlPost } from './curlHelper';
 import type { Booking, Payment } from '~/types/booking';
 
 // Type declaration for Vite environment variables
@@ -169,11 +170,12 @@ export const createBooking = async (
   token: string,
   language = 'es'
 ): Promise<unknown> => {
-  console.warn('🎯 [CREATE BOOKING] Starting createBooking with params:', {
-    payload,
-    language,
-    hasToken: !!token,
-    BASE_URL,
+  logCurlPost({
+    url: `${BASE_URL}/bookings`,
+    body: payload,
+    token,
+    headers: { 'X-Language': language },
+    label: 'CREATE BOOKING',
   });
 
   if (BASE_URL === '' || BASE_URL === undefined) {
@@ -189,10 +191,20 @@ export const createBooking = async (
       headers: {
         'X-Language': language,
       },
+      // Booking creation involves multiple DB queries + external exchange rate API
+      // and can take 5–15s; 30s gives enough headroom without masking real hangs.
+      timeout: 30000,
     });
 
+    // Check if the result contains an error (from createServiceREST catch)
+    if (result !== null && typeof result === 'object' && 'error' in result) {
+      console.error('❌ [CREATE BOOKING] Error in result:', result.error);
+      return { success: false, error: result.error };
+    }
+
     console.warn('✅ [CREATE BOOKING] Success! Result:', JSON.stringify(result, null, 2));
-    return result;
+    // Cast result to object type to allow spread
+    return { success: true, ...(result as Record<string, unknown>) };
   } catch (error) {
     console.error('❌ [CREATE BOOKING] Error caught:', error);
     if (error instanceof Error) {

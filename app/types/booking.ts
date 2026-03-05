@@ -154,7 +154,10 @@ export interface CreateBookingDto {
 export interface Client {
   clientName: string;
   clientAge: number;
-  [key: string]: string | number;
+  countryId?: string;
+  countryCode?: string;
+  identificationTypeId?: string;
+  clientId?: string;
 }
 
 export interface UpdateBookingDto {

@@ -23,6 +23,7 @@ import {
 } from '~/server/businessLogic/rolesBusinessLogic';
 import { useAppDispatch } from '~/store/hooks';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
+import { useErrorModal } from '~/utilities/useErrorModal';
 import { useTranslation } from '~/lib/i18n/utils';
 import { selectAuthToken } from '~/store/slices/authSlice';
 import { useAppSelector } from '~/store/hooks';
@@ -76,6 +77,7 @@ export default function Roles(): JSX.Element {
   });
 
   const dispatch = useAppDispatch();
+  const { showError } = useErrorModal();
 
   useEffect(() => {
     // Don't fetch if token is not available yet
@@ -121,6 +123,7 @@ export default function Roles(): JSX.Element {
             from: 1,
             to: 1,
           });
+          showError({ messageKey: 'roles.rolesLoadError' });
         }
       } catch (error) {
         console.error('Error fetching roles:', error);
@@ -135,6 +138,7 @@ export default function Roles(): JSX.Element {
           from: 1,
           to: 1,
         });
+        showError({ messageKey: 'roles.rolesLoadError' });
       } finally {
         dispatch(setGlobalLoading({ isLoading: false, message: '' }));
         setIsLoading(false);
@@ -142,7 +146,7 @@ export default function Roles(): JSX.Element {
     };
 
     void fetchRoles();
-  }, [page, language, token, limit]);
+  }, [page, language, token, limit, dispatch, showError, t]);
 
   const resetForm = () => {
     setNewRole({

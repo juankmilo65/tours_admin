@@ -21,6 +21,7 @@ import countriesBL from '~/server/businessLogic/countriesBusinessLogic';
 import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import { getBookingStatusesDropdownBusiness } from '~/server/businessLogic/bookingStatusesBusinessLogic';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
+import { useErrorModal } from '~/utilities/useErrorModal';
 import { selectAuthToken } from '~/store/slices/authSlice';
 import { selectSelectedCountry } from '~/store/slices/countriesSlice';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
@@ -204,6 +205,8 @@ export default function Bookings(): JSX.Element {
     loaderData.statuses
   );
 
+  const { showError } = useErrorModal();
+
   // Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -242,11 +245,13 @@ export default function Bookings(): JSX.Element {
       } else {
         setBookings([]);
         setPagination({ page: 1, limit: 10, total: 0, totalPages: 0 });
+        showError({ messageKey: 'common.loadError' });
       }
     } catch (error) {
       console.error('Error fetching bookings:', error);
       setBookings([]);
       setPagination({ page: 1, limit: 10, total: 0, totalPages: 0 });
+      showError({ messageKey: 'common.loadError' });
     } finally {
       dispatch(setGlobalLoading({ isLoading: false, message: '' }));
     }

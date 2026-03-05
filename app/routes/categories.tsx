@@ -22,6 +22,7 @@ import {
 import type { Column } from '~/components/ui/Table';
 import { useAppDispatch } from '~/store/hooks';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
+import { useErrorModal } from '~/utilities/useErrorModal';
 import { useTranslation } from '~/lib/i18n/utils';
 import { Input } from '~/components/ui/Input';
 import { Dialog } from '~/components/ui/Dialog';
@@ -71,6 +72,7 @@ export default function Categories(): JSX.Element {
   });
   const isInitialMount = useRef(true);
   const dispatch = useAppDispatch();
+  const { showError } = useErrorModal();
 
   // Fetch categories when filters or pagination change (but not on initial mount)
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function Categories(): JSX.Element {
         } else {
           // Hide loader if no success
           dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+          showError({ messageKey: 'categories.loadError' });
         }
       } catch (error) {
         console.error('Error fetching categories:', error);
@@ -107,11 +110,12 @@ export default function Categories(): JSX.Element {
         setPagination({ page: 1, limit: 10, total: 0, totalPages: 0 });
         // Hide loader on error
         dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+        showError({ messageKey: 'categories.loadError' });
       }
     };
 
     void fetchCategories();
-  }, [page, statusFilter, limit, language, dispatch, t]);
+  }, [page, statusFilter, limit, language, dispatch, t, showError]);
 
   // Handle image preview using useMemo for derived state
   const imagePreview = useMemo(() => {

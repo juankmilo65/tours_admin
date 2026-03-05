@@ -90,6 +90,7 @@ export default [
       '@typescript-eslint/no-unsafe-return': 'error',
       '@typescript-eslint/no-unsafe-argument': 'error',
       '@typescript-eslint/no-unused-vars': 'error',
+      'no-unused-vars': 'off',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/await-thenable': 'error',
@@ -110,7 +111,6 @@ export default [
       ],
       '@typescript-eslint/no-inferrable-types': 'error',
       // JavaScript/ESLint rules
-      'no-unused-vars': 'error',
       'no-debugger': 'error',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'error',

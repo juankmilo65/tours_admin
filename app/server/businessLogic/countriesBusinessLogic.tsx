@@ -1,5 +1,6 @@
-import { getCountries, getCountryById } from '../countries';
+import { getCountries, getCountryById, getCountriesDropdown } from '../countries';
 import type { ServiceResult } from '../_index';
+import type { CountryDropdown } from '~/types/country';
 
 interface CountriesPayload {
   token?: string;
@@ -55,6 +56,21 @@ const getCountryByIdBusiness = async (data: CountriesPayload): Promise<ServiceRe
 };
 
 /**
+ * Business logic for getting countries dropdown
+ */
+const getCountriesDropdownBusiness = async (
+  language = 'es'
+): Promise<ServiceResult<CountryDropdown[]>> => {
+  try {
+    const result = await getCountriesDropdown(language);
+    return result as ServiceResult<CountryDropdown[]>;
+  } catch (error) {
+    console.error('Error in getCountriesDropdownBusiness:', error);
+    return { error };
+  }
+};
+
+/**
  * Main business logic router
  */
 const countriesBusinessLogic = (
@@ -68,12 +84,12 @@ const countriesBusinessLogic = (
 
   const handler = ACTIONS[action];
   if (!handler) {
-    return {
+    return Promise.resolve({
       error: {
         status: 400,
         message: 'Invalid action',
       },
-    };
+    });
   }
 
   return handler();
@@ -94,3 +110,4 @@ const countries = async (formData: FormData, token = ''): Promise<ServiceResult<
 };
 
 export default countries;
+export { getCountriesDropdownBusiness };

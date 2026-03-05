@@ -1,6 +1,6 @@
 /**
  * Create Booking Modal Component
- * Follows the same pattern as CreateTourModal with dynamic client list
+ * Follows same pattern as CreateTourModal with dynamic client list
  */
 
 import React from 'react';
@@ -12,9 +12,14 @@ import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken } from '~/store/slices/authSlice';
 import { openModal, closeModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { getToursDropdownBusiness } from '~/server/businessLogic/toursBusinessLogic';
+import { getIdentificationTypesDropdownBusiness } from '~/server/businessLogic/identificationTypesBusinessLogic';
+import { getCountriesDropdownBusiness } from '~/server/businessLogic/countriesBusinessLogic';
+import { useErrorModal } from '~/utilities/useErrorModal';
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
 import type { Client } from '~/types/booking';
+import type { IdentificationTypeDropdown } from '~/types/identificationType';
+import type { CountryDropdown } from '~/types/country';
 
 // The dropdown endpoint returns minimal tour info (same as offers)
 interface TourOption {
@@ -35,6 +40,7 @@ interface BookingFormData {
   endDate: string;
   currency: string;
   clients: Client[];
+  specialRequests?: string;
 }
 
 export function CreateBookingModal({
@@ -45,19 +51,72 @@ export function CreateBookingModal({
   const { t, language } = useTranslation();
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
+  const { showError } = useErrorModal();
 
   const [tours, setTours] = useState<TourOption[]>([]);
+  const [countries, setCountries] = useState<CountryDropdown[]>([]);
+  const [identificationTypes, setIdentificationTypes] = useState<IdentificationTypeDropdown[]>([]);
+  const [clientNationalities, setClientNationalities] = useState<Record<number, string>>({});
 
   const [formData, setFormData] = useState<BookingFormData>({
     tourId: '',
     startDate: '',
     endDate: '',
     currency: 'MXN',
-    clients: [{ clientName: '', clientAge: 0 }],
+    clients: [{ clientName: '', clientAge: 0, identificationTypeId: '', clientId: '' }],
   });
 
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasSpecialRequests, setHasSpecialRequests] = useState(false);
+
+  // Fetch countries dropdown on mount
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        const resultRaw = await getCountriesDropdownBusiness(language);
+        const result = resultRaw as { success?: boolean; data?: CountryDropdown[] };
+        if (result.success === true && result.data !== undefined) {
+          setCountries(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching countries:', error);
+      }
+    };
+
+    void fetchCountries();
+  }, [language]);
+
+  // Fetch identification types by country code (dynamic, replaces hardcoded 'CO')
+  const fetchIdentificationTypesByCountry = async (countryCode: string): Promise<void> => {
+    dispatch(setGlobalLoading({ isLoading: true }));
+    try {
+      const identificationTypesData = await getIdentificationTypesDropdownBusiness(
+        countryCode,
+        true,
+        language
+      );
+      const identificationTypesResult = identificationTypesData as {
+        success?: boolean;
+        data?: IdentificationTypeDropdown[];
+      };
+
+      if (
+        identificationTypesResult.success === true &&
+        identificationTypesResult.data !== undefined
+      ) {
+        setIdentificationTypes(identificationTypesResult.data);
+      } else {
+        setIdentificationTypes([]);
+        showError({ messageKey: 'bookings.loadIdTypesError' });
+      }
+    } catch (error) {
+      console.error('Error fetching identification types:', error);
+      setIdentificationTypes([]);
+    } finally {
+      dispatch(setGlobalLoading({ isLoading: false }));
+    }
+  };
 
   // Fetch tours on mount
   useEffect(() => {
@@ -96,10 +155,19 @@ export function CreateBookingModal({
     const newClients = [...formData.clients];
     const currentClient = newClients[index];
     if (currentClient !== undefined) {
+      let finalValue: string | number;
+
+      if (field === 'clientAge') {
+        finalValue = typeof value === 'number' ? value : Number(value);
+      } else if (field === 'identificationTypeId' || field === 'clientId') {
+        finalValue = String(value);
+      } else {
+        finalValue = value;
+      }
+
       const updatedClient: Client = {
-        clientName: currentClient.clientName,
-        clientAge: currentClient.clientAge,
-        [field]: field === 'clientAge' ? Number(value) : value,
+        ...currentClient,
+        [field]: finalValue,
       };
       newClients[index] = updatedClient;
     }
@@ -118,6 +186,8 @@ export function CreateBookingModal({
     const newClient: Client = {
       clientName: '',
       clientAge: 0,
+      identificationTypeId: '',
+      clientId: '',
     };
     setFormData((prev) => ({
       ...prev,
@@ -130,15 +200,40 @@ export function CreateBookingModal({
     }
   };
 
+  // Handle nationality change per client
+  const handleNationalityChange = (index: number, countryCode: string): void => {
+    setClientNationalities((prev) => ({ ...prev, [index]: countryCode }));
+
+    // Reset identificationTypeId for this client when nationality changes
+    handleClientChange(index, 'identificationTypeId', '');
+
+    // Reload identification types for the selected country
+    setIdentificationTypes([]);
+    if (countryCode !== '') {
+      void fetchIdentificationTypesByCountry(countryCode);
+    }
+  };
+
   // Remove a client
   const handleRemoveClient = (index: number): void => {
     if (formData.clients.length <= 1) {
-      // Don't remove the last client
+      // Don't remove last client
       return;
     }
 
     const newClients = formData.clients.filter((_, i) => i !== index);
     setFormData((prev) => ({ ...prev, clients: newClients }));
+
+    // Reorder nationality map after removal
+    setClientNationalities((prev) => {
+      const updated: Record<number, string> = {};
+      Object.entries(prev).forEach(([key, val]) => {
+        const keyNum = Number(key);
+        if (keyNum < index) updated[keyNum] = val;
+        else if (keyNum > index) updated[keyNum - 1] = val;
+      });
+      return updated;
+    });
   };
 
   const validateForm = (): boolean => {
@@ -167,6 +262,17 @@ export function CreateBookingModal({
         if (!client.clientAge || client.clientAge < 0) {
           newErrors[`clients.${index}.clientAge`] = t('validation.required') ?? 'Required';
         }
+        if ((clientNationalities[index] ?? '') === '') {
+          newErrors[`clients.${index}.nationality`] =
+            t('bookings.selectNationality') ?? 'Select nationality';
+        }
+        if ((client.identificationTypeId ?? '').trim() === '') {
+          newErrors[`clients.${index}.identificationTypeId`] =
+            t('bookings.selectIdType') ?? 'Select ID type';
+        }
+        if ((client.clientId ?? '').trim() === '') {
+          newErrors[`clients.${index}.clientId`] = t('bookings.enterClientId') ?? 'Enter client ID';
+        }
       });
     }
 
@@ -192,31 +298,41 @@ export function CreateBookingModal({
     );
 
     try {
-      const result = await createBookingBusiness(formData, token ?? '');
+      // Merge countryCode from clientNationalities into each client before submitting
+      const payloadWithCountry: BookingFormData = {
+        ...formData,
+        clients: formData.clients.map((client, index) => ({
+          ...client,
+          countryCode: clientNationalities[index] ?? '',
+        })),
+        specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
+      };
 
+      const result = await createBookingBusiness(payloadWithCountry, token ?? '');
       if (!result.success) {
         // Hide global spinner on error
         dispatch(setGlobalLoading({ isLoading: false }));
 
-        // Extract error details if available
         const errorMessage =
-          (result as { error?: { message?: string } }).error?.message ??
-          result.message ??
-          t('bookings.createError') ??
-          'Error creating booking';
+          result.message ?? t('bookings.createError') ?? 'Error creating booking';
 
-        dispatch(
-          openModal({
-            id: 'create-booking-error',
-            type: 'confirm',
-            title: t('common.error'),
-            isOpen: true,
-            data: {
-              message: errorMessage,
-              icon: 'alert',
-            },
-          })
-        );
+        const modalPayload = {
+          id: 'create-booking-error',
+          type: 'confirm',
+          title: t('common.error'),
+          isOpen: true,
+          data: {
+            message: errorMessage,
+            icon: 'alert',
+          },
+        };
+
+        // Close of create booking modal first so that error modal can appear on top
+        if (onClose !== undefined) {
+          onClose();
+        }
+
+        dispatch(openModal(modalPayload as Parameters<typeof openModal>[0]));
         setIsSubmitting(false);
         return;
       }
@@ -286,7 +402,7 @@ export function CreateBookingModal({
         style={{
           backgroundColor: 'white',
           borderRadius: 'var(--radius-lg)',
-          maxWidth: '800px',
+          maxWidth: '1100px',
           width: '100%',
           maxHeight: '90vh',
           overflowY: 'auto',
@@ -541,7 +657,7 @@ export function CreateBookingModal({
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '40px 1fr 150px 40px',
+                      gridTemplateColumns: '40px 1fr 100px 180px 150px 150px 40px',
                       gap: 'var(--space-3)',
                       fontSize: 'var(--text-sm)',
                       fontWeight: 'var(--font-weight-semibold)',
@@ -551,6 +667,9 @@ export function CreateBookingModal({
                     <div>#</div>
                     <div>{t('bookings.clientName') ?? 'Client Name'}</div>
                     <div>{t('bookings.clientAge') ?? 'Age'}</div>
+                    <div>{t('bookings.nationality') ?? 'Nationality'}</div>
+                    <div>{t('bookings.idType') ?? 'ID Type'}</div>
+                    <div>{t('bookings.clientId') ?? 'Client ID'}</div>
                     <div />
                   </div>
                 </div>
@@ -560,7 +679,7 @@ export function CreateBookingModal({
                     key={`client-${index}`}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '40px 1fr 150px 40px',
+                      gridTemplateColumns: '40px 1fr 100px 180px 150px 150px 40px',
                       gap: 'var(--space-3)',
                       padding: 'var(--space-3)',
                       alignItems: 'center',
@@ -584,7 +703,6 @@ export function CreateBookingModal({
                     >
                       {index + 1}
                     </div>
-
                     {/* Client Name */}
                     <div>
                       <Input
@@ -596,7 +714,6 @@ export function CreateBookingModal({
                         required
                       />
                     </div>
-
                     {/* Client Age */}
                     <div>
                       <Input
@@ -610,7 +727,50 @@ export function CreateBookingModal({
                         required
                       />
                     </div>
-
+                    {/* Nationality */}
+                    <Select
+                      options={[
+                        {
+                          value: '',
+                          label: t('bookings.selectNationality') ?? 'Select nationality',
+                        },
+                        ...countries.map((country) => ({
+                          value: country.code,
+                          label:
+                            language === 'en'
+                              ? (country.nationality_en ?? country.name_en)
+                              : (country.nationality_es ?? country.name_es),
+                        })),
+                      ]}
+                      value={clientNationalities[index] ?? ''}
+                      onChange={(value: string) => handleNationalityChange(index, value)}
+                      placeholder={t('bookings.selectNationality') ?? 'Select nationality'}
+                      id={`nationality-${index}`}
+                    />
+                    {/* ID Type - disabled until nationality is selected */}
+                    <Select
+                      options={[
+                        { value: '', label: t('bookings.selectIdType') ?? 'Select ID Type' },
+                        ...identificationTypes.map((idType) => ({
+                          value: idType.id,
+                          label: language === 'en' ? idType.name_en : idType.name_es,
+                        })),
+                      ]}
+                      value={client.identificationTypeId ?? ''}
+                      onChange={(value: string) =>
+                        handleClientChange(index, 'identificationTypeId', value)
+                      }
+                      placeholder={t('bookings.selectIdType') ?? 'Select ID Type'}
+                      id={`id-type-${index}`}
+                      disabled={(clientNationalities[index] ?? '') === ''}
+                    />
+                    {/* Client ID */}
+                    <Input
+                      type="text"
+                      value={client.clientId ?? ''}
+                      onChange={(e) => handleClientChange(index, 'clientId', e.target.value)}
+                      placeholder={t('bookings.enterClientId') ?? 'Enter ID'}
+                    />
                     {/* Remove Button */}
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                       <button
@@ -678,6 +838,60 @@ export function CreateBookingModal({
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Special Requests */}
+            <div style={{ marginTop: 'var(--space-4)' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  cursor: 'pointer',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-700)',
+                  userSelect: 'none',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={hasSpecialRequests}
+                  onChange={(e) => {
+                    setHasSpecialRequests(e.target.checked);
+                    if (!e.target.checked) {
+                      setFormData((prev) => ({ ...prev, specialRequests: '' }));
+                    }
+                  }}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                {t('bookings.hasSpecialRequests') ?? 'Add special requests'}
+              </label>
+              {hasSpecialRequests && (
+                <textarea
+                  value={formData.specialRequests ?? ''}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, specialRequests: e.target.value }))
+                  }
+                  placeholder={
+                    t('bookings.specialRequestsPlaceholder') ??
+                    'e.g. dietary restrictions, preferred language...'
+                  }
+                  rows={3}
+                  style={{
+                    marginTop: 'var(--space-2)',
+                    width: '100%',
+                    padding: 'var(--space-2) var(--space-3)',
+                    border: '1px solid var(--color-neutral-300)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--color-neutral-900)',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              )}
             </div>
 
             {/* Action Buttons */}
