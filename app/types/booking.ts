@@ -216,3 +216,23 @@ export interface CreatePaymentDto {
   transactionReference?: string;
   notes?: string;
 }
+
+export interface BookingStatusHistoryEntry {
+  step: number;
+  statusCode: string;
+  statusName: string;
+  statusName_es: string;
+  statusName_en: string;
+  changeReason?: string;
+  notes?: string;
+  changedBy?: string;
+  changedAt: string;
+}
+
+export interface BookingStatusHistory {
+  bookingId: string;
+  confirmationCode: string;
+  currentStatus: string;
+  totalChanges: number;
+  history: BookingStatusHistoryEntry[];
+}

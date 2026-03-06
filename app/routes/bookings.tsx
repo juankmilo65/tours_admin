@@ -20,6 +20,7 @@ import citiesBL from '~/server/businessLogic/citiesBusinessLogic';
 import countriesBL from '~/server/businessLogic/countriesBusinessLogic';
 import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import { getBookingStatusesDropdownBusiness } from '~/server/businessLogic/bookingStatusesBusinessLogic';
+import { getToursDropdownBusiness } from '~/server/businessLogic/toursBusinessLogic';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
 import { useErrorModal } from '~/utilities/useErrorModal';
 import { selectAuthToken } from '~/store/slices/authSlice';
@@ -29,8 +30,16 @@ import { useTranslation } from '~/lib/i18n/utils';
 import { bookingEs, bookingEn } from '~/lib/i18n';
 import { CreateBookingModal } from '~/components/bookings/CreateBookingModal';
 import { BookingClientsModal } from '~/components/bookings/BookingClientsModal';
+import { EditBookingModal } from '~/components/bookings/EditBookingModal';
+import { BookingStatusModal } from '~/components/bookings/BookingStatusModal';
 import type { BookingClient } from '~/types/booking';
 import type { City } from '~/server/cities';
+
+interface TourOption {
+  id: string;
+  title_es: string;
+  title_en: string;
+}
 
 // Types for loader data
 interface LoaderData {
@@ -145,12 +154,10 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
 
   // Fetch booking statuses for dropdown
-  const statusesResult = await getBookingStatusesDropdownBusiness(
-    session.get('authToken') as string | undefined,
-    'es'
-  );
+  const statusesResult: { success: boolean; data: Array<{ value: string; label: string }> | null } =
+    await getBookingStatusesDropdownBusiness(session.get('authToken') as string | undefined, 'es');
   const statuses =
-    statusesResult.success === true && statusesResult.data !== undefined ? statusesResult.data : [];
+    statusesResult.success === true && statusesResult.data !== null ? statusesResult.data : [];
 
   return data(
     {
@@ -206,6 +213,7 @@ export default function Bookings(): JSX.Element {
   const [statuses, setStatuses] = useState<Array<{ value: string; label: string }>>(
     loaderData.statuses
   );
+  const [tours, setTours] = useState<TourOption[]>([]);
 
   const { showError } = useErrorModal();
 
@@ -218,6 +226,18 @@ export default function Bookings(): JSX.Element {
     clients: BookingClient[];
     confirmationCode: string;
   }>({ isOpen: false, clients: [], confirmationCode: '' });
+
+  // Edit modal state
+  const [editModal, setEditModal] = useState<{ isOpen: boolean; booking: Booking | null }>({
+    isOpen: false,
+    booking: null,
+  });
+
+  // Status modal state
+  const [statusModal, setStatusModal] = useState<{ isOpen: boolean; booking: Booking | null }>({
+    isOpen: false,
+    booking: null,
+  });
 
   // Refresh bookings function
   const refreshBookings = async () => {
@@ -290,12 +310,32 @@ export default function Bookings(): JSX.Element {
 
   // Reload statuses when language changes
   useEffect(() => {
-    void getBookingStatusesDropdownBusiness(token, language).then((result) => {
-      if (result.success === true && result.data !== undefined && result.data !== null) {
-        setStatuses(result.data);
+    void getBookingStatusesDropdownBusiness(token, language).then(
+      (result: { success: boolean; data: Array<{ value: string; label: string }> | null }) => {
+        if (result.success === true && result.data !== null) {
+          setStatuses(result.data);
+        }
       }
-    });
+    );
   }, [language, token]);
+
+  // Load tours dropdown
+  useEffect(() => {
+    const fetchTours = async () => {
+      try {
+        const result = (await getToursDropdownBusiness(countryId ?? null, language)) as {
+          success?: boolean;
+          data?: TourOption[];
+        };
+        if (result.success === true && result.data !== undefined) {
+          setTours(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching tours dropdown:', error);
+      }
+    };
+    void fetchTours();
+  }, [countryId, language]);
 
   const handleViewBooking = (booking: Booking) => {
     navigate(`/bookings/${booking.id}`);
@@ -486,14 +526,15 @@ export default function Bookings(): JSX.Element {
       key: 'actions',
       label: t('common.actions') ?? 'Acciones',
       render: (_value: unknown, row: Booking) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* View details */}
           <button
             type="button"
             onClick={() => handleViewBooking(row)}
             style={{
-              padding: '8px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              padding: 7,
+              borderRadius: 8,
+              backgroundColor: 'rgba(59,130,246,0.1)',
               color: '#2563eb',
               border: 'none',
               cursor: 'pointer',
@@ -501,7 +542,7 @@ export default function Bookings(): JSX.Element {
             title={bookingsT.viewDetails}
           >
             <svg
-              style={{ width: '16px', height: '16px' }}
+              style={{ width: 16, height: 16 }}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -517,6 +558,62 @@ export default function Bookings(): JSX.Element {
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+              />
+            </svg>
+          </button>
+          {/* Edit booking */}
+          <button
+            type="button"
+            onClick={() => setEditModal({ isOpen: true, booking: row })}
+            style={{
+              padding: 7,
+              borderRadius: 8,
+              backgroundColor: 'rgba(234,179,8,0.1)',
+              color: '#ca8a04',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            title={language === 'en' ? 'Edit' : 'Editar'}
+          >
+            <svg
+              style={{ width: 16, height: 16 }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+          </button>
+          {/* Status history */}
+          <button
+            type="button"
+            onClick={() => setStatusModal({ isOpen: true, booking: row })}
+            style={{
+              padding: 7,
+              borderRadius: 8,
+              backgroundColor: 'rgba(34,197,94,0.1)',
+              color: '#16a34a',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            title={language === 'en' ? 'Status' : 'Estado'}
+          >
+            <svg
+              style={{ width: 16, height: 16 }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
               />
             </svg>
           </button>
@@ -763,17 +860,22 @@ export default function Bookings(): JSX.Element {
                   marginBottom: 'var(--space-1)',
                 }}
               >
-                ID del Tour
+                {bookingsT.tour}
               </label>
-              <Input
-                type="text"
-                placeholder="ID del Tour"
+              <Select
+                options={[
+                  { value: '', label: language === 'en' ? 'All Tours' : 'Todos los Tours' },
+                  ...tours.map((tour) => ({
+                    value: tour.id,
+                    label: language === 'en' ? tour.title_en : tour.title_es,
+                  })),
+                ]}
                 value={tourIdFilter}
-                onChange={(e) => {
-                  setTourIdFilter(e.target.value);
+                onChange={(v: string) => {
+                  setTourIdFilter(v);
                   setPage(1);
                 }}
-                style={{ height: '40px' }}
+                placeholder={language === 'en' ? 'All Tours' : 'Todos los Tours'}
               />
             </div>
           </div>
@@ -881,6 +983,24 @@ export default function Bookings(): JSX.Element {
         clients={clientsModal.clients}
         confirmationCode={clientsModal.confirmationCode}
         onClose={() => setClientsModal((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      <EditBookingModal
+        isOpen={editModal.isOpen}
+        booking={editModal.booking}
+        onClose={() => setEditModal({ isOpen: false, booking: null })}
+        onSuccess={() => {
+          void refreshBookings();
+        }}
+      />
+
+      <BookingStatusModal
+        isOpen={statusModal.isOpen}
+        booking={statusModal.booking}
+        onClose={() => setStatusModal({ isOpen: false, booking: null })}
+        onSuccess={() => {
+          void refreshBookings();
+        }}
       />
     </div>
   );

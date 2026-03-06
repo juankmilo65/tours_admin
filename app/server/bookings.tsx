@@ -471,3 +471,24 @@ export const createPayment = async (
     return { error, success: false };
   }
 };
+
+/**
+ * Get status history for a booking
+ */
+export const getBookingStatusHistory = async (
+  bookingId: string,
+  token?: string,
+  language = 'es'
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    return { success: false, data: null };
+  }
+  try {
+    const endpoint = `bookings/${bookingId}/status-history`;
+    const service = createServiceREST(BASE_URL, endpoint, `Bearer ${token ?? ''}`);
+    return await service.get({ headers: { 'X-Language': language } });
+  } catch (error) {
+    console.error('❌ [GET BOOKING STATUS HISTORY] Error:', error);
+    return { success: false, data: null };
+  }
+};

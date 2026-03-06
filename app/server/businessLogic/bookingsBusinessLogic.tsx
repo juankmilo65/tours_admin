@@ -2,7 +2,13 @@
  * Bookings Business Logic - Business layer for Booking Management
  */
 
-import type { Booking, Payment, BookingStats } from '~/types/booking';
+import type {
+  Booking,
+  Payment,
+  BookingStats,
+  BookingStatusHistory,
+  BookingStatusHistoryEntry,
+} from '~/types/booking';
 import {
   getAllBookings,
   getBookingById,
@@ -12,6 +18,7 @@ import {
   getBookingStats,
   getBookingPayments,
   createPayment,
+  getBookingStatusHistory,
 } from '../bookings';
 
 export type { Booking, Payment, BookingStats };
@@ -305,5 +312,30 @@ export const createPaymentBusiness = async (
       success: false,
       message: error instanceof Error ? error.message : 'Error creating payment',
     };
+  }
+};
+
+export type { BookingStatusHistoryEntry };
+
+/**
+ * Get status history for a booking
+ */
+export const getBookingStatusHistoryBusiness = async (
+  bookingId: string,
+  token?: string,
+  language = 'es'
+): Promise<{ success: boolean; data: BookingStatusHistory | null }> => {
+  try {
+    const result = (await getBookingStatusHistory(bookingId, token, language)) as {
+      success?: boolean;
+      data?: BookingStatusHistory | null;
+    };
+    if (result.success === true) {
+      return { success: true, data: result.data ?? null };
+    }
+    return { success: false, data: null };
+  } catch (error) {
+    console.error('Error in getBookingStatusHistoryBusiness:', error);
+    return { success: false, data: null };
   }
 };

@@ -19,6 +19,35 @@ const BASE_URL =
   (import.meta as unknown as ViteImportMeta).env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
 /**
+ * Fetch the next booking status for a given status code
+ */
+export const getNextBookingStatusService = async (
+  currentStatusCode: string,
+  token?: string,
+  language = 'es'
+): Promise<{ success: boolean; data: import('~/types/bookingStatus').BookingStatus | null }> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    return { success: false, data: null };
+  }
+
+  try {
+    const endpoint = `booking-statuses/${currentStatusCode}/next`;
+    const service = createServiceREST(BASE_URL, endpoint, `Bearer ${token ?? ''}`);
+    const result = (await service.get({
+      headers: { 'X-Language': language },
+    })) as { success?: boolean; data?: import('~/types/bookingStatus').BookingStatus | null };
+
+    if (result.success === true) {
+      return { success: true, data: result.data ?? null };
+    }
+    return { success: false, data: null };
+  } catch (error) {
+    console.error('❌ [GET NEXT BOOKING STATUS] Error:', error);
+    return { success: false, data: null };
+  }
+};
+
+/**
  * Fetch all booking statuses
  */
 export const getBookingStatusesService = async (

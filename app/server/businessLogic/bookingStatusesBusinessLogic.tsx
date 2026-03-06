@@ -3,7 +3,7 @@
  * Handles business logic for booking statuses
  */
 
-import { getBookingStatusesService } from '../bookingStatuses';
+import { getBookingStatusesService, getNextBookingStatusService } from '../bookingStatuses';
 import type { BookingStatus, BookingStatusResponse } from '~/types/bookingStatus';
 
 /**
@@ -17,7 +17,18 @@ export const getBookingStatusesBusiness = (
 };
 
 /**
- * Get booking statuses formatted for dropdown options
+ * Get the next booking status for a given status code
+ */
+export const getNextBookingStatusBusiness = (
+  currentStatusCode: string,
+  token?: string,
+  language = 'es'
+): Promise<{ success: boolean; data: BookingStatus | null }> => {
+  return getNextBookingStatusService(currentStatusCode, token, language);
+};
+
+/**
+ * Get booking statuses formatted as dropdown options
  */
 export const getBookingStatusesDropdownBusiness = async (
   token?: string,
