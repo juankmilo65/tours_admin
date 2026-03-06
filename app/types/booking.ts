@@ -8,15 +8,21 @@ export interface Booking {
   userId: string;
   tourId: string;
   offerId?: string;
+  tourTitle?: string;
   startDate: string; // UTC
   endDate: string; // UTC
+  bookingDate?: string; // UTC
   numberOfPeople: number;
-  totalPrice: number;
+  totalPrice: number | string;
   currency: string;
+  totalPriceConverted?: number;
+  convertedCurrency?: string;
   usdPrice?: number;
   usdExchangeRate?: number;
-  status: 'pending' | 'partial' | 'paid' | 'cancelled' | 'urgent';
+  status: 'pending' | 'partial' | 'paid' | 'cancelled' | 'urgent' | 'requested' | string;
+  statusId?: string;
   confirmationCode: string;
+  specialRequests?: string;
   firstName1?: string;
   firstName2?: string;
   lastName1?: string;
@@ -33,17 +39,32 @@ export interface Booking {
   updatedAt: string;
   tour?: Tour;
   user?: User;
+  offer?: unknown;
   country?: Country;
   payments?: Payment[];
+  clients?: BookingClient[];
 }
 
 export interface Tour {
   id: string;
   title: string;
+  title_es?: string;
+  title_en?: string;
   description?: string;
   duration?: number;
-  basePrice?: number;
+  basePrice?: number | string;
   currency?: string;
+  city?: {
+    id: string;
+    name_es?: string;
+    name_en?: string;
+    country?: {
+      id: string;
+      name_es?: string;
+      name_en?: string;
+      isoCode?: string;
+    };
+  };
 }
 
 export interface User {
@@ -51,6 +72,17 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  fullName?: string;
+}
+
+export interface BookingClient {
+  id?: string;
+  clientName: string;
+  clientAge: number;
+  countryId?: string;
+  countryCode?: string;
+  identificationTypeId?: string;
+  clientId?: string;
 }
 
 export interface Country {

@@ -10,7 +10,7 @@ import { useTranslation } from '~/lib/i18n/utils';
 import { createBookingBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken } from '~/store/slices/authSlice';
-import { openModal, closeModal, setGlobalLoading } from '~/store/slices/uiSlice';
+import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { getToursDropdownBusiness } from '~/server/businessLogic/toursBusinessLogic';
 import { getIdentificationTypesDropdownBusiness } from '~/server/businessLogic/identificationTypesBusinessLogic';
 import { getCountriesDropdownBusiness } from '~/server/businessLogic/countriesBusinessLogic';
@@ -310,35 +310,30 @@ export function CreateBookingModal({
 
       const result = await createBookingBusiness(payloadWithCountry, token ?? '');
       if (!result.success) {
-        // Hide global spinner on error
+        // Hide global spinner on error, keep modal open
         dispatch(setGlobalLoading({ isLoading: false }));
 
         const errorMessage =
           result.message ?? t('bookings.createError') ?? 'Error creating booking';
 
-        const modalPayload = {
-          id: 'create-booking-error',
-          type: 'confirm',
-          title: t('common.error'),
-          isOpen: true,
-          data: {
-            message: errorMessage,
-            icon: 'alert',
-          },
-        };
-
-        // Close of create booking modal first so that error modal can appear on top
-        if (onClose !== undefined) {
-          onClose();
-        }
-
-        dispatch(openModal(modalPayload as Parameters<typeof openModal>[0]));
+        dispatch(
+          openModal({
+            id: 'create-booking-error',
+            type: 'confirm',
+            title: t('common.error') ?? 'Error',
+            isOpen: true,
+            data: { message: errorMessage, icon: 'alert' },
+          } as Parameters<typeof openModal>[0])
+        );
         setIsSubmitting(false);
         return;
       }
 
-      // Success
-      dispatch(closeModal('create-booking'));
+      // Success — hide spinner, close this modal, notify parent, show success
+      dispatch(setGlobalLoading({ isLoading: false }));
+      if (onClose !== undefined) {
+        onClose();
+      }
       if (onSuccess !== undefined) {
         onSuccess();
       }
@@ -347,13 +342,14 @@ export function CreateBookingModal({
         openModal({
           id: 'create-booking-success',
           type: 'confirm',
-          title: t('common.success'),
+          title: t('common.success') ?? 'Success',
           isOpen: true,
           data: {
-            message: t('bookings.createSuccess') ?? 'Booking created successfully',
+            message:
+              result.message ?? t('bookings.createSuccess') ?? 'Booking created successfully',
             icon: 'success',
           },
-        })
+        } as Parameters<typeof openModal>[0])
       );
     } catch (error) {
       console.error('Error creating booking:', error);

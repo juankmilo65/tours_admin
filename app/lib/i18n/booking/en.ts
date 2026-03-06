@@ -42,6 +42,7 @@ export const bookingEn = {
   paid: 'Paid',
   cancelled: 'Cancelled',
   urgent: 'Urgent',
+  requested: 'Requested',
   notSpecified: 'Not specified',
   cancellationReason: 'Cancellation Reason',
   confirmCancellation: 'Confirm Cancellation',

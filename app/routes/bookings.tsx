@@ -312,8 +312,103 @@ export default function Bookings(): JSX.Element {
       render: (value: unknown) => {
         const code = value as string;
         return (
-          <div className="font-mono text-sm font-semibold text-gray-900 bg-gray-100 px-2 py-1 rounded">
+          <div className="font-mono text-xs font-semibold text-gray-900 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
             {code}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'tourTitle',
+      label: bookingsT.tour,
+      render: (value: unknown, record: Booking) => {
+        const title = (value as string | undefined) ?? record.tour?.title ?? bookingsT.notSpecified;
+        return (
+          <div className="text-sm text-gray-900 font-medium max-w-[180px] truncate" title={title}>
+            {title}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'user',
+      label: bookingsT.customer,
+      render: (value: unknown, record: Booking) => {
+        const user = value as Booking['user'];
+        const fullName =
+          user?.fullName ??
+          (user?.firstName !== undefined ? `${user.firstName} ${user.lastName}` : undefined) ??
+          (record.firstName1 !== undefined
+            ? `${record.firstName1} ${record.lastName1 ?? ''}`
+            : bookingsT.notSpecified);
+        const email = user?.email;
+        return (
+          <div>
+            <div className="text-sm font-semibold text-gray-900 whitespace-nowrap">{fullName}</div>
+            {email !== undefined && <div className="text-xs text-gray-500">{email}</div>}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'clients',
+      label: bookingsT.numberOfPeople,
+      render: (value: unknown, record: Booking) => {
+        const clients = value as Booking['clients'];
+        const count = clients?.length ?? record.numberOfPeople ?? 0;
+        return (
+          <div className="text-center">
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold">
+              {count}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'startDate',
+      label: bookingsT.startDate,
+      render: (value: unknown) => {
+        const dateValue = value as string;
+        return (
+          <div className="text-sm text-gray-600 whitespace-nowrap">
+            {new Date(dateValue).toLocaleDateString('es-ES', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'endDate',
+      label: bookingsT.endDate,
+      render: (value: unknown) => {
+        const dateValue = value as string;
+        return (
+          <div className="text-sm text-gray-600 whitespace-nowrap">
+            {new Date(dateValue).toLocaleDateString('es-ES', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'bookingDate',
+      label: bookingsT.bookingDate,
+      render: (value: unknown, record: Booking) => {
+        const dateValue = (value as string | undefined) ?? record.createdAt;
+        return (
+          <div className="text-sm text-gray-600 whitespace-nowrap">
+            {new Date(dateValue).toLocaleDateString('es-ES', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
           </div>
         );
       },
@@ -329,6 +424,7 @@ export default function Bookings(): JSX.Element {
           paid: 'bg-green-100 text-green-700',
           cancelled: 'bg-red-100 text-red-700',
           urgent: 'bg-red-100 text-red-700',
+          requested: 'bg-blue-100 text-blue-700',
         };
         const statusLabels: Record<string, string> = {
           pending: bookingsT.pending,
@@ -336,74 +432,18 @@ export default function Bookings(): JSX.Element {
           paid: bookingsT.paid,
           cancelled: bookingsT.cancelled,
           urgent: bookingsT.urgent,
+          requested: bookingsT.requested ?? 'Solicitada',
         };
         const colorClass = statusColors[statusValue] ?? 'bg-gray-100 text-gray-700';
         const labelText = statusLabels[statusValue] ?? statusValue;
         return (
           <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${colorClass}`}
+            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${colorClass}`}
           >
             {labelText}
           </span>
         );
       },
-    },
-    {
-      key: 'startDate',
-      label: bookingsT.startDate,
-      render: (value: unknown) => {
-        const dateValue = value as string;
-        return (
-          <div className="text-sm text-gray-600">
-            {new Date(dateValue).toLocaleDateString('es-ES', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'numberOfPeople',
-      label: bookingsT.numberOfPeople,
-      render: (value: unknown) => (
-        <div className="text-sm font-semibold text-gray-900">{value as number}</div>
-      ),
-    },
-    {
-      key: 'totalPrice',
-      label: bookingsT.totalPrice,
-      render: (value: unknown, record: Booking) => {
-        const price = value as number;
-        return (
-          <div className="text-sm font-semibold text-gray-900">
-            ${price} {record.currency}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'tour',
-      label: bookingsT.tour,
-      render: (value: unknown) => {
-        const tour = value as Booking['tour'];
-        return <div className="text-sm text-gray-900">{tour?.title ?? bookingsT.notSpecified}</div>;
-      },
-    },
-    {
-      key: 'customer',
-      label: bookingsT.customer,
-      render: (_value: unknown, record: Booking) => (
-        <div>
-          <div className="font-semibold text-gray-900">
-            {record.firstName1} {record.lastName1}
-          </div>
-          {record.email !== undefined && (
-            <div className="text-sm text-gray-500">{record.email}</div>
-          )}
-        </div>
-      ),
     },
     {
       key: 'actions',
