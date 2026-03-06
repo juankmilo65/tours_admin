@@ -28,6 +28,8 @@ import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { useTranslation } from '~/lib/i18n/utils';
 import { bookingEs, bookingEn } from '~/lib/i18n';
 import { CreateBookingModal } from '~/components/bookings/CreateBookingModal';
+import { BookingClientsModal } from '~/components/bookings/BookingClientsModal';
+import type { BookingClient } from '~/types/booking';
 import type { City } from '~/server/cities';
 
 // Types for loader data
@@ -210,6 +212,13 @@ export default function Bookings(): JSX.Element {
   // Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
+  // Clients modal state
+  const [clientsModal, setClientsModal] = useState<{
+    isOpen: boolean;
+    clients: BookingClient[];
+    confirmationCode: string;
+  }>({ isOpen: false, clients: [], confirmationCode: '' });
+
   // Refresh bookings function
   const refreshBookings = async () => {
     dispatch(setGlobalLoading({ isLoading: true, message: t('common.loading') ?? 'Cargando...' }));
@@ -356,11 +365,39 @@ export default function Bookings(): JSX.Element {
       render: (value: unknown, record: Booking) => {
         const clients = value as Booking['clients'];
         const count = clients?.length ?? record.numberOfPeople ?? 0;
+        const hasClients = clients !== undefined && clients.length > 0;
         return (
           <div className="text-center">
-            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                if (hasClients) {
+                  setClientsModal({
+                    isOpen: true,
+                    clients: clients ?? [],
+                    confirmationCode: record.confirmationCode ?? '',
+                  });
+                }
+              }}
+              title={hasClients ? bookingsT.clients : undefined}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: hasClients ? '#dbeafe' : '#f3f4f6',
+                color: hasClients ? '#1d4ed8' : '#6b7280',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                border: 'none',
+                cursor: hasClients ? 'pointer' : 'default',
+                transition: 'background 0.15s',
+              }}
+            >
               {count}
-            </span>
+            </button>
           </div>
         );
       },
@@ -837,6 +874,13 @@ export default function Bookings(): JSX.Element {
         onSuccess={() => {
           void refreshBookings();
         }}
+      />
+
+      <BookingClientsModal
+        isOpen={clientsModal.isOpen}
+        clients={clientsModal.clients}
+        confirmationCode={clientsModal.confirmationCode}
+        onClose={() => setClientsModal((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );
