@@ -18,7 +18,7 @@ import {
 import { getNextBookingStatusBusiness } from '~/server/businessLogic/bookingStatusesBusinessLogic';
 import type { Booking } from '~/types/booking';
 import type { BookingStatusHistoryEntry } from '~/server/businessLogic/bookingsBusinessLogic';
-import type { BookingStatus } from '~/types/bookingStatus';
+import type { NextBookingStatus } from '~/types/bookingStatus';
 
 interface BookingStatusModalProps {
   isOpen: boolean;
@@ -66,7 +66,7 @@ export function BookingStatusModal({
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
 
-  const [nextStatus, setNextStatus] = useState<BookingStatus | null>(null);
+  const [nextStatus, setNextStatus] = useState<NextBookingStatus | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [history, setHistory] = useState<BookingStatusHistoryEntry[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -373,7 +373,7 @@ export function BookingStatusModal({
             <button
               type="button"
               disabled={isTransitioning}
-              onClick={() => void changeStatus(nextStatus.code)}
+              onClick={() => void changeStatus(nextStatus.nextStatusCode)}
               style={{
                 padding: '9px 18px',
                 borderRadius: 8,
@@ -386,7 +386,9 @@ export function BookingStatusModal({
                 opacity: isTransitioning ? 0.6 : 1,
               }}
             >
-              {language === 'en' ? `→ ${nextStatus.name_en}` : `→ ${nextStatus.name_es}`}
+              {language === 'en'
+                ? `→ ${nextStatus.nextStatusName.en}`
+                : `→ ${nextStatus.nextStatusName.es}`}
             </button>
           ) : null}
         </div>

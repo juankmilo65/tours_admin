@@ -502,6 +502,9 @@ export default function Bookings(): JSX.Element {
           cancelled: 'bg-red-100 text-red-700',
           urgent: 'bg-red-100 text-red-700',
           requested: 'bg-blue-100 text-blue-700',
+          confirmed: 'bg-indigo-100 text-indigo-700',
+          pending_payment: 'bg-yellow-100 text-yellow-700',
+          partially_paid: 'bg-orange-100 text-orange-700',
         };
         const statusLabels: Record<string, string> = {
           pending: bookingsT.pending,
@@ -509,7 +512,10 @@ export default function Bookings(): JSX.Element {
           paid: bookingsT.paid,
           cancelled: bookingsT.cancelled,
           urgent: bookingsT.urgent,
-          requested: bookingsT.requested ?? 'Solicitada',
+          requested: bookingsT.requested,
+          confirmed: bookingsT.confirmed,
+          pending_payment: bookingsT.pendingPayment,
+          partially_paid: bookingsT.partiallyPaid,
         };
         const colorClass = statusColors[statusValue] ?? 'bg-gray-100 text-gray-700';
         const labelText = statusLabels[statusValue] ?? statusValue;

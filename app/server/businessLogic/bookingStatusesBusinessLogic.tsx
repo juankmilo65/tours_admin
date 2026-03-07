@@ -4,7 +4,11 @@
  */
 
 import { getBookingStatusesService, getNextBookingStatusService } from '../bookingStatuses';
-import type { BookingStatus, BookingStatusResponse } from '~/types/bookingStatus';
+import type {
+  BookingStatus,
+  BookingStatusResponse,
+  NextBookingStatus,
+} from '~/types/bookingStatus';
 
 /**
  * Get all booking statuses
@@ -23,7 +27,7 @@ export const getNextBookingStatusBusiness = (
   currentStatusCode: string,
   token?: string,
   language = 'es'
-): Promise<{ success: boolean; data: BookingStatus | null }> => {
+): Promise<{ success: boolean; data: NextBookingStatus | null }> => {
   return getNextBookingStatusService(currentStatusCode, token, language);
 };
 

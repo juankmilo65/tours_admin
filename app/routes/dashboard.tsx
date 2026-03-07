@@ -21,6 +21,8 @@ import {
 } from '~/server/businessLogic/bookingsBusinessLogic';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
+import { useTranslation } from '~/lib/i18n/utils';
+import { bookingEs, bookingEn } from '~/lib/i18n';
 
 export async function loader(args: LoaderFunctionArgs): Promise<null> {
   await requireAuth(args);
@@ -31,6 +33,31 @@ export default function Dashboard(): JSX.Element {
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
   const { bookings, stats } = useAppSelector((state) => state.bookings);
+  const { language } = useTranslation();
+  const bookingsT = language === 'en' ? bookingEn : bookingEs;
+
+  const statusColors: Record<string, string> = {
+    pending: 'bg-yellow-100 text-yellow-800',
+    partial: 'bg-orange-100 text-orange-800',
+    paid: 'bg-green-100 text-green-800',
+    cancelled: 'bg-red-100 text-red-800',
+    urgent: 'bg-red-100 text-red-800',
+    requested: 'bg-blue-100 text-blue-800',
+    confirmed: 'bg-indigo-100 text-indigo-800',
+    pending_payment: 'bg-yellow-100 text-yellow-800',
+    partially_paid: 'bg-orange-100 text-orange-800',
+  };
+  const statusLabels: Record<string, string> = {
+    pending: bookingsT.pending,
+    partial: bookingsT.partial,
+    paid: bookingsT.paid,
+    cancelled: bookingsT.cancelled,
+    urgent: bookingsT.urgent,
+    requested: bookingsT.requested,
+    confirmed: bookingsT.confirmed,
+    pending_payment: bookingsT.pendingPayment,
+    partially_paid: bookingsT.partiallyPaid,
+  };
 
   const loadDashboardData = async () => {
     // Load stats
@@ -144,14 +171,10 @@ export default function Dashboard(): JSX.Element {
                 <p className="text-sm text-gray-500">{booking.startDate}</p>
                 <span
                   className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                    booking.status === 'paid'
-                      ? 'bg-green-100 text-green-800'
-                      : booking.status === 'cancelled'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-yellow-100 text-yellow-800'
+                    statusColors[booking.status] ?? 'bg-yellow-100 text-yellow-800'
                   }`}
                 >
-                  {booking.status}
+                  {statusLabels[booking.status] ?? booking.status}
                 </span>
               </div>
             </div>

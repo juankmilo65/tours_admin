@@ -4,7 +4,7 @@
  */
 
 import { createServiceREST } from './_index';
-import type { BookingStatusResponse } from '~/types/bookingStatus';
+import type { BookingStatusResponse, NextBookingStatus } from '~/types/bookingStatus';
 
 // Type declaration for Vite environment variables
 interface ViteImportMetaEnv {
@@ -25,7 +25,7 @@ export const getNextBookingStatusService = async (
   currentStatusCode: string,
   token?: string,
   language = 'es'
-): Promise<{ success: boolean; data: import('~/types/bookingStatus').BookingStatus | null }> => {
+): Promise<{ success: boolean; data: NextBookingStatus | null }> => {
   if (BASE_URL === '' || BASE_URL === undefined) {
     return { success: false, data: null };
   }
@@ -35,7 +35,7 @@ export const getNextBookingStatusService = async (
     const service = createServiceREST(BASE_URL, endpoint, `Bearer ${token ?? ''}`);
     const result = (await service.get({
       headers: { 'X-Language': language },
-    })) as { success?: boolean; data?: import('~/types/bookingStatus').BookingStatus | null };
+    })) as { success?: boolean; data?: NextBookingStatus | null };
 
     if (result.success === true) {
       return { success: true, data: result.data ?? null };
