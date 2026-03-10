@@ -182,6 +182,10 @@ export function CreateBookingModal({
     if (errors[errorKey] !== undefined) {
       setErrors((prev) => ({ ...prev, [errorKey]: undefined }));
     }
+    // Clear group-level minor-without-adult error when any age changes
+    if (field === 'clientAge' && errors['clients.minorWithoutAdult'] !== undefined) {
+      setErrors((prev) => ({ ...prev, 'clients.minorWithoutAdult': undefined }));
+    }
   };
 
   // Mark one client as primary (radio-button behaviour)
@@ -221,6 +225,12 @@ export function CreateBookingModal({
   // Handle nationality change per client
   const handleNationalityChange = (index: number, countryCode: string): void => {
     setClientNationalities((prev) => ({ ...prev, [index]: countryCode }));
+
+    // Clear nationality error for this client
+    const nationalityErrorKey = `clients.${index}.nationality`;
+    if (errors[nationalityErrorKey] !== undefined) {
+      setErrors((prev) => ({ ...prev, [nationalityErrorKey]: undefined }));
+    }
 
     // Reset identificationTypeId for this client when nationality changes
     handleClientChange(index, 'identificationTypeId', '');
@@ -319,10 +329,6 @@ export function CreateBookingModal({
         } else if (client.clientAge > 120) {
           newErrors[`clients.${index}.clientAge`] =
             t('bookings.clientAgeMax') ?? 'La edad no puede ser mayor a 120 años';
-        } else if (client.clientAge < 18) {
-          newErrors[`clients.${index}.clientAge`] =
-            t('bookings.clientAgeUnder18') ??
-            'Los menores de 18 años deben ser acompañados por un adulto';
         }
 
         // Nationality validation
@@ -357,6 +363,19 @@ export function CreateBookingModal({
             t('bookings.clientIdMaxLength') ?? 'El ID no puede exceder 50 caracteres';
         }
       });
+
+      // Group-level: if any client is a minor, at least one adult (18+) must be present
+      const hasMinor = formData.clients.some(
+        (c) => c.clientAge !== undefined && c.clientAge !== null && c.clientAge < 18
+      );
+      const hasAdult = formData.clients.some(
+        (c) => c.clientAge !== undefined && c.clientAge !== null && c.clientAge >= 18
+      );
+      if (hasMinor && !hasAdult) {
+        newErrors['clients.minorWithoutAdult'] =
+          t('bookings.clientAgeUnder18') ??
+          'Los menores de 18 años deben ser acompañados por un adulto';
+      }
     }
 
     // Validate special requests (if checkbox is checked)
@@ -1096,6 +1115,23 @@ export function CreateBookingModal({
                   >
                     <span>⚠</span>
                     {errors.primaryClient}
+                  </div>
+                )}
+                {errors['clients.minorWithoutAdult'] !== undefined && (
+                  <div
+                    style={{
+                      padding: 'var(--space-2) var(--space-3)',
+                      backgroundColor: '#fef2f2',
+                      color: '#dc2626',
+                      fontSize: 'var(--text-sm)',
+                      fontWeight: 500,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span>⚠</span>
+                    {errors['clients.minorWithoutAdult']}
                   </div>
                 )}
               </div>
