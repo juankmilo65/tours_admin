@@ -391,25 +391,16 @@ export default function Bookings(): JSX.Element {
             ? `${record.firstName1} ${record.lastName1 ?? ''}`
             : bookingsT.notSpecified);
         const email = user?.email;
+        const clients = record.clients;
+        const count = clients?.length ?? record.numberOfPeople ?? 0;
+        const hasClients = clients !== undefined && clients.length > 0;
         return (
           <div>
             <div className="text-sm font-semibold text-gray-900 whitespace-nowrap">{fullName}</div>
             {email !== undefined && <div className="text-xs text-gray-500">{email}</div>}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'clients',
-      label: bookingsT.numberOfPeople,
-      render: (value: unknown, record: Booking) => {
-        const clients = value as Booking['clients'];
-        const count = clients?.length ?? record.numberOfPeople ?? 0;
-        const hasClients = clients !== undefined && clients.length > 0;
-        return (
-          <div className="text-center">
             <button
               type="button"
+              title={count > 0 ? bookingsT.viewCompanions : undefined}
               onClick={() => {
                 if (hasClients) {
                   setClientsModal({
@@ -419,24 +410,36 @@ export default function Bookings(): JSX.Element {
                   });
                 }
               }}
-              title={hasClients ? bookingsT.clients : undefined}
               style={{
+                marginTop: 4,
                 display: 'inline-flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: hasClients ? '#dbeafe' : '#f3f4f6',
-                color: hasClients ? '#1d4ed8' : '#6b7280',
-                fontSize: '0.875rem',
-                fontWeight: 600,
+                gap: 4,
+                background: 'none',
                 border: 'none',
+                padding: 0,
                 cursor: hasClients ? 'pointer' : 'default',
-                transition: 'background 0.15s',
+                color: hasClients ? '#1d4ed8' : '#6b7280',
+                fontSize: '0.7rem',
+                fontWeight: 500,
               }}
             >
-              {count}
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: hasClients ? '#dbeafe' : '#f3f4f6',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                }}
+              >
+                {count}
+              </span>
+              {bookingsT.companions}
             </button>
           </div>
         );

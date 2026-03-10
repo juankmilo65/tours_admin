@@ -83,6 +83,7 @@ export interface BookingClient {
   countryCode?: string;
   identificationTypeId?: string;
   clientId?: string;
+  isPrimary?: boolean;
 }
 
 export interface Country {
@@ -190,6 +191,7 @@ export interface Client {
   countryCode?: string;
   identificationTypeId?: string;
   clientId?: string;
+  isPrimary?: boolean;
 }
 
 export interface UpdateBookingDto {

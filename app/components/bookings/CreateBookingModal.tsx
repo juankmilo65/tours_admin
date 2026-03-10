@@ -9,7 +9,7 @@ import type { JSX } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 import { createBookingBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
-import { selectAuthToken } from '~/store/slices/authSlice';
+import { selectAuthToken, selectAuth } from '~/store/slices/authSlice';
 import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { getToursDropdownBusiness } from '~/server/businessLogic/toursBusinessLogic';
 import { getIdentificationTypesDropdownBusiness } from '~/server/businessLogic/identificationTypesBusinessLogic';
@@ -51,7 +51,10 @@ export function CreateBookingModal({
   const { t, language } = useTranslation();
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
+  const currentUser = useAppSelector(selectAuth).user;
   const { showError } = useErrorModal();
+
+  const [isBookingForMe, setIsBookingForMe] = useState(false);
 
   const [tours, setTours] = useState<TourOption[]>([]);
   const [countries, setCountries] = useState<CountryDropdown[]>([]);
@@ -181,6 +184,21 @@ export function CreateBookingModal({
     }
   };
 
+  // Mark one client as primary (radio-button behaviour)
+  const handleSetPrimary = (index: number): void => {
+    setFormData((prev) => ({
+      ...prev,
+      clients: prev.clients.map((c, i) => ({ ...c, isPrimary: i === index })),
+    }));
+    // If the user manually sets a different client as primary, un-tick the "for me" checkbox
+    if (index !== 0) {
+      setIsBookingForMe(false);
+    }
+    if (errors.primaryClient !== undefined) {
+      setErrors((prev) => ({ ...prev, primaryClient: undefined }));
+    }
+  };
+
   // Add a new client
   const handleAddClient = (): void => {
     const newClient: Client = {
@@ -239,6 +257,12 @@ export function CreateBookingModal({
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<string, string>> = {};
 
+    // Validate primary client
+    if (!formData.clients.some((c) => c.isPrimary === true)) {
+      newErrors.primaryClient =
+        t('bookings.noPrimaryClient') ?? 'Debes marcar un cliente como principal';
+    }
+
     if (!formData.tourId) {
       newErrors.tourId = t('bookings.tours.tourRequired') ?? 'Tour is required';
     }
@@ -251,29 +275,106 @@ export function CreateBookingModal({
       newErrors.endDate = t('validation.required') ?? 'Required';
     }
 
+    // Validate dates: end date must be after start date
+    if (formData.startDate && formData.endDate) {
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      if (end <= start) {
+        newErrors.endDate =
+          t('bookings.endDateAfterStartDate') ??
+          'La fecha de fin debe ser posterior a la fecha de inicio';
+      }
+    }
+
+    // Validate currency
+    if (!formData.currency || formData.currency.trim() === '') {
+      newErrors.currency = t('validation.required') ?? 'Required';
+    }
+
     // Validate clients
     if (formData.clients.length === 0) {
       newErrors.clients = t('bookings.clientsRequired') ?? 'At least one client is required';
     } else {
       formData.clients.forEach((client, index) => {
+        // Client Name validation
         if (!client.clientName || client.clientName.trim() === '') {
           newErrors[`clients.${index}.clientName`] = t('validation.required') ?? 'Required';
+        } else if (client.clientName.trim().length < 3) {
+          newErrors[`clients.${index}.clientName`] =
+            t('bookings.clientNameMinLength') ?? 'El nombre debe tener al menos 3 caracteres';
+        } else if (client.clientName.trim().length > 100) {
+          newErrors[`clients.${index}.clientName`] =
+            t('bookings.clientNameMaxLength') ?? 'El nombre no puede exceder 100 caracteres';
         }
-        if (!client.clientAge || client.clientAge < 0) {
+
+        // Client Age validation
+        if (client.clientAge === undefined || client.clientAge === null) {
           newErrors[`clients.${index}.clientAge`] = t('validation.required') ?? 'Required';
+        } else if (!Number.isInteger(client.clientAge)) {
+          newErrors[`clients.${index}.clientAge`] =
+            t('bookings.clientAgeInteger') ?? 'La edad debe ser un número entero';
+        } else if (client.clientAge < 0) {
+          newErrors[`clients.${index}.clientAge`] =
+            t('bookings.clientAgeMin') ?? 'La edad no puede ser negativa';
+        } else if (client.clientAge > 120) {
+          newErrors[`clients.${index}.clientAge`] =
+            t('bookings.clientAgeMax') ?? 'La edad no puede ser mayor a 120 años';
+        } else if (client.clientAge < 18) {
+          newErrors[`clients.${index}.clientAge`] =
+            t('bookings.clientAgeUnder18') ??
+            'Los menores de 18 años deben ser acompañados por un adulto';
         }
+
+        // Nationality validation
         if ((clientNationalities[index] ?? '') === '') {
           newErrors[`clients.${index}.nationality`] =
             t('bookings.selectNationality') ?? 'Select nationality';
         }
-        if ((client.identificationTypeId ?? '').trim() === '') {
+
+        // ID Type validation (only if nationality is selected)
+        if (
+          (clientNationalities[index] ?? '') !== '' &&
+          (client.identificationTypeId ?? '').trim() === ''
+        ) {
           newErrors[`clients.${index}.identificationTypeId`] =
             t('bookings.selectIdType') ?? 'Select ID type';
         }
-        if ((client.clientId ?? '').trim() === '') {
+
+        // Client ID validation (only if ID type is selected)
+        if (
+          (client.identificationTypeId ?? '').trim() !== '' &&
+          (client.clientId ?? '').trim() === ''
+        ) {
           newErrors[`clients.${index}.clientId`] = t('bookings.enterClientId') ?? 'Enter client ID';
+        } else if (
+          (client.clientId ?? '').trim() !== '' &&
+          (client.clientId ?? '').trim().length < 3
+        ) {
+          newErrors[`clients.${index}.clientId`] =
+            t('bookings.clientIdMinLength') ?? 'El ID debe tener al menos 3 caracteres';
+        } else if ((client.clientId ?? '').trim().length > 50) {
+          newErrors[`clients.${index}.clientId`] =
+            t('bookings.clientIdMaxLength') ?? 'El ID no puede exceder 50 caracteres';
         }
       });
+    }
+
+    // Validate special requests (if checkbox is checked)
+    if (hasSpecialRequests) {
+      const specialRequests = formData.specialRequests ?? '';
+      if (specialRequests.trim() === '') {
+        newErrors.specialRequests =
+          t('bookings.specialRequestsRequired') ??
+          'Por favor ingresa tus solicitudes especiales o desmarca la casilla';
+      } else if (specialRequests.trim().length < 10) {
+        newErrors.specialRequests =
+          t('bookings.specialRequestsMinLength') ??
+          'Las solicitudes especiales deben tener al menos 10 caracteres';
+      } else if (specialRequests.trim().length > 500) {
+        newErrors.specialRequests =
+          t('bookings.specialRequestsMaxLength') ??
+          'Las solicitudes especiales no pueden exceder 500 caracteres';
+      }
     }
 
     setErrors(newErrors);
@@ -572,10 +673,100 @@ export function CreateBookingModal({
                 value={formData.currency}
                 onChange={(value: string) => {
                   setFormData((prev) => ({ ...prev, currency: value }));
+                  if (errors.currency !== undefined) {
+                    setErrors((prev) => ({ ...prev, currency: undefined }));
+                  }
                 }}
                 placeholder={t('bookings.selectCurrency') ?? 'Select currency'}
                 id="select-currency"
               />
+              {errors.currency !== undefined && (
+                <span
+                  style={{
+                    color: 'red',
+                    fontSize: 'var(--text-xs)',
+                    marginTop: 'var(--space-1)',
+                    display: 'block',
+                  }}
+                >
+                  {errors.currency}
+                </span>
+              )}
+            </div>
+
+            {/* Is this booking for me? */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-3)',
+                padding: 'var(--space-3) var(--space-4)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: isBookingForMe
+                  ? 'var(--color-primary-50, #eff6ff)'
+                  : 'var(--color-neutral-50)',
+                border: `1px solid ${isBookingForMe ? 'var(--color-primary-200, #bfdbfe)' : 'var(--color-neutral-200)'}`,
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+              onClick={() => {
+                const next = !isBookingForMe;
+                setIsBookingForMe(next);
+                if (next && currentUser !== null) {
+                  const fullName = `${currentUser.firstName} ${currentUser.lastName}`.trim();
+                  setFormData((prev) => ({
+                    ...prev,
+                    clients: prev.clients.map((c, i) =>
+                      i === 0
+                        ? { ...c, clientName: fullName, isPrimary: true }
+                        : { ...c, isPrimary: false }
+                    ),
+                  }));
+                } else {
+                  setFormData((prev) => ({
+                    ...prev,
+                    clients: prev.clients.map((c, i) =>
+                      i === 0 ? { ...c, clientName: '', isPrimary: false } : c
+                    ),
+                  }));
+                }
+                if (errors.primaryClient !== undefined) {
+                  setErrors((prev) => ({ ...prev, primaryClient: undefined }));
+                }
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={isBookingForMe}
+                onChange={() => undefined}
+                style={{
+                  width: 18,
+                  height: 18,
+                  cursor: 'pointer',
+                  accentColor: 'var(--color-primary-500)',
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-800)',
+                }}
+              >
+                {t('bookings.bookingForMe') ?? '¿Esta reserva es para ti?'}
+              </span>
+              {isBookingForMe && currentUser !== null && (
+                <span
+                  style={{
+                    marginLeft: 'auto',
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--color-primary-600, #2563eb)',
+                    fontWeight: 500,
+                  }}
+                >
+                  {`${currentUser.firstName} ${currentUser.lastName}`.trim()}
+                </span>
+              )}
             </div>
 
             {/* Clients */}
@@ -653,7 +844,7 @@ export function CreateBookingModal({
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '40px 1fr 100px 180px 150px 150px 40px',
+                      gridTemplateColumns: '40px 1fr 100px 180px 150px 150px 56px 40px',
                       gap: 'var(--space-3)',
                       fontSize: 'var(--text-sm)',
                       fontWeight: 'var(--font-weight-semibold)',
@@ -666,6 +857,9 @@ export function CreateBookingModal({
                     <div>{t('bookings.nationality') ?? 'Nationality'}</div>
                     <div>{t('bookings.idType') ?? 'ID Type'}</div>
                     <div>{t('bookings.clientId') ?? 'Client ID'}</div>
+                    <div style={{ textAlign: 'center' }}>
+                      {t('bookings.isPrimary') ?? 'Principal'}
+                    </div>
                     <div />
                   </div>
                 </div>
@@ -675,7 +869,7 @@ export function CreateBookingModal({
                     key={`client-${index}`}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '40px 1fr 100px 180px 150px 150px 40px',
+                      gridTemplateColumns: '40px 1fr 100px 180px 150px 150px 56px 40px',
                       gap: 'var(--space-3)',
                       padding: 'var(--space-3)',
                       alignItems: 'center',
@@ -708,6 +902,7 @@ export function CreateBookingModal({
                         placeholder={t('bookings.clientNamePlaceholder') ?? 'Enter name'}
                         error={errors[`clients.${index}.clientName`]}
                         required
+                        disabled={index === 0 && isBookingForMe}
                       />
                     </div>
                     {/* Client Age */}
@@ -724,49 +919,102 @@ export function CreateBookingModal({
                       />
                     </div>
                     {/* Nationality */}
-                    <Select
-                      options={[
-                        {
-                          value: '',
-                          label: t('bookings.selectNationality') ?? 'Select nationality',
-                        },
-                        ...countries.map((country) => ({
-                          value: country.code,
-                          label:
-                            language === 'en'
-                              ? (country.nationality_en ?? country.name_en)
-                              : (country.nationality_es ?? country.name_es),
-                        })),
-                      ]}
-                      value={clientNationalities[index] ?? ''}
-                      onChange={(value: string) => handleNationalityChange(index, value)}
-                      placeholder={t('bookings.selectNationality') ?? 'Select nationality'}
-                      id={`nationality-${index}`}
-                    />
+                    <div>
+                      <Select
+                        options={[
+                          {
+                            value: '',
+                            label: t('bookings.selectNationality') ?? 'Select nationality',
+                          },
+                          ...countries.map((country) => ({
+                            value: country.code,
+                            label:
+                              language === 'en'
+                                ? (country.nationality_en ?? country.name_en)
+                                : (country.nationality_es ?? country.name_es),
+                          })),
+                        ]}
+                        value={clientNationalities[index] ?? ''}
+                        onChange={(value: string) => handleNationalityChange(index, value)}
+                        placeholder={t('bookings.selectNationality') ?? 'Select nationality'}
+                        id={`nationality-${index}`}
+                      />
+                      {errors[`clients.${index}.nationality`] !== undefined && (
+                        <span
+                          style={{
+                            color: 'red',
+                            fontSize: 'var(--text-xs)',
+                            marginTop: 'var(--space-1)',
+                            display: 'block',
+                          }}
+                        >
+                          {errors[`clients.${index}.nationality`]}
+                        </span>
+                      )}
+                    </div>
                     {/* ID Type - disabled until nationality is selected */}
-                    <Select
-                      options={[
-                        { value: '', label: t('bookings.selectIdType') ?? 'Select ID Type' },
-                        ...identificationTypes.map((idType) => ({
-                          value: idType.id,
-                          label: language === 'en' ? idType.name_en : idType.name_es,
-                        })),
-                      ]}
-                      value={client.identificationTypeId ?? ''}
-                      onChange={(value: string) =>
-                        handleClientChange(index, 'identificationTypeId', value)
-                      }
-                      placeholder={t('bookings.selectIdType') ?? 'Select ID Type'}
-                      id={`id-type-${index}`}
-                      disabled={(clientNationalities[index] ?? '') === ''}
-                    />
+                    <div>
+                      <Select
+                        options={[
+                          { value: '', label: t('bookings.selectIdType') ?? 'Select ID Type' },
+                          ...identificationTypes.map((idType) => ({
+                            value: idType.id,
+                            label: language === 'en' ? idType.name_en : idType.name_es,
+                          })),
+                        ]}
+                        value={client.identificationTypeId ?? ''}
+                        onChange={(value: string) =>
+                          handleClientChange(index, 'identificationTypeId', value)
+                        }
+                        placeholder={t('bookings.selectIdType') ?? 'Select ID Type'}
+                        id={`id-type-${index}`}
+                        disabled={(clientNationalities[index] ?? '') === ''}
+                      />
+                      {errors[`clients.${index}.identificationTypeId`] !== undefined && (
+                        <span
+                          style={{
+                            color: 'red',
+                            fontSize: 'var(--text-xs)',
+                            marginTop: 'var(--space-1)',
+                            display: 'block',
+                          }}
+                        >
+                          {errors[`clients.${index}.identificationTypeId`]}
+                        </span>
+                      )}
+                    </div>
                     {/* Client ID */}
-                    <Input
-                      type="text"
-                      value={client.clientId ?? ''}
-                      onChange={(e) => handleClientChange(index, 'clientId', e.target.value)}
-                      placeholder={t('bookings.enterClientId') ?? 'Enter ID'}
-                    />
+                    <div>
+                      <Input
+                        type="text"
+                        value={client.clientId ?? ''}
+                        onChange={(e) => handleClientChange(index, 'clientId', e.target.value)}
+                        placeholder={t('bookings.enterClientId') ?? 'Enter ID'}
+                        error={errors[`clients.${index}.clientId`]}
+                      />
+                    </div>
+                    {/* isPrimary radio */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="primaryClient"
+                        checked={client.isPrimary === true}
+                        onChange={() => handleSetPrimary(index)}
+                        title={t('bookings.setPrimary') ?? 'Marcar como principal'}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          cursor: 'pointer',
+                          accentColor: 'var(--color-primary-500)',
+                        }}
+                      />
+                    </div>
                     {/* Remove Button */}
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                       <button
@@ -799,7 +1047,7 @@ export function CreateBookingModal({
                         }}
                         onMouseOut={(e) => {
                           if (formData.clients.length > 1) {
-                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
                           }
                         }}
                         title={t('common.remove') ?? 'Remove'}
@@ -833,6 +1081,23 @@ export function CreateBookingModal({
                     {errors.clients}
                   </div>
                 )}
+                {errors.primaryClient !== undefined && (
+                  <div
+                    style={{
+                      padding: 'var(--space-2) var(--space-3)',
+                      backgroundColor: '#fef2f2',
+                      color: '#dc2626',
+                      fontSize: 'var(--text-sm)',
+                      fontWeight: 500,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span>⚠</span>
+                    {errors.primaryClient}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -864,29 +1129,46 @@ export function CreateBookingModal({
                 {t('bookings.hasSpecialRequests') ?? 'Add special requests'}
               </label>
               {hasSpecialRequests && (
-                <textarea
-                  value={formData.specialRequests ?? ''}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, specialRequests: e.target.value }))
-                  }
-                  placeholder={
-                    t('bookings.specialRequestsPlaceholder') ??
-                    'e.g. dietary restrictions, preferred language...'
-                  }
-                  rows={3}
-                  style={{
-                    marginTop: 'var(--space-2)',
-                    width: '100%',
-                    padding: 'var(--space-2) var(--space-3)',
-                    border: '1px solid var(--color-neutral-300)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: 'var(--text-sm)',
-                    color: 'var(--color-neutral-900)',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                    boxSizing: 'border-box',
-                  }}
-                />
+                <>
+                  <textarea
+                    value={formData.specialRequests ?? ''}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, specialRequests: e.target.value }))
+                    }
+                    placeholder={
+                      t('bookings.specialRequestsPlaceholder') ??
+                      'e.g. dietary restrictions, preferred language...'
+                    }
+                    rows={3}
+                    style={{
+                      marginTop: 'var(--space-2)',
+                      width: '100%',
+                      padding: 'var(--space-2) var(--space-3)',
+                      border:
+                        errors.specialRequests !== undefined
+                          ? '1px solid #ef4444'
+                          : '1px solid var(--color-neutral-300)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--color-neutral-900)',
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {errors.specialRequests !== undefined && (
+                    <span
+                      style={{
+                        color: 'red',
+                        fontSize: 'var(--text-xs)',
+                        marginTop: 'var(--space-1)',
+                        display: 'block',
+                      }}
+                    >
+                      {errors.specialRequests}
+                    </span>
+                  )}
+                </>
               )}
             </div>
 
