@@ -376,6 +376,11 @@ export function TourEditForm({
       newErrors.basePrice = 'Base price is required';
     }
 
+    // Validate that at least 2 activities are assigned
+    if (selectedActivities.length < 2) {
+      newErrors.activities = 'Se requieren al menos 2 actividades (Minimum 2 activities required)';
+    }
+
     // Validate images (minimum 2)
     const totalImages = (tourData.images?.length ?? 0) + newImages.length;
     if (totalImages < 2) {
@@ -1187,6 +1192,28 @@ export function TourEditForm({
           </div>
         </div>
       </div>
+
+      {/* Activities validation feedback */}
+      {errors.activities !== undefined && errors.activities !== '' && (
+        <div
+          style={{
+            marginBottom: 'var(--space-6)',
+            padding: 'var(--space-3) var(--space-4)',
+            backgroundColor: 'var(--color-error-50, #fef2f2)',
+            border: '1px solid var(--color-error-200, #fecaca)',
+            borderRadius: 'var(--radius-md)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            color: 'var(--color-error-700, #b91c1c)',
+            fontSize: 'var(--text-sm)',
+            fontWeight: 500,
+          }}
+        >
+          <span>⚠</span>
+          {errors.activities}
+        </div>
+      )}
 
       {/* Actions */}
       <div

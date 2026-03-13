@@ -14,11 +14,13 @@ import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { selectAuthToken } from '~/store/slices/authSlice';
 import { updateBookingBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
-import { getCountriesDropdownBusiness } from '~/server/businessLogic/countriesBusinessLogic';
-import { getIdentificationTypesDropdownBusiness } from '~/server/businessLogic/identificationTypesBusinessLogic';
+import { getTourHourRangeBusiness } from '~/server/businessLogic/toursBusinessLogic';
+import {
+  useDropdownCache,
+  useCachedNationalities,
+  useAllCachedIdentificationTypes,
+} from '~/hooks/useDropdownCache';
 import type { Booking, BookingClient } from '~/types/booking';
-import type { CountryDropdown } from '~/types/country';
-import type { IdentificationTypeDropdown } from '~/types/identificationType';
 
 interface EditBookingModalProps {
   isOpen: boolean;
@@ -34,13 +36,13 @@ interface EditFormData {
   clients: BookingClient[];
 }
 
-// Convert ISO to datetime-local value (strip seconds+ms, keep local offset)
-function toDatetimeLocal(iso: string): string {
+// Convert ISO to date-only value (YYYY-MM-DD in local time)
+function toDateLocal(iso: string): string {
   if (!iso) return '';
   try {
     const d = new Date(iso);
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   } catch {
     return '';
   }
@@ -66,10 +68,15 @@ export function EditBookingModal({
   const [hasSpecialRequests, setHasSpecialRequests] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
+  const [hourRange, setHourRange] = useState<string | null>(null);
+  const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
 
-  const [countries, setCountries] = useState<CountryDropdown[]>([]);
-  const [identificationTypes, setIdentificationTypes] = useState<IdentificationTypeDropdown[]>([]);
   const [clientNationalities, setClientNationalities] = useState<Record<number, string>>({});
+
+  // Cache-first dropdown loaders
+  const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
+  const countries = useCachedNationalities(language);
+  const allIdTypesByCountry = useAllCachedIdentificationTypes();
 
   // Populate form when booking changes
   useEffect(() => {
@@ -81,8 +88,8 @@ export function EditBookingModal({
     }
 
     setFormData({
-      startDate: toDatetimeLocal(booking.startDate),
-      endDate: toDatetimeLocal(booking.endDate),
+      startDate: toDateLocal(booking.startDate),
+      endDate: toDateLocal(booking.endDate),
       specialRequests: booking.specialRequests ?? '',
       clients,
     });
@@ -90,31 +97,41 @@ export function EditBookingModal({
     setErrors({});
   }, [booking]);
 
-  // Fetch countries
+  // On modal open: load nationality dropdown + init per-client nationalities + preload ID types
   useEffect(() => {
     if (!isOpen) return;
-    void getCountriesDropdownBusiness(language).then((res) => {
-      const r = res as { success?: boolean; data?: CountryDropdown[] };
-      if (r.success === true && r.data !== undefined) setCountries(r.data);
-    });
-  }, [isOpen, language]);
 
-  const fetchIdTypes = async (countryCode: string): Promise<void> => {
-    if (!countryCode) {
-      setIdentificationTypes([]);
-      return;
+    void loadNationalities(language);
+
+    if (booking?.clients) {
+      // Initialise clientNationalities from the existing booking data
+      const initNat: Record<number, string> = {};
+      booking.clients.forEach((c, i) => {
+        if (c.countryCode !== undefined && c.countryCode !== '') initNat[i] = c.countryCode;
+      });
+      setClientNationalities(initNat);
+
+      // Preload identification types for every unique country in the booking
+      const uniqueCodes = [...new Set(booking.clients.map((c) => c.countryCode).filter(Boolean))];
+      uniqueCodes.forEach((code) => {
+        if (code !== undefined && code !== '') void loadIdentificationTypes(code, language);
+      });
     }
-    dispatch(setGlobalLoading({ isLoading: true }));
-    try {
-      const res = (await getIdentificationTypesDropdownBusiness(countryCode, true, language)) as {
-        success?: boolean;
-        data?: IdentificationTypeDropdown[];
-      };
-      setIdentificationTypes(res.success === true ? (res.data ?? []) : []);
-    } finally {
-      dispatch(setGlobalLoading({ isLoading: false }));
+
+    // Fetch hour range for the tour
+    if (booking?.tourId !== undefined && booking.tourId !== '' && token !== null && token !== '') {
+      setIsLoadingHourRange(true);
+      void getTourHourRangeBusiness(booking.tourId, token, language)
+        .then((result) => {
+          setHourRange(result.success ? (result.data?.hourRange ?? null) : null);
+        })
+        .catch(() => setHourRange(null))
+        .finally(() => setIsLoadingHourRange(false));
+    } else {
+      setHourRange(null);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, booking]);
 
   const handleClientChange = (
     index: number,
@@ -136,8 +153,9 @@ export function EditBookingModal({
   const handleNationalityChange = (index: number, code: string): void => {
     setClientNationalities((p) => ({ ...p, [index]: code }));
     handleClientChange(index, 'identificationTypeId' as keyof BookingClient, '');
-    setIdentificationTypes([]);
-    void fetchIdTypes(code);
+    if (code) void loadIdentificationTypes(code, language);
+    // Clear nationality error
+    setErrors((p) => ({ ...p, [`clients.${index}.nationality`]: undefined }));
   };
 
   const handleAddClient = (): void => {
@@ -172,6 +190,17 @@ export function EditBookingModal({
       if (!c.clientAge || c.clientAge < 0) {
         errs[`clients.${i}.clientAge`] = t('validation.required') ?? 'Required';
       }
+      if ((clientNationalities[i] ?? c.countryCode ?? '') === '') {
+        errs[`clients.${i}.nationality`] =
+          bookingsT.selectNationality ?? 'Seleccionar nacionalidad';
+      }
+      if (
+        (clientNationalities[i] ?? c.countryCode ?? '') !== '' &&
+        (c.identificationTypeId ?? '').trim() === ''
+      ) {
+        errs[`clients.${i}.identificationTypeId`] =
+          bookingsT.selectIdType ?? 'Seleccionar tipo de ID';
+      }
     });
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -185,14 +214,23 @@ export function EditBookingModal({
     dispatch(setGlobalLoading({ isLoading: true, message: t('common.saving') ?? 'Guardando...' }));
 
     try {
+      const buildDateTime = (date: string, time: string): string => {
+        if (!date) return '';
+        const d = new Date(`${date}T${time}:00`);
+        return isNaN(d.getTime()) ? `${date}T${time}:00` : d.toISOString();
+      };
+
+      const [rangeStart, rangeEnd] =
+        hourRange !== null ? hourRange.split(' - ') : ['00:00', '00:00'];
+
       const clientsWithCountry: BookingClient[] = formData.clients.map((c, i) => ({
         ...c,
         countryCode: clientNationalities[i] ?? c.countryCode ?? '',
       }));
 
       const payload: Partial<Booking> = {
-        startDate: new Date(formData.startDate).toISOString(),
-        endDate: new Date(formData.endDate).toISOString(),
+        startDate: buildDateTime(formData.startDate, rangeStart ?? '00:00'),
+        endDate: buildDateTime(formData.endDate, rangeEnd ?? '00:00'),
         specialRequests: hasSpecialRequests ? formData.specialRequests : '',
         clients: clientsWithCountry,
       };
@@ -317,6 +355,48 @@ export function EditBookingModal({
             <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
               {bookingsT.confirmationCode}: {booking.confirmationCode}
             </p>
+            {(() => {
+              const statusColorMap: Record<string, { background: string; color: string }> = {
+                requested: { background: '#dbeafe', color: '#1d4ed8' },
+                confirmed: { background: '#e0e7ff', color: '#4338ca' },
+                pending_payment: { background: '#fef9c3', color: '#a16207' },
+                partially_paid: { background: '#ffedd5', color: '#c2410c' },
+                paid: { background: '#dcfce7', color: '#15803d' },
+                partial: { background: '#ffedd5', color: '#c2410c' },
+                pending: { background: '#fef9c3', color: '#a16207' },
+                cancelled: { background: '#fee2e2', color: '#b91c1c' },
+                urgent: { background: '#fee2e2', color: '#b91c1c' },
+              };
+              const statusLabelMap: Record<string, string> = {
+                requested: bookingsT.requested,
+                confirmed: bookingsT.confirmed,
+                pending_payment: bookingsT.pendingPayment,
+                partially_paid: bookingsT.partiallyPaid,
+                paid: bookingsT.paid,
+                partial: bookingsT.partial,
+                pending: bookingsT.pending,
+                cancelled: bookingsT.cancelled,
+                urgent: bookingsT.urgent,
+              };
+              const s = booking.status ?? '';
+              const colors = statusColorMap[s] ?? { background: '#f3f4f6', color: '#374151' };
+              return (
+                <span
+                  style={{
+                    display: 'inline-block',
+                    marginTop: 6,
+                    padding: '2px 10px',
+                    borderRadius: 9999,
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    background: colors.background,
+                    color: colors.color,
+                  }}
+                >
+                  {statusLabelMap[s] ?? s}
+                </span>
+              );
+            })()}
           </div>
           <button
             type="button"
@@ -346,25 +426,10 @@ export function EditBookingModal({
           }}
         >
           {/* Read-only info row */}
-          <div style={sectionStyle}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <div>
               <span style={labelStyle}>{bookingsT.tour}</span>
               <div style={readonlyStyle}>{booking.tourTitle ?? booking.tour?.title ?? '—'}</div>
-            </div>
-            <div>
-              <span style={labelStyle}>{bookingsT.customer}</span>
-              <div style={readonlyStyle}>
-                {(booking.user?.fullName ??
-                  `${booking.user?.firstName ?? ''} ${booking.user?.lastName ?? ''}`.trim()) ||
-                  '—'}
-              </div>
-            </div>
-          </div>
-
-          <div style={sectionStyle}>
-            <div>
-              <span style={labelStyle}>{bookingsT.status}</span>
-              <div style={readonlyStyle}>{booking.status}</div>
             </div>
             <div>
               <span style={labelStyle}>{bookingsT.currency}</span>
@@ -373,42 +438,136 @@ export function EditBookingModal({
           </div>
 
           {/* Editable: Dates */}
-          <div style={sectionStyle}>
-            <div>
-              <label style={labelStyle}>
-                {bookingsT.startDate} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <Input
-                type="datetime-local"
-                name="startDate"
-                value={formData.startDate}
-                onChange={(e) => {
-                  setFormData((p) => ({ ...p, startDate: e.target.value }));
-                  if (errors.startDate !== undefined) {
-                    setErrors((p) => ({ ...p, startDate: undefined }));
-                  }
-                }}
-                required
-                error={errors.startDate}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>
-                {bookingsT.endDate} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <Input
-                type="datetime-local"
-                name="endDate"
-                value={formData.endDate}
-                onChange={(e) => {
-                  setFormData((p) => ({ ...p, endDate: e.target.value }));
-                  if (errors.endDate !== undefined) {
-                    setErrors((p) => ({ ...p, endDate: undefined }));
-                  }
-                }}
-                required
-                error={errors.endDate}
-              />
+          <div>
+            <div style={sectionStyle}>
+              <div>
+                <label style={labelStyle}>
+                  {bookingsT.startDate} <span style={{ color: 'red' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Input
+                    type="date"
+                    name="startDate"
+                    value={formData.startDate}
+                    onChange={(e) => {
+                      setFormData((p) => ({ ...p, startDate: e.target.value }));
+                      if (errors.startDate !== undefined) {
+                        setErrors((p) => ({ ...p, startDate: undefined }));
+                      }
+                    }}
+                    required
+                    error={errors.startDate}
+                  />
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '3px 10px',
+                      borderRadius: 9999,
+                      whiteSpace: 'nowrap',
+                      backgroundColor: isLoadingHourRange
+                        ? '#f3f4f6'
+                        : hourRange !== null
+                          ? '#eff6ff'
+                          : '#f3f4f6',
+                      border: `1px solid ${
+                        isLoadingHourRange ? '#e5e7eb' : hourRange !== null ? '#bfdbfe' : '#e5e7eb'
+                      }`,
+                      fontSize: '0.875rem',
+                      color: isLoadingHourRange
+                        ? '#9ca3af'
+                        : hourRange !== null
+                          ? '#1d4ed8'
+                          : '#9ca3af',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    {isLoadingHourRange
+                      ? language === 'en'
+                        ? 'Loading...'
+                        : 'Cargando...'
+                      : (hourRange?.split(' - ')[0] ??
+                        (language === 'en' ? 'No schedule' : 'Sin horario'))}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>
+                  {bookingsT.endDate} <span style={{ color: 'red' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Input
+                    type="date"
+                    name="endDate"
+                    value={formData.endDate}
+                    onChange={(e) => {
+                      setFormData((p) => ({ ...p, endDate: e.target.value }));
+                      if (errors.endDate !== undefined) {
+                        setErrors((p) => ({ ...p, endDate: undefined }));
+                      }
+                    }}
+                    required
+                    error={errors.endDate}
+                  />
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '3px 10px',
+                      borderRadius: 9999,
+                      whiteSpace: 'nowrap',
+                      backgroundColor: isLoadingHourRange
+                        ? '#f3f4f6'
+                        : hourRange !== null
+                          ? '#eff6ff'
+                          : '#f3f4f6',
+                      border: `1px solid ${
+                        isLoadingHourRange ? '#e5e7eb' : hourRange !== null ? '#bfdbfe' : '#e5e7eb'
+                      }`,
+                      fontSize: '0.875rem',
+                      color: isLoadingHourRange
+                        ? '#9ca3af'
+                        : hourRange !== null
+                          ? '#1d4ed8'
+                          : '#9ca3af',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    {isLoadingHourRange
+                      ? language === 'en'
+                        ? 'Loading...'
+                        : 'Cargando...'
+                      : (hourRange?.split(' - ')[1] ??
+                        (language === 'en' ? 'No schedule' : 'Sin horario'))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -425,23 +584,7 @@ export function EditBookingModal({
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#111827' }}>
                 {bookingsT.clients}
               </h3>
-              <button
-                type="button"
-                onClick={handleAddClient}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '6px 14px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: 'var(--color-primary-500)',
-                  color: 'white',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
-              >
+              <button type="button" onClick={handleAddClient} className="modal-btn-add-client">
                 <svg
                   width="14"
                   height="14"
@@ -522,38 +665,68 @@ export function EditBookingModal({
                     error={errors[`clients.${index}.clientAge`]}
                     required
                   />
-                  <Select
-                    options={[
-                      { value: '', label: bookingsT.selectNationality },
-                      ...countries.map((c) => ({
-                        value: c.code,
-                        label:
-                          language === 'en'
-                            ? (c.nationality_en ?? c.name_en)
-                            : (c.nationality_es ?? c.name_es),
-                      })),
-                    ]}
-                    value={clientNationalities[index] ?? client.countryCode ?? ''}
-                    onChange={(v) => handleNationalityChange(index, v)}
-                    placeholder={bookingsT.selectNationality}
-                    id={`edit-nat-${index}`}
-                  />
-                  <Select
-                    options={[
-                      { value: '', label: language === 'en' ? 'Select ID Type' : 'Tipo ID' },
-                      ...identificationTypes.map((it) => ({
-                        value: it.id,
-                        label: language === 'en' ? it.name_en : it.name_es,
-                      })),
-                    ]}
-                    value={client.identificationTypeId ?? ''}
-                    onChange={(v) =>
-                      handleClientChange(index, 'identificationTypeId' as keyof BookingClient, v)
-                    }
-                    placeholder={language === 'en' ? 'Select ID Type' : 'Tipo ID'}
-                    id={`edit-idtype-${index}`}
-                    disabled={(clientNationalities[index] ?? client.countryCode ?? '') === ''}
-                  />
+                  <div>
+                    <Select
+                      options={[
+                        { value: '', label: bookingsT.selectNationality },
+                        ...countries.map((c) => ({
+                          value: c.code,
+                          label:
+                            language === 'en'
+                              ? (c.nationality_en ?? c.name_en)
+                              : (c.nationality_es ?? c.name_es),
+                        })),
+                      ]}
+                      value={clientNationalities[index] ?? client.countryCode ?? ''}
+                      onChange={(v) => handleNationalityChange(index, v)}
+                      placeholder={bookingsT.selectNationality}
+                      id={`edit-nat-${index}`}
+                    />
+                    {errors[`clients.${index}.nationality`] !== undefined && (
+                      <p
+                        style={{
+                          fontSize: 'var(--text-sm)',
+                          color: 'var(--color-error-500)',
+                          marginTop: '0.25rem',
+                        }}
+                      >
+                        {errors[`clients.${index}.nationality`]}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Select
+                      options={[
+                        { value: '', label: language === 'en' ? 'Select ID Type' : 'Tipo ID' },
+                        ...(
+                          allIdTypesByCountry[
+                            clientNationalities[index] ?? client.countryCode ?? ''
+                          ] ?? []
+                        ).map((it) => ({
+                          value: it.id,
+                          label: language === 'en' ? it.name_en : it.name_es,
+                        })),
+                      ]}
+                      value={client.identificationTypeId ?? ''}
+                      onChange={(v) =>
+                        handleClientChange(index, 'identificationTypeId' as keyof BookingClient, v)
+                      }
+                      placeholder={language === 'en' ? 'Select ID Type' : 'Tipo ID'}
+                      id={`edit-idtype-${index}`}
+                      disabled={(clientNationalities[index] ?? client.countryCode ?? '') === ''}
+                    />
+                    {errors[`clients.${index}.identificationTypeId`] !== undefined && (
+                      <p
+                        style={{
+                          fontSize: 'var(--text-sm)',
+                          color: 'var(--color-error-500)',
+                          marginTop: '0.25rem',
+                        }}
+                      >
+                        {errors[`clients.${index}.identificationTypeId`]}
+                      </p>
+                    )}
+                  </div>
                   <Input
                     type="text"
                     value={client.clientId ?? ''}
@@ -652,46 +825,16 @@ export function EditBookingModal({
           </div>
 
           {/* Footer */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: 12,
-              paddingTop: 16,
-              borderTop: '1px solid #e5e7eb',
-            }}
-          >
+          <div className="modal-footer">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              style={{
-                padding: '9px 22px',
-                borderRadius: 8,
-                border: '1px solid #d1d5db',
-                background: 'white',
-                color: '#374151',
-                fontSize: '0.9rem',
-                fontWeight: 500,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              }}
+              className="modal-btn modal-btn-secondary"
             >
               {t('common.cancel')}
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                padding: '9px 22px',
-                borderRadius: 8,
-                border: 'none',
-                background: isSubmitting ? '#9ca3af' : '#2563eb',
-                color: 'white',
-                fontSize: '0.9rem',
-                fontWeight: 500,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              }}
-            >
+            <button type="submit" disabled={isSubmitting} className="modal-btn modal-btn-primary">
               {isSubmitting
                 ? (t('common.saving') ?? 'Guardando...')
                 : language === 'en'

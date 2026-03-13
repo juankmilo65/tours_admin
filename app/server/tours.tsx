@@ -148,6 +148,31 @@ export const getToursDropdown = async (
 };
 
 /**
+ * Get hour range for a tour from its scheduled activities
+ * GET /tours/:tourId/hour-range
+ * Requires authentication (Bearer token)
+ */
+export const getTourHourRange = async (tourId: string, token: string): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    return { success: false, message: 'Backend URL not configured' };
+  }
+
+  if (!tourId) {
+    return { success: false, message: 'Tour ID is required' };
+  }
+
+  try {
+    const endpoint = `tours/${tourId}/hour-range`;
+    const service = createServiceREST(BASE_URL, endpoint, `Bearer ${token}`);
+    const result = await service.get({});
+    return result;
+  } catch (error) {
+    console.error('❌ [GET TOUR HOUR RANGE] Error:', error);
+    return { success: false, error };
+  }
+};
+
+/**
  * Get tours from backend API with filters
  */
 /**
@@ -371,8 +396,6 @@ export const uploadTourImages = async (
   images: File[],
   setCover = false,
   token: string,
-
-  // eslint-disable-next-line no-unused-vars
   onProgress?: (progress: number) => void
 ): Promise<unknown> => {
   console.warn('🎯 [UPLOAD TOUR IMAGES] Starting with params:', {

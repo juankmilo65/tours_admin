@@ -601,9 +601,10 @@ export function CreateTourModal({
       newErrors.maxCapacity = t('tours.maxCapacityRequired') ?? 'Max capacity is required';
     if (formData.basePrice <= 0)
       newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
-    // Validate that at least one activity is provided
-    if (formData.activities.length === 0) {
-      newErrors.activities = t('tours.activitiesRequired') ?? 'Al menos una actividad es requerida';
+    // Validate that at least 2 activities are provided
+    if (formData.activities.length < 2) {
+      newErrors.activities =
+        t('tours.activitiesMinRequired') ?? 'Se requieren al menos 2 actividades';
     }
     // Validate that at least one image is provided (new or existing)
     const totalImages = formData.images.length + formData.existingImageUrls.length;

@@ -23,18 +23,13 @@ import uiReducer from '~/store/slices/uiSlice';
 import authReducer from '~/store/slices/authSlice';
 import cacheReducer from '~/store/slices/cacheSlice';
 import bookingsReducer from '~/store/slices/bookingsSlice';
-/* import toursReducer from '~/store/slices/toursSlice';
-import usersReducer from '~/store/slices/usersSlice';
-import reservationsReducer from '~/store/slices/reservationsSlice';
-import newsReducer from '~/store/slices/newsSlice';
-import offersReducer from '~/store/slices/offersSlice'; */
 
 // Redux Persist configuration
 const persistConfig = {
   key: 'root',
   version: 1,
   storage,
-  whitelist: ['country', 'auth'], // Persist countries and auth state
+  whitelist: ['country', 'auth', 'cache'], // Persist countries, auth and dropdown cache
 };
 
 const rootReducer = combineReducers({

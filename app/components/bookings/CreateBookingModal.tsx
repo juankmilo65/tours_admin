@@ -11,15 +11,18 @@ import { createBookingBusiness } from '~/server/businessLogic/bookingsBusinessLo
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken, selectAuth } from '~/store/slices/authSlice';
 import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
-import { getToursDropdownBusiness } from '~/server/businessLogic/toursBusinessLogic';
-import { getIdentificationTypesDropdownBusiness } from '~/server/businessLogic/identificationTypesBusinessLogic';
-import { getCountriesDropdownBusiness } from '~/server/businessLogic/countriesBusinessLogic';
-import { useErrorModal } from '~/utilities/useErrorModal';
+import {
+  getToursDropdownBusiness,
+  getTourHourRangeBusiness,
+} from '~/server/businessLogic/toursBusinessLogic';
+import {
+  useDropdownCache,
+  useCachedNationalities,
+  useAllCachedIdentificationTypes,
+} from '~/hooks/useDropdownCache';
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
 import type { Client } from '~/types/booking';
-import type { IdentificationTypeDropdown } from '~/types/identificationType';
-import type { CountryDropdown } from '~/types/country';
 
 // The dropdown endpoint returns minimal tour info (same as offers)
 interface TourOption {
@@ -52,14 +55,18 @@ export function CreateBookingModal({
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectAuth).user;
-  const { showError } = useErrorModal();
 
   const [isBookingForMe, setIsBookingForMe] = useState(false);
 
   const [tours, setTours] = useState<TourOption[]>([]);
-  const [countries, setCountries] = useState<CountryDropdown[]>([]);
-  const [identificationTypes, setIdentificationTypes] = useState<IdentificationTypeDropdown[]>([]);
   const [clientNationalities, setClientNationalities] = useState<Record<number, string>>({});
+  const [hourRange, setHourRange] = useState<string | null>(null);
+  const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
+
+  // Cache-first dropdown loaders
+  const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
+  const countries = useCachedNationalities(language);
+  const allIdTypesByCountry = useAllCachedIdentificationTypes();
 
   const [formData, setFormData] = useState<BookingFormData>({
     tourId: '',
@@ -73,53 +80,10 @@ export function CreateBookingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSpecialRequests, setHasSpecialRequests] = useState(false);
 
-  // Fetch countries dropdown on mount
+  // Load nationality dropdown into cache when modal opens or language changes
   useEffect(() => {
-    const fetchCountries = async () => {
-      try {
-        const resultRaw = await getCountriesDropdownBusiness(language);
-        const result = resultRaw as { success?: boolean; data?: CountryDropdown[] };
-        if (result.success === true && result.data !== undefined) {
-          setCountries(result.data);
-        }
-      } catch (error) {
-        console.error('Error fetching countries:', error);
-      }
-    };
-
-    void fetchCountries();
-  }, [language]);
-
-  // Fetch identification types by country code (dynamic, replaces hardcoded 'CO')
-  const fetchIdentificationTypesByCountry = async (countryCode: string): Promise<void> => {
-    dispatch(setGlobalLoading({ isLoading: true }));
-    try {
-      const identificationTypesData = await getIdentificationTypesDropdownBusiness(
-        countryCode,
-        true,
-        language
-      );
-      const identificationTypesResult = identificationTypesData as {
-        success?: boolean;
-        data?: IdentificationTypeDropdown[];
-      };
-
-      if (
-        identificationTypesResult.success === true &&
-        identificationTypesResult.data !== undefined
-      ) {
-        setIdentificationTypes(identificationTypesResult.data);
-      } else {
-        setIdentificationTypes([]);
-        showError({ messageKey: 'bookings.loadIdTypesError' });
-      }
-    } catch (error) {
-      console.error('Error fetching identification types:', error);
-      setIdentificationTypes([]);
-    } finally {
-      dispatch(setGlobalLoading({ isLoading: false }));
-    }
-  };
+    void loadNationalities(language);
+  }, [isOpen, language, loadNationalities]);
 
   // Fetch tours on mount
   useEffect(() => {
@@ -138,6 +102,26 @@ export function CreateBookingModal({
 
     void fetchTours();
   }, [language]);
+
+  // Fetch hour range when tour selection changes
+  useEffect(() => {
+    if (formData.tourId === '' || token === null || token === '') {
+      setHourRange(null);
+      return;
+    }
+    const fetchHourRange = async () => {
+      setIsLoadingHourRange(true);
+      try {
+        const result = await getTourHourRangeBusiness(formData.tourId, token, language);
+        setHourRange(result.success ? (result.data?.hourRange ?? null) : null);
+      } catch {
+        setHourRange(null);
+      } finally {
+        setIsLoadingHourRange(false);
+      }
+    };
+    void fetchHourRange();
+  }, [formData.tourId, token, language]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
     const { name, value, type } = e.target;
@@ -235,10 +219,9 @@ export function CreateBookingModal({
     // Reset identificationTypeId for this client when nationality changes
     handleClientChange(index, 'identificationTypeId', '');
 
-    // Reload identification types for the selected country
-    setIdentificationTypes([]);
+    // Load identification types for selected country via cache
     if (countryCode !== '') {
-      void fetchIdentificationTypesByCountry(countryCode);
+      void loadIdentificationTypes(countryCode, language);
     }
   };
 
@@ -418,9 +401,21 @@ export function CreateBookingModal({
     );
 
     try {
-      // Merge countryCode from clientNationalities into each client before submitting
+      // Combine date-only values with hour-range times, then build the payload
+      const buildDateTime = (date: string, time: string): string => {
+        // Convert "YYYY-MM-DD" + "HH:MM" into an ISO string
+        if (!date) return '';
+        const d = new Date(`${date}T${time}:00`);
+        return isNaN(d.getTime()) ? `${date}T${time}:00` : d.toISOString();
+      };
+
+      const [rangeStart, rangeEnd] =
+        hourRange !== null ? hourRange.split(' - ') : ['00:00', '00:00'];
+
       const payloadWithCountry: BookingFormData = {
         ...formData,
+        startDate: buildDateTime(formData.startDate, rangeStart ?? '00:00'),
+        endDate: buildDateTime(formData.endDate, rangeEnd ?? '00:00'),
         clients: formData.clients.map((client, index) => ({
           ...client,
           countryCode: clientNationalities[index] ?? '',
@@ -627,47 +622,155 @@ export function CreateBookingModal({
             </div>
 
             {/* Dates */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 'var(--space-2)',
-                    fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
-                  }}
-                >
-                  {t('bookings.startDate')} <span style={{ color: 'red' }}>*</span>
-                </label>
-                <Input
-                  type="datetime-local"
-                  name="startDate"
-                  value={formData.startDate}
-                  onChange={handleInputChange}
-                  required
-                  error={errors.startDate}
-                />
-              </div>
+            <div>
+              <div
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      marginBottom: 'var(--space-2)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      color: 'var(--color-neutral-700)',
+                    }}
+                  >
+                    {t('bookings.startDate')} <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <Input
+                      type="date"
+                      name="startDate"
+                      value={formData.startDate}
+                      onChange={handleInputChange}
+                      required
+                      error={errors.startDate}
+                    />
+                    {formData.tourId !== '' && (
+                      <div
+                        style={{
+                          flexShrink: 0,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-2)',
+                          padding: '3px 10px',
+                          borderRadius: 'var(--radius-full, 9999px)',
+                          whiteSpace: 'nowrap',
+                          backgroundColor: isLoadingHourRange
+                            ? 'var(--color-neutral-100)'
+                            : hourRange !== null
+                              ? 'var(--color-primary-50, #eff6ff)'
+                              : 'var(--color-neutral-100)',
+                          border: `1px solid ${
+                            isLoadingHourRange
+                              ? 'var(--color-neutral-200)'
+                              : hourRange !== null
+                                ? 'var(--color-primary-200, #bfdbfe)'
+                                : 'var(--color-neutral-200)'
+                          }`,
+                          fontSize: 'var(--text-sm)',
+                          color: isLoadingHourRange
+                            ? 'var(--color-neutral-500)'
+                            : hourRange !== null
+                              ? 'var(--color-primary-700, #1d4ed8)'
+                              : 'var(--color-neutral-500)',
+                          fontWeight: 500,
+                        }}
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        {isLoadingHourRange
+                          ? language === 'en'
+                            ? 'Loading...'
+                            : 'Cargando...'
+                          : (hourRange?.split(' - ')[0] ??
+                            (language === 'en' ? 'No schedule' : 'Sin horario'))}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 'var(--space-2)',
-                    fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
-                  }}
-                >
-                  {t('bookings.endDate')} <span style={{ color: 'red' }}>*</span>
-                </label>
-                <Input
-                  type="datetime-local"
-                  name="endDate"
-                  value={formData.endDate}
-                  onChange={handleInputChange}
-                  required
-                  error={errors.endDate}
-                />
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      marginBottom: 'var(--space-2)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      color: 'var(--color-neutral-700)',
+                    }}
+                  >
+                    {t('bookings.endDate')} <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <Input
+                      type="date"
+                      name="endDate"
+                      value={formData.endDate}
+                      onChange={handleInputChange}
+                      required
+                      error={errors.endDate}
+                    />
+                    {formData.tourId !== '' && (
+                      <div
+                        style={{
+                          flexShrink: 0,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-2)',
+                          padding: '3px 10px',
+                          borderRadius: 'var(--radius-full, 9999px)',
+                          whiteSpace: 'nowrap',
+                          backgroundColor: isLoadingHourRange
+                            ? 'var(--color-neutral-100)'
+                            : hourRange !== null
+                              ? 'var(--color-primary-50, #eff6ff)'
+                              : 'var(--color-neutral-100)',
+                          border: `1px solid ${
+                            isLoadingHourRange
+                              ? 'var(--color-neutral-200)'
+                              : hourRange !== null
+                                ? 'var(--color-primary-200, #bfdbfe)'
+                                : 'var(--color-neutral-200)'
+                          }`,
+                          fontSize: 'var(--text-sm)',
+                          color: isLoadingHourRange
+                            ? 'var(--color-neutral-500)'
+                            : hourRange !== null
+                              ? 'var(--color-primary-700, #1d4ed8)'
+                              : 'var(--color-neutral-500)',
+                          fontWeight: 500,
+                        }}
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        {isLoadingHourRange
+                          ? language === 'en'
+                            ? 'Loading...'
+                            : 'Cargando...'
+                          : (hourRange?.split(' - ')[1] ??
+                            (language === 'en' ? 'No schedule' : 'Sin horario'))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -808,29 +911,7 @@ export function CreateBookingModal({
                 >
                   {t('bookings.clients') ?? 'Clients'}
                 </h3>
-                <button
-                  type="button"
-                  onClick={handleAddClient}
-                  style={{
-                    padding: 'var(--space-2) var(--space-4)',
-                    backgroundColor: 'var(--color-primary-500)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                    fontWeight: 'var(--font-weight-medium)',
-                    fontSize: 'var(--text-sm)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-1)',
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-primary-600)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-primary-500)';
-                  }}
-                >
+                <button type="button" onClick={handleAddClient} className="modal-btn-add-client">
                   <svg
                     width="16"
                     height="16"
@@ -976,10 +1057,12 @@ export function CreateBookingModal({
                       <Select
                         options={[
                           { value: '', label: t('bookings.selectIdType') ?? 'Select ID Type' },
-                          ...identificationTypes.map((idType) => ({
-                            value: idType.id,
-                            label: language === 'en' ? idType.name_en : idType.name_es,
-                          })),
+                          ...(allIdTypesByCountry[clientNationalities[index] ?? ''] ?? []).map(
+                            (idType) => ({
+                              value: idType.id,
+                              label: language === 'en' ? idType.name_en : idType.name_es,
+                            })
+                          ),
                         ]}
                         value={client.identificationTypeId ?? ''}
                         onChange={(value: string) =>
@@ -1209,51 +1292,18 @@ export function CreateBookingModal({
             </div>
 
             {/* Action Buttons */}
-            <div
-              style={{
-                display: 'flex',
-                gap: 'var(--space-4)',
-                justifyContent: 'flex-end',
-                marginTop: 'var(--space-6)',
-                paddingTop: 'var(--space-4)',
-                borderTop: '1px solid var(--color-neutral-200)',
-              }}
-            >
+            <div className="modal-footer">
               <button
                 type="button"
                 onClick={() => {
                   if (onClose !== undefined) onClose();
                 }}
                 disabled={isSubmitting}
-                style={{
-                  padding: 'var(--space-2) var(--space-6)',
-                  backgroundColor: 'var(--color-neutral-200)',
-                  color: 'var(--color-neutral-700)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  fontWeight: 'var(--font-weight-medium)',
-                  fontSize: 'var(--text-sm)',
-                }}
+                className="modal-btn modal-btn-secondary"
               >
                 {t('common.cancel')}
               </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                style={{
-                  padding: 'var(--space-2) var(--space-6)',
-                  backgroundColor: isSubmitting
-                    ? 'var(--color-neutral-400)'
-                    : 'var(--color-primary-500)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  fontWeight: 'var(--font-weight-medium)',
-                  fontSize: 'var(--text-sm)',
-                }}
-              >
+              <button type="submit" disabled={isSubmitting} className="modal-btn modal-btn-primary">
                 {isSubmitting ? t('common.saving') : t('bookings.newBooking')}
               </button>
             </div>
