@@ -14,6 +14,7 @@ import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import {
   getToursDropdownBusiness,
   getTourHourRangeBusiness,
+  getTourByIdBusiness,
 } from '~/server/businessLogic/toursBusinessLogic';
 import {
   useDropdownCache,
@@ -23,6 +24,7 @@ import {
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
 import type { Client } from '~/types/booking';
+import { getMinimumBookingDate } from '~/utilities/timezoneValidation';
 
 // The dropdown endpoint returns minimal tour info (same as offers)
 interface TourOption {
@@ -62,6 +64,7 @@ export function CreateBookingModal({
   const [clientNationalities, setClientNationalities] = useState<Record<number, string>>({});
   const [hourRange, setHourRange] = useState<string | null>(null);
   const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
+  const [minBookingDate, setMinBookingDate] = useState<string>('');
 
   // Cache-first dropdown loaders
   const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
@@ -107,20 +110,46 @@ export function CreateBookingModal({
   useEffect(() => {
     if (formData.tourId === '' || token === null || token === '') {
       setHourRange(null);
+      setMinBookingDate('');
       return;
     }
-    const fetchHourRange = async () => {
+    const fetchTourDetails = async () => {
       setIsLoadingHourRange(true);
       try {
-        const result = await getTourHourRangeBusiness(formData.tourId, token, language);
-        setHourRange(result.success ? (result.data?.hourRange ?? null) : null);
+        // Fetch hour range
+        const hourRangeResult = await getTourHourRangeBusiness(formData.tourId, token, language);
+        const newHourRange = hourRangeResult.success
+          ? (hourRangeResult.data?.hourRange ?? null)
+          : null;
+        setHourRange(newHourRange);
+
+        // Fetch tour details to get country code
+        const tourResult = (await getTourByIdBusiness(formData.tourId, language, 'MXN', token)) as {
+          success?: boolean;
+          data?: { city?: { countryId?: string } };
+        };
+        if (tourResult.success === true && tourResult.data?.city?.countryId !== undefined) {
+          const countryCode = tourResult.data.city.countryId;
+
+          // Calculate minimum booking date if we have tour start time
+          if (newHourRange !== null) {
+            const startTime = newHourRange.split(' - ')[0] ?? '';
+            const minDate = getMinimumBookingDate(startTime, countryCode);
+            setMinBookingDate(minDate);
+          } else {
+            setMinBookingDate('');
+          }
+        } else {
+          setMinBookingDate('');
+        }
       } catch {
         setHourRange(null);
+        setMinBookingDate('');
       } finally {
         setIsLoadingHourRange(false);
       }
     };
-    void fetchHourRange();
+    void fetchTourDetails();
   }, [formData.tourId, token, language]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
@@ -645,6 +674,8 @@ export function CreateBookingModal({
                       onChange={handleInputChange}
                       required
                       error={errors.startDate}
+                      min={minBookingDate}
+                      disabled={minBookingDate === ''}
                     />
                     {formData.tourId !== '' && (
                       <div
@@ -718,6 +749,8 @@ export function CreateBookingModal({
                       onChange={handleInputChange}
                       required
                       error={errors.endDate}
+                      min={minBookingDate}
+                      disabled={minBookingDate === ''}
                     />
                     {formData.tourId !== '' && (
                       <div
