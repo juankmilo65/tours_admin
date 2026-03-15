@@ -97,6 +97,30 @@ export function CreateBookingModal({
   const [apiError, setApiError] = useState<string | null>(null);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
 
+  // Reset all form state when the modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData({
+      tourId: '',
+      startDate: '',
+      endDate: '',
+      currency: 'MXN',
+      clients: [{ clientName: '', clientAge: 0, identificationTypeId: '', clientId: '' }],
+    });
+    setErrors({});
+    setIsSubmitting(false);
+    setHasSpecialRequests(false);
+    setApiError(null);
+    setIsBookingForMe(false);
+    setClientNationalities({});
+    setHourRange(null);
+    setTourDaysCount(null);
+    setMinBookingDate('');
+    setTourCountryCode('');
+    setTourAvailability(null);
+    setAvailabilityError('');
+  }, [isOpen]);
+
   // Load nationality dropdown into cache when modal opens or language changes
   useEffect(() => {
     void loadNationalities(language);
