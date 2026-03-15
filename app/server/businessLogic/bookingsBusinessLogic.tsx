@@ -136,12 +136,19 @@ export const createBookingBusiness = async (
     if (result.message !== undefined) {
       errorMessage = result.message;
     } else if (result.error !== undefined) {
-      if (result.error.message !== undefined) {
+      // Check axios response data first (contains the real API error)
+      const responseData = result.error.response?.data as
+        | { error?: string; message?: string }
+        | undefined;
+      if (responseData?.error !== undefined) {
+        errorMessage = responseData.error;
+      } else if (responseData?.message !== undefined) {
+        errorMessage = responseData.message;
+      } else if (typeof result.error === 'string') {
+        errorMessage = result.error;
+      } else if (result.error.message !== undefined) {
         errorMessage = result.error.message;
-      } else if (result.error.response?.data?.message !== undefined) {
-        errorMessage = result.error.response.data.message;
       } else {
-        // Fallback: use the error object itself if it's a string
         errorMessage = String(result.error);
       }
     }
@@ -173,16 +180,36 @@ export const updateBookingBusiness = async (
       success?: boolean;
       message?: string;
       data?: Booking;
-      error?: { message?: string };
+      error?: {
+        message?: string;
+        response?: { data?: { error?: string; message?: string } };
+      };
     };
 
     if (result.success === true && result.data !== undefined) {
       return result as { success: boolean; message?: string; data?: Booking };
     }
 
+    // Extract error message: prioritize API response data over generic axios message
+    let errorMessage = 'Error updating booking';
+    if (result.message !== undefined) {
+      errorMessage = result.message;
+    } else if (result.error !== undefined) {
+      const responseData = result.error.response?.data;
+      if (responseData?.error !== undefined) {
+        errorMessage = responseData.error;
+      } else if (responseData?.message !== undefined) {
+        errorMessage = responseData.message;
+      } else if (typeof result.error === 'string') {
+        errorMessage = result.error as string;
+      } else if (result.error.message !== undefined) {
+        errorMessage = result.error.message;
+      }
+    }
+
     return {
       success: false,
-      message: result.message ?? result.error?.message ?? 'Error updating booking',
+      message: errorMessage,
     };
   } catch (error) {
     console.error('Error in updateBookingBusiness:', error);

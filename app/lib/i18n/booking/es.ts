@@ -111,5 +111,6 @@ export const bookingEs = {
   specialRequestsRequired: 'Por favor ingresa tus solicitudes especiales o desmarca la casilla',
   specialRequestsMinLength: 'Las solicitudes especiales deben tener al menos 10 caracteres',
   specialRequestsMaxLength: 'Las solicitudes especiales no pueden exceder 500 caracteres',
+  validationErrorsTitle: 'Por favor corrige los siguientes errores:',
   loadIdTypesError: 'Error al cargar los tipos de identificación',
 };

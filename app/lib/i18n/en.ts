@@ -829,6 +829,7 @@ export const en: Translation = {
     specialRequestsRequired: 'Please enter your special requests or uncheck the box',
     specialRequestsMinLength: 'Special requests must be at least 10 characters',
     specialRequestsMaxLength: 'Special requests cannot exceed 500 characters',
+    validationErrorsTitle: 'Please fix the following errors:',
   },
   users: {
     sectionTitle: 'Users',

@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 import { createBookingBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
@@ -89,6 +89,8 @@ export function CreateBookingModal({
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSpecialRequests, setHasSpecialRequests] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
 
   // Load nationality dropdown into cache when modal opens or language changes
   useEffect(() => {
@@ -206,6 +208,20 @@ export function CreateBookingModal({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
     const { name, value, type } = e.target;
+
+    // Clear API error on any form change
+    if (apiError !== null) setApiError(null);
+
+    if (name === 'startDate' && tourDaysCount !== null && tourDaysCount > 0 && value !== '') {
+      const start = new Date(value);
+      start.setDate(start.getDate() + (tourDaysCount - 1));
+      const endDate = start.toISOString().split('T')[0] ?? '';
+      setFormData((prev) => ({ ...prev, startDate: value, endDate }));
+      if (errors.startDate !== undefined || errors.endDate !== undefined) {
+        setErrors((prev) => ({ ...prev, startDate: undefined, endDate: undefined }));
+      }
+      return;
+    }
 
     setFormData((prev) => ({
       ...prev,
@@ -330,6 +346,7 @@ export function CreateBookingModal({
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<string, string>> = {};
+    const clientLabel = (i: number) => `${t('bookings.clientName') ?? 'Client'} ${i + 1}`;
 
     // Validate primary client
     if (!formData.clients.some((c) => c.isPrimary === true)) {
@@ -342,18 +359,18 @@ export function CreateBookingModal({
     }
 
     if (!formData.startDate) {
-      newErrors.startDate = t('validation.required') ?? 'Required';
+      newErrors.startDate = `${t('bookings.startDate') ?? 'Start Date'}: ${t('validation.required') ?? 'Required'}`;
     }
 
     if (!formData.endDate) {
-      newErrors.endDate = t('validation.required') ?? 'Required';
+      newErrors.endDate = `${t('bookings.endDate') ?? 'End Date'}: ${t('validation.required') ?? 'Required'}`;
     }
 
-    // Validate dates: end date must be after start date
+    // Validate dates: end date must be after or equal to start date
     if (formData.startDate && formData.endDate) {
       const start = new Date(formData.startDate);
       const end = new Date(formData.endDate);
-      if (end <= start) {
+      if (end < start) {
         newErrors.endDate =
           t('bookings.endDateAfterStartDate') ??
           'La fecha de fin debe ser posterior a la fecha de inicio';
@@ -362,7 +379,7 @@ export function CreateBookingModal({
 
     // Validate currency
     if (!formData.currency || formData.currency.trim() === '') {
-      newErrors.currency = t('validation.required') ?? 'Required';
+      newErrors.currency = `${t('bookings.currency') ?? 'Currency'}: ${t('validation.required') ?? 'Required'}`;
     }
 
     // Validate clients
@@ -372,33 +389,35 @@ export function CreateBookingModal({
       formData.clients.forEach((client, index) => {
         // Client Name validation
         if (!client.clientName || client.clientName.trim() === '') {
-          newErrors[`clients.${index}.clientName`] = t('validation.required') ?? 'Required';
+          newErrors[`clients.${index}.clientName`] =
+            `${clientLabel(index)}: ${t('validation.required') ?? 'Required'}`;
         } else if (client.clientName.trim().length < 3) {
           newErrors[`clients.${index}.clientName`] =
-            t('bookings.clientNameMinLength') ?? 'El nombre debe tener al menos 3 caracteres';
+            `${clientLabel(index)}: ${t('bookings.clientNameMinLength') ?? 'El nombre debe tener al menos 3 caracteres'}`;
         } else if (client.clientName.trim().length > 100) {
           newErrors[`clients.${index}.clientName`] =
-            t('bookings.clientNameMaxLength') ?? 'El nombre no puede exceder 100 caracteres';
+            `${clientLabel(index)}: ${t('bookings.clientNameMaxLength') ?? 'El nombre no puede exceder 100 caracteres'}`;
         }
 
         // Client Age validation
         if (client.clientAge === undefined || client.clientAge === null) {
-          newErrors[`clients.${index}.clientAge`] = t('validation.required') ?? 'Required';
+          newErrors[`clients.${index}.clientAge`] =
+            `${clientLabel(index)} - ${t('bookings.clientAge') ?? 'Age'}: ${t('validation.required') ?? 'Required'}`;
         } else if (!Number.isInteger(client.clientAge)) {
           newErrors[`clients.${index}.clientAge`] =
-            t('bookings.clientAgeInteger') ?? 'La edad debe ser un número entero';
+            `${clientLabel(index)}: ${t('bookings.clientAgeInteger') ?? 'La edad debe ser un número entero'}`;
         } else if (client.clientAge < 0) {
           newErrors[`clients.${index}.clientAge`] =
-            t('bookings.clientAgeMin') ?? 'La edad no puede ser negativa';
+            `${clientLabel(index)}: ${t('bookings.clientAgeMin') ?? 'La edad no puede ser negativa'}`;
         } else if (client.clientAge > 120) {
           newErrors[`clients.${index}.clientAge`] =
-            t('bookings.clientAgeMax') ?? 'La edad no puede ser mayor a 120 años';
+            `${clientLabel(index)}: ${t('bookings.clientAgeMax') ?? 'La edad no puede ser mayor a 120 años'}`;
         }
 
         // Nationality validation
         if ((clientNationalities[index] ?? '') === '') {
           newErrors[`clients.${index}.nationality`] =
-            t('bookings.selectNationality') ?? 'Select nationality';
+            `${clientLabel(index)}: ${t('bookings.selectNationality') ?? 'Select nationality'}`;
         }
 
         // ID Type validation (only if nationality is selected)
@@ -407,7 +426,7 @@ export function CreateBookingModal({
           (client.identificationTypeId ?? '').trim() === ''
         ) {
           newErrors[`clients.${index}.identificationTypeId`] =
-            t('bookings.selectIdType') ?? 'Select ID type';
+            `${clientLabel(index)}: ${t('bookings.selectIdType') ?? 'Select ID type'}`;
         }
 
         // Client ID validation (only if ID type is selected)
@@ -415,16 +434,17 @@ export function CreateBookingModal({
           (client.identificationTypeId ?? '').trim() !== '' &&
           (client.clientId ?? '').trim() === ''
         ) {
-          newErrors[`clients.${index}.clientId`] = t('bookings.enterClientId') ?? 'Enter client ID';
+          newErrors[`clients.${index}.clientId`] =
+            `${clientLabel(index)}: ${t('bookings.enterClientId') ?? 'Enter client ID'}`;
         } else if (
           (client.clientId ?? '').trim() !== '' &&
           (client.clientId ?? '').trim().length < 3
         ) {
           newErrors[`clients.${index}.clientId`] =
-            t('bookings.clientIdMinLength') ?? 'El ID debe tener al menos 3 caracteres';
+            `${clientLabel(index)}: ${t('bookings.clientIdMinLength') ?? 'El ID debe tener al menos 3 caracteres'}`;
         } else if ((client.clientId ?? '').trim().length > 50) {
           newErrors[`clients.${index}.clientId`] =
-            t('bookings.clientIdMaxLength') ?? 'El ID no puede exceder 50 caracteres';
+            `${clientLabel(index)}: ${t('bookings.clientIdMaxLength') ?? 'El ID no puede exceder 50 caracteres'}`;
         }
       });
 
@@ -468,6 +488,9 @@ export function CreateBookingModal({
     e.preventDefault();
 
     if (!validateForm()) {
+      window.setTimeout(() => {
+        errorSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
       return;
     }
 
@@ -515,24 +538,18 @@ export function CreateBookingModal({
         specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
       };
 
-      const result = await createBookingBusiness(payloadWithCountry, token ?? '');
+      const result = await createBookingBusiness(payloadWithCountry, token ?? '', language);
       if (!result.success) {
-        // Hide global spinner on error, keep modal open
         dispatch(setGlobalLoading({ isLoading: false }));
 
         const errorMessage =
           result.message ?? t('bookings.createError') ?? 'Error creating booking';
 
-        dispatch(
-          openModal({
-            id: 'create-booking-error',
-            type: 'confirm',
-            title: t('common.error') ?? 'Error',
-            isOpen: true,
-            data: { message: errorMessage, icon: 'alert' },
-          } as Parameters<typeof openModal>[0])
-        );
+        setApiError(errorMessage);
         setIsSubmitting(false);
+        window.setTimeout(() => {
+          errorSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
         return;
       }
 
@@ -560,20 +577,11 @@ export function CreateBookingModal({
       );
     } catch (error) {
       console.error('Error creating booking:', error);
-      // Hide global spinner on error
       dispatch(setGlobalLoading({ isLoading: false }));
-      dispatch(
-        openModal({
-          id: 'create-booking-error',
-          type: 'confirm',
-          title: t('common.error'),
-          isOpen: true,
-          data: {
-            message: t('bookings.createError') ?? 'Error creating booking',
-            icon: 'alert',
-          },
-        })
-      );
+      setApiError(t('bookings.createError') ?? 'Error creating booking');
+      window.setTimeout(() => {
+        errorSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
     } finally {
       setIsSubmitting(false);
     }
@@ -773,7 +781,6 @@ export function CreateBookingModal({
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleInputChange}
-                      required
                       error={errors.startDate}
                       min={minBookingDate}
                       disabled={minBookingDate === ''}
@@ -848,10 +855,11 @@ export function CreateBookingModal({
                       name="endDate"
                       value={formData.endDate}
                       onChange={handleInputChange}
-                      required
                       error={errors.endDate}
                       min={minBookingDate}
-                      disabled={minBookingDate === ''}
+                      disabled={
+                        minBookingDate === '' || (tourDaysCount !== null && tourDaysCount > 0)
+                      }
                     />
                     {formData.tourId !== '' && (
                       <div
@@ -1142,7 +1150,6 @@ export function CreateBookingModal({
                         onChange={(e) => handleClientChange(index, 'clientName', e.target.value)}
                         placeholder={t('bookings.clientNamePlaceholder') ?? 'Enter name'}
                         error={errors[`clients.${index}.clientName`]}
-                        required
                         disabled={index === 0 && isBookingForMe}
                       />
                     </div>
@@ -1156,7 +1163,6 @@ export function CreateBookingModal({
                         min={0}
                         max={120}
                         error={errors[`clients.${index}.clientAge`]}
-                        required
                       />
                     </div>
                     {/* Nationality */}
@@ -1268,44 +1274,51 @@ export function CreateBookingModal({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          width: '32px',
-                          height: '32px',
+                          width: '36px',
+                          height: '36px',
                           borderRadius: 'var(--radius-md)',
                           backgroundColor:
                             formData.clients.length <= 1
-                              ? 'var(--color-neutral-200)'
-                              : 'rgba(239, 68, 68, 0.1)',
+                              ? 'var(--color-neutral-100)'
+                              : 'rgba(239, 68, 68, 0.08)',
                           color:
+                            formData.clients.length <= 1 ? 'var(--color-neutral-400)' : '#dc2626',
+                          border:
                             formData.clients.length <= 1
-                              ? 'var(--color-neutral-400)'
-                              : 'var(--color-error-600)',
-                          border: 'none',
+                              ? '1px solid var(--color-neutral-200)'
+                              : '1px solid rgba(239, 68, 68, 0.25)',
                           cursor: formData.clients.length <= 1 ? 'not-allowed' : 'pointer',
                           transition: 'all 0.2s',
                         }}
                         onMouseOver={(e) => {
                           if (formData.clients.length > 1) {
-                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+                            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
                           }
                         }}
                         onMouseOut={(e) => {
                           if (formData.clients.length > 1) {
-                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+                            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
                           }
                         }}
                         title={t('common.remove') ?? 'Remove'}
                       >
                         <svg
-                          width="18"
-                          height="18"
+                          width="20"
+                          height="20"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
                           strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         >
                           <path d="M3 6h18" />
                           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
                           <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
                         </svg>
                       </button>
                     </div>
@@ -1431,6 +1444,139 @@ export function CreateBookingModal({
                 </>
               )}
             </div>
+
+            {/* API Error Banner */}
+            {apiError !== null && (
+              <div
+                ref={errorSummaryRef}
+                style={{
+                  marginTop: 'var(--space-4)',
+                  padding: 'var(--space-4)',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #f87171',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                }}
+              >
+                <div
+                  style={{
+                    flexShrink: 0,
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    backgroundColor: '#fee2e2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#dc2626"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontWeight: 600,
+                      color: '#991b1b',
+                      fontSize: 'var(--text-sm)',
+                    }}
+                  >
+                    {language === 'en' ? 'Server Error' : 'Error del Servidor'}
+                  </p>
+                  <p
+                    style={{
+                      margin: '4px 0 0',
+                      color: '#b91c1c',
+                      fontSize: 'var(--text-sm)',
+                    }}
+                  >
+                    {apiError}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setApiError(null)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#b91c1c',
+                    padding: 4,
+                    flexShrink: 0,
+                    lineHeight: 1,
+                    fontSize: '18px',
+                  }}
+                  aria-label="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Error Summary */}
+            {Object.keys(errors).length > 0 && (
+              <div
+                ref={errorSummaryRef}
+                style={{
+                  marginTop: 'var(--space-4)',
+                  padding: 'var(--space-4)',
+                  backgroundColor: 'var(--color-error-50, #fef2f2)',
+                  border: '1px solid var(--color-error-300, #fca5a5)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0 0 var(--space-2) 0',
+                    fontWeight: 'var(--font-weight-semibold)',
+                    color: 'var(--color-error-700, #b91c1c)',
+                    fontSize: 'var(--text-sm)',
+                  }}
+                >
+                  ⚠{' '}
+                  {t('bookings.validationErrorsTitle') ??
+                    'Por favor corrige los siguientes errores:'}
+                </p>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 'var(--space-4)',
+                    listStyleType: 'disc',
+                  }}
+                >
+                  {Object.entries(errors).map(
+                    ([key, message]) =>
+                      message !== undefined && (
+                        <li
+                          key={key}
+                          style={{
+                            color: 'var(--color-error-700, #b91c1c)',
+                            fontSize: 'var(--text-sm)',
+                            marginBottom: 'var(--space-1)',
+                          }}
+                        >
+                          {message}
+                        </li>
+                      )
+                  )}
+                </ul>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="modal-footer">

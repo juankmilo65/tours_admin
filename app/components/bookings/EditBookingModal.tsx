@@ -5,7 +5,7 @@
  */
 
 import type { JSX, CSSProperties, FormEvent } from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 import { bookingEs, bookingEn } from '~/lib/i18n';
 import { Input } from '~/components/ui/Input';
@@ -68,6 +68,8 @@ export function EditBookingModal({
   const [hasSpecialRequests, setHasSpecialRequests] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
   const [hourRange, setHourRange] = useState<string | null>(null);
   const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
   const [tourDaysCount, setTourDaysCount] = useState<number | null>(null);
@@ -96,6 +98,7 @@ export function EditBookingModal({
     });
     setHasSpecialRequests((booking.specialRequests ?? '') !== '');
     setErrors({});
+    setApiError(null);
   }, [booking]);
 
   // On modal open: load nationality dropdown + init per-client nationalities + preload ID types
@@ -144,6 +147,7 @@ export function EditBookingModal({
     field: keyof BookingClient,
     value: string | number
   ): void => {
+    if (apiError !== null) setApiError(null);
     setFormData((prev) => {
       const updated = [...prev.clients];
       const cur = updated[index];
@@ -187,34 +191,78 @@ export function EditBookingModal({
 
   const validate = (): boolean => {
     const errs: Partial<Record<string, string>> = {};
-    if (!formData.startDate) errs.startDate = t('validation.required') ?? 'Required';
-    if (!formData.endDate) errs.endDate = t('validation.required') ?? 'Required';
+    const clientLabel = (i: number) => `${bookingsT.clientName} ${i + 1}`;
+
+    if (!formData.startDate) {
+      errs.startDate = `${bookingsT.startDate}: ${t('validation.required') ?? 'Required'}`;
+    }
+    if (!formData.endDate) {
+      errs.endDate = `${bookingsT.endDate}: ${t('validation.required') ?? 'Required'}`;
+    }
+
+    // Validate dates
+    if (formData.startDate && formData.endDate) {
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      if (end < start) {
+        errs.endDate = bookingsT.endDateAfterStartDate ?? 'End date must be after start date';
+      }
+    }
+
     formData.clients.forEach((c, i) => {
       if (!c.clientName?.trim()) {
-        errs[`clients.${i}.clientName`] = t('validation.required') ?? 'Required';
+        errs[`clients.${i}.clientName`] =
+          `${clientLabel(i)}: ${t('validation.required') ?? 'Required'}`;
+      } else if (c.clientName.trim().length < 3) {
+        errs[`clients.${i}.clientName`] = `${clientLabel(i)}: ${bookingsT.clientNameMinLength}`;
+      } else if (c.clientName.trim().length > 100) {
+        errs[`clients.${i}.clientName`] = `${clientLabel(i)}: ${bookingsT.clientNameMaxLength}`;
       }
-      if (!c.clientAge || c.clientAge < 0) {
-        errs[`clients.${i}.clientAge`] = t('validation.required') ?? 'Required';
+
+      if (c.clientAge === undefined || c.clientAge === null) {
+        errs[`clients.${i}.clientAge`] =
+          `${clientLabel(i)} - ${bookingsT.clientAge}: ${t('validation.required') ?? 'Required'}`;
+      } else if (c.clientAge < 0) {
+        errs[`clients.${i}.clientAge`] = `${clientLabel(i)}: ${bookingsT.clientAgeMin}`;
+      } else if (c.clientAge > 120) {
+        errs[`clients.${i}.clientAge`] = `${clientLabel(i)}: ${bookingsT.clientAgeMax}`;
       }
+
       if ((clientNationalities[i] ?? c.countryCode ?? '') === '') {
-        errs[`clients.${i}.nationality`] =
-          bookingsT.selectNationality ?? 'Seleccionar nacionalidad';
+        errs[`clients.${i}.nationality`] = `${clientLabel(i)}: ${bookingsT.selectNationality}`;
       }
+
       if (
         (clientNationalities[i] ?? c.countryCode ?? '') !== '' &&
         (c.identificationTypeId ?? '').trim() === ''
       ) {
-        errs[`clients.${i}.identificationTypeId`] =
-          bookingsT.selectIdType ?? 'Seleccionar tipo de ID';
+        errs[`clients.${i}.identificationTypeId`] = `${clientLabel(i)}: ${bookingsT.selectIdType}`;
       }
     });
+
+    // Group-level: if any client is a minor, at least one adult (18+) must be present
+    const hasMinor = formData.clients.some(
+      (c) => c.clientAge !== undefined && c.clientAge !== null && c.clientAge < 18
+    );
+    const hasAdult = formData.clients.some(
+      (c) => c.clientAge !== undefined && c.clientAge !== null && c.clientAge >= 18
+    );
+    if (hasMinor && !hasAdult) {
+      errs['clients.minorWithoutAdult'] = bookingsT.clientAgeUnder18;
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   const handleSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
-    if (!validate() || !booking) return;
+    if (!validate() || !booking) {
+      window.setTimeout(() => {
+        errorSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+      return;
+    }
 
     setIsSubmitting(true);
     dispatch(setGlobalLoading({ isLoading: true, message: t('common.saving') ?? 'Guardando...' }));
@@ -277,24 +325,21 @@ export function EditBookingModal({
           } as Parameters<typeof openModal>[0])
         );
       } else {
-        dispatch(
-          openModal({
-            id: 'edit-booking-error',
-            type: 'confirm',
-            title: t('common.error') ?? 'Error',
-            isOpen: true,
-            data: {
-              message:
-                result.message ??
-                (language === 'en' ? 'Error updating booking' : 'Error al actualizar la reserva'),
-              icon: 'alert',
-            },
-          } as Parameters<typeof openModal>[0])
-        );
+        const errorMessage =
+          result.message ??
+          (language === 'en' ? 'Error updating booking' : 'Error al actualizar la reserva');
+        setApiError(errorMessage);
+        window.setTimeout(() => {
+          errorSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
       }
     } catch (err) {
       dispatch(setGlobalLoading({ isLoading: false }));
       console.error('Edit booking error:', err);
+      setApiError(language === 'en' ? 'Error updating booking' : 'Error al actualizar la reserva');
+      window.setTimeout(() => {
+        errorSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
     } finally {
       setIsSubmitting(false);
     }
@@ -506,12 +551,21 @@ export function EditBookingModal({
                     name="startDate"
                     value={formData.startDate}
                     onChange={(e) => {
-                      setFormData((p) => ({ ...p, startDate: e.target.value }));
-                      if (errors.startDate !== undefined) {
-                        setErrors((p) => ({ ...p, startDate: undefined }));
+                      if (apiError !== null) setApiError(null);
+                      const value = e.target.value;
+                      if (tourDaysCount !== null && tourDaysCount > 0 && value !== '') {
+                        const start = new Date(value);
+                        start.setDate(start.getDate() + (tourDaysCount - 1));
+                        const endDate = start.toISOString().split('T')[0] ?? '';
+                        setFormData((p) => ({ ...p, startDate: value, endDate }));
+                        setErrors((p) => ({ ...p, startDate: undefined, endDate: undefined }));
+                      } else {
+                        setFormData((p) => ({ ...p, startDate: value }));
+                        if (errors.startDate !== undefined) {
+                          setErrors((p) => ({ ...p, startDate: undefined }));
+                        }
                       }
                     }}
-                    required
                     error={errors.startDate}
                   />
                   <div
@@ -570,13 +624,14 @@ export function EditBookingModal({
                     name="endDate"
                     value={formData.endDate}
                     onChange={(e) => {
+                      if (apiError !== null) setApiError(null);
                       setFormData((p) => ({ ...p, endDate: e.target.value }));
                       if (errors.endDate !== undefined) {
                         setErrors((p) => ({ ...p, endDate: undefined }));
                       }
                     }}
-                    required
                     error={errors.endDate}
+                    disabled={tourDaysCount !== null && tourDaysCount > 0}
                   />
                   <div
                     style={{
@@ -709,7 +764,6 @@ export function EditBookingModal({
                     onChange={(e) => handleClientChange(index, 'clientName', e.target.value)}
                     placeholder={bookingsT.clientNamePlaceholder}
                     error={errors[`clients.${index}.clientName`]}
-                    required
                   />
                   <Input
                     type="number"
@@ -719,7 +773,6 @@ export function EditBookingModal({
                     min={0}
                     max={120}
                     error={errors[`clients.${index}.clientAge`]}
-                    required
                   />
                   <div>
                     <Select
@@ -797,30 +850,56 @@ export function EditBookingModal({
                       onClick={() => handleRemoveClient(index)}
                       disabled={formData.clients.length <= 1}
                       style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: 6,
-                        border: 'none',
+                        width: 36,
+                        height: 36,
+                        borderRadius: 'var(--radius-md, 6px)',
+                        border:
+                          formData.clients.length <= 1
+                            ? '1px solid var(--color-neutral-200, #e5e7eb)'
+                            : '1px solid rgba(239,68,68,0.25)',
                         cursor: formData.clients.length <= 1 ? 'not-allowed' : 'pointer',
                         background:
-                          formData.clients.length <= 1 ? '#f3f4f6' : 'rgba(239,68,68,0.1)',
-                        color: formData.clients.length <= 1 ? '#d1d5db' : '#dc2626',
+                          formData.clients.length <= 1
+                            ? 'var(--color-neutral-100, #f3f4f6)'
+                            : 'rgba(239,68,68,0.08)',
+                        color:
+                          formData.clients.length <= 1
+                            ? 'var(--color-neutral-400, #d1d5db)'
+                            : '#dc2626',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        transition: 'all 0.2s',
                       }}
+                      onMouseOver={(e) => {
+                        if (formData.clients.length > 1) {
+                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.15)';
+                          e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (formData.clients.length > 1) {
+                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.08)';
+                          e.currentTarget.style.borderColor = 'rgba(239,68,68,0.25)';
+                        }
+                      }}
+                      title={t('common.remove') ?? 'Eliminar'}
                     >
                       <svg
-                        width="14"
-                        height="14"
+                        width="20"
+                        height="20"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
                         <path d="M3 6h18" />
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
                         <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
                       </svg>
                     </button>
                   </div>
@@ -879,6 +958,137 @@ export function EditBookingModal({
               />
             )}
           </div>
+
+          {/* API Error Banner */}
+          {apiError !== null && (
+            <div
+              ref={errorSummaryRef}
+              style={{
+                marginTop: 'var(--space-4)',
+                padding: 'var(--space-4)',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #f87171',
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px',
+              }}
+            >
+              <div
+                style={{
+                  flexShrink: 0,
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  backgroundColor: '#fee2e2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#dc2626"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontWeight: 600,
+                    color: '#991b1b',
+                    fontSize: 'var(--text-sm)',
+                  }}
+                >
+                  {language === 'en' ? 'Server Error' : 'Error del Servidor'}
+                </p>
+                <p
+                  style={{
+                    margin: '4px 0 0',
+                    color: '#b91c1c',
+                    fontSize: 'var(--text-sm)',
+                  }}
+                >
+                  {apiError}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setApiError(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#b91c1c',
+                  padding: 4,
+                  flexShrink: 0,
+                  lineHeight: 1,
+                  fontSize: '18px',
+                }}
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Error Summary */}
+          {Object.keys(errors).length > 0 && (
+            <div
+              ref={errorSummaryRef}
+              style={{
+                marginTop: 'var(--space-4)',
+                padding: 'var(--space-4)',
+                backgroundColor: 'var(--color-error-50, #fef2f2)',
+                border: '1px solid var(--color-error-300, #fca5a5)',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              <p
+                style={{
+                  margin: '0 0 var(--space-2) 0',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  color: 'var(--color-error-700, #b91c1c)',
+                  fontSize: 'var(--text-sm)',
+                }}
+              >
+                ⚠ {bookingsT.validationErrorsTitle ?? 'Por favor corrige los siguientes errores:'}
+              </p>
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: 'var(--space-4)',
+                  listStyleType: 'disc',
+                }}
+              >
+                {Object.entries(errors).map(
+                  ([key, message]) =>
+                    message !== undefined && (
+                      <li
+                        key={key}
+                        style={{
+                          color: 'var(--color-error-700, #b91c1c)',
+                          fontSize: 'var(--text-sm)',
+                          marginBottom: 'var(--space-1)',
+                        }}
+                      >
+                        {message}
+                      </li>
+                    )
+                )}
+              </ul>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="modal-footer">
