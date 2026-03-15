@@ -276,6 +276,7 @@ export function TourCard({
                 fontWeight: 700,
                 letterSpacing: '.3px',
                 lineHeight: 1.4,
+                boxShadow: '0 2px 8px rgba(0,0,0,.25)',
               }}
             >
               -{discount}%
@@ -283,18 +284,33 @@ export function TourCard({
           )}
           <span
             style={{
-              backgroundColor: diff.bg,
-              color: diff.text,
-              border: `1px solid ${diff.border}`,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              backgroundColor: 'rgba(0,0,0,.55)',
+              color: '#fff',
               padding: '4px 10px',
               borderRadius: 'var(--radius-full)',
               fontSize: '11px',
               fontWeight: 600,
               textTransform: 'capitalize',
-              backdropFilter: 'blur(6px)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
               lineHeight: 1.4,
+              boxShadow: '0 2px 8px rgba(0,0,0,.18)',
+              border: '1px solid rgba(255,255,255,.12)',
             }}
           >
+            <span
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                backgroundColor: diff.text,
+                flexShrink: 0,
+                boxShadow: `0 0 4px ${diff.text}`,
+              }}
+            />
             {tour.difficulty}
           </span>
         </div>
@@ -308,15 +324,17 @@ export function TourCard({
             display: 'inline-flex',
             alignItems: 'center',
             gap: '5px',
-            backgroundColor: tour.isActive ? 'rgba(16,185,129,.14)' : 'rgba(239,68,68,.12)',
-            color: tour.isActive ? '#059669' : '#dc2626',
-            border: `1px solid ${tour.isActive ? 'rgba(16,185,129,.3)' : 'rgba(239,68,68,.25)'}`,
+            backgroundColor: 'rgba(0,0,0,.55)',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,.12)',
             padding: '4px 10px',
             borderRadius: 'var(--radius-full)',
             fontSize: '11px',
             fontWeight: 600,
-            backdropFilter: 'blur(6px)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
             lineHeight: 1.4,
+            boxShadow: '0 2px 8px rgba(0,0,0,.18)',
           }}
         >
           <span
@@ -326,6 +344,7 @@ export function TourCard({
               borderRadius: '50%',
               backgroundColor: tour.isActive ? '#10b981' : '#ef4444',
               flexShrink: 0,
+              boxShadow: `0 0 4px ${tour.isActive ? '#10b981' : '#ef4444'}`,
             }}
           />
           {tour.isActive ? t('common.active') : t('common.inactive')}
@@ -343,7 +362,13 @@ export function TourCard({
             color: '#fff',
             fontSize: '12px',
             fontWeight: 500,
-            textShadow: '0 1px 3px rgba(0,0,0,.4)',
+            backgroundColor: 'rgba(0,0,0,.50)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            padding: '4px 10px',
+            borderRadius: 'var(--radius-full)',
+            border: '1px solid rgba(255,255,255,.12)',
+            boxShadow: '0 2px 8px rgba(0,0,0,.18)',
           }}
         >
           <MapPinIcon />

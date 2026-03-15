@@ -24,14 +24,6 @@ export const getTourById = async (
   currency = 'MXN',
   token = ''
 ): Promise<unknown> => {
-  console.warn('🎯 [GET TOUR BY ID] Starting getTourById with params:', {
-    id,
-    language,
-    currency,
-    hasToken: token !== '',
-    BASE_URL,
-  });
-
   // Check if backend URL is configured
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn('⚠️ [GET TOUR BY ID] BACKEND_URL is not configured, returning empty');
@@ -40,15 +32,7 @@ export const getTourById = async (
 
   try {
     const tourEndpoint = `tours/${id}`;
-    const fullUrl = `${BASE_URL}/${tourEndpoint}`;
-    console.warn('🌐 [GET TOUR BY ID] Full URL to call:', fullUrl);
-
     const tourService = createServiceREST(BASE_URL, tourEndpoint, `Bearer ${token}`);
-    console.warn('📡 [GET TOUR BY ID] Calling backend with headers:', {
-      'X-Language': language,
-      'X-Currency': currency,
-      Authorization: `Bearer ${token.substring(0, 20)}...`,
-    });
 
     const result = await tourService.get({
       headers: {
@@ -56,8 +40,6 @@ export const getTourById = async (
         'X-Currency': currency,
       },
     });
-
-    console.warn('✅ [GET TOUR BY ID] Success! Result:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
     // Handle network errors gracefully (ECONNREFUSED, etc.)
@@ -622,16 +604,6 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
     const toursEndpoint = 'tours/cards';
     const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token ?? ''}`);
 
-    console.warn('🌐 [GET TOURS] Calling backend API:', {
-      endpoint: toursEndpoint,
-      params,
-      headers: {
-        'X-Language': language,
-        'X-Currency': currency,
-        Authorization: `Bearer ${token ?? ''}`,
-      },
-    });
-
     const result = await toursService.get({
       params,
       headers: {
@@ -639,8 +611,6 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
         'X-Currency': currency,
       },
     });
-
-    console.warn('✅ [GET TOURS] Success! Result:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
     // Handle network errors gracefully (ECONNREFUSED, etc.)

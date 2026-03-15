@@ -76,11 +76,6 @@ export async function getPriceRange(
   const now = Date.now();
 
   if (cachedEntry !== undefined && now - cachedEntry.timestamp < CACHE_TTL) {
-    console.log(
-      '✅ [PRICE RANGE] Using cached data (cache age:',
-      Math.floor((now - cachedEntry.timestamp) / 1000),
-      'seconds)'
-    );
     return cachedEntry.data;
   }
 

@@ -2,6 +2,7 @@ import {
   getTours,
   getTourById,
   getToursDropdown,
+  getTourHourRange,
   createTour,
   updateTour,
   cloneTour,
@@ -148,39 +149,17 @@ const toursBusinessLogic = (
 };
 
 /**
- * Parse an activity time string ("HH:MM AM/PM" or "HH:MM" 24h) to minutes since midnight.
- */
-const parseTimeToMinutes = (timeStr: string): number => {
-  const amPm = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (amPm !== null) {
-    let h = parseInt(amPm[1] ?? '0', 10);
-    const m = parseInt(amPm[2] ?? '0', 10);
-    const period = (amPm[3] ?? '').toUpperCase();
-    if (period === 'PM' && h !== 12) h += 12;
-    if (period === 'AM' && h === 12) h = 0;
-    return h * 60 + m;
-  }
-  const h24 = timeStr.trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (h24 !== null) {
-    return parseInt(h24[1] ?? '0', 10) * 60 + parseInt(h24[2] ?? '0', 10);
-  }
-  return -1;
-};
-
-/**
- * Business logic for getting a tour's hour range derived from its activities.
- * Computes the range client-side from the tour's activity times to avoid the
- * backend's alphabetical sort bug with 12-hour AM/PM time strings.
- * Returns { tourId, hourRange } where hourRange is "HH:MM - HH:MM" (first to last
- * activity by actual clock time) or null when there are no activities.
+ * Business logic for getting a tour's hour range from the dedicated API endpoint.
+ * Calls GET /api/tours/:tourId/hour-range which returns { startHour, endHour, daysCount }.
+ * Returns { tourId, hourRange, daysCount } where hourRange is "startHour - endHour" or null.
  */
 export const getTourHourRangeBusiness = async (
   tourId: string,
   token: string,
-  language = 'es'
+  _language = 'es'
 ): Promise<{
   success: boolean;
-  data?: { tourId: string; hourRange: string | null };
+  data?: { tourId: string; hourRange: string | null; daysCount: number };
   message?: string;
 }> => {
   if (token === '' || token === undefined) {
@@ -192,31 +171,34 @@ export const getTourHourRangeBusiness = async (
   }
 
   try {
-    const tourResult = (await getTourById(tourId, language, 'MXN', token)) as {
+    const result = (await getTourHourRange(tourId, token)) as {
       success?: boolean;
-      data?: { activities?: Array<{ hora?: string }> };
+      data?: { tourId?: string; startHour?: string; endHour?: string; daysCount?: number };
       message?: string;
     };
 
-    if (tourResult.success !== true || tourResult.data === undefined) {
-      return { success: false, message: tourResult.message ?? 'Tour not found' };
+    if (result.success !== true || result.data === undefined) {
+      return { success: false, message: result.message ?? 'Hour range not found' };
     }
 
-    const activities = tourResult.data.activities ?? [];
-    const times = activities
-      .map((a) => ({ raw: a.hora ?? '', mins: parseTimeToMinutes(a.hora ?? '') }))
-      .filter((t) => t.raw !== '' && t.mins >= 0);
+    const { startHour, endHour, daysCount } = result.data;
+    const start = startHour ?? '';
+    const end = endHour ?? '';
 
-    if (times.length === 0) {
-      return { success: true, data: { tourId, hourRange: null } };
+    if (start === '' && end === '') {
+      return { success: true, data: { tourId, hourRange: null, daysCount: daysCount ?? 1 } };
     }
 
-    times.sort((a, b) => a.mins - b.mins);
-    const first = times.at(0)?.raw ?? '';
-    const last = times.at(-1)?.raw ?? '';
-    const hourRange = first === last ? first : `${first} - ${last}`;
+    const hourRange =
+      start !== '' && end !== '' && start !== end
+        ? `${start} - ${end}`
+        : start !== ''
+          ? start
+          : end !== ''
+            ? end
+            : null;
 
-    return { success: true, data: { tourId, hourRange } };
+    return { success: true, data: { tourId, hourRange, daysCount: daysCount ?? 1 } };
   } catch (error) {
     console.error('Error in getTourHourRangeBusiness:', error);
     return { success: false, message: 'Error fetching tour hour range' };

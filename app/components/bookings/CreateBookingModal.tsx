@@ -67,6 +67,7 @@ export function CreateBookingModal({
   const [clientNationalities, setClientNationalities] = useState<Record<number, string>>({});
   const [hourRange, setHourRange] = useState<string | null>(null);
   const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
+  const [tourDaysCount, setTourDaysCount] = useState<number | null>(null);
   const [minBookingDate, setMinBookingDate] = useState<string>('');
   const [tourAvailability, setTourAvailability] = useState<TourAvailabilityData | null>(null);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
@@ -157,6 +158,7 @@ export function CreateBookingModal({
     if (formData.tourId === '' || token === null || token === '') {
       setHourRange(null);
       setMinBookingDate('');
+      setTourDaysCount(null);
       return;
     }
     const fetchTourDetails = async () => {
@@ -168,6 +170,9 @@ export function CreateBookingModal({
           ? (hourRangeResult.data?.hourRange ?? null)
           : null;
         setHourRange(newHourRange);
+        setTourDaysCount(
+          hourRangeResult.success ? (hourRangeResult.data?.daysCount ?? null) : null
+        );
 
         // Fetch tour details to get country code
         const tourResult = (await getTourByIdBusiness(formData.tourId, language, 'MXN', token)) as {
@@ -191,6 +196,7 @@ export function CreateBookingModal({
       } catch {
         setHourRange(null);
         setMinBookingDate('');
+        setTourDaysCount(null);
       } finally {
         setIsLoadingHourRange(false);
       }
@@ -477,11 +483,22 @@ export function CreateBookingModal({
 
     try {
       // Combine date-only values with hour-range times, then build the payload
+      const to24h = (time: string): string => {
+        const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!match) return time;
+        let h = parseInt(match[1] ?? '0', 10);
+        const m = match[2] ?? '00';
+        const period = (match[3] ?? '').toUpperCase();
+        if (period === 'PM' && h !== 12) h += 12;
+        if (period === 'AM' && h === 12) h = 0;
+        return `${String(h).padStart(2, '0')}:${m}`;
+      };
+
       const buildDateTime = (date: string, time: string): string => {
-        // Convert "YYYY-MM-DD" + "HH:MM" into an ISO string
         if (!date) return '';
-        const d = new Date(`${date}T${time}:00`);
-        return isNaN(d.getTime()) ? `${date}T${time}:00` : d.toISOString();
+        const t24 = to24h(time);
+        const d = new Date(`${date}T${t24}:00`);
+        return isNaN(d.getTime()) ? `${date}T${t24}:00` : d.toISOString();
       };
 
       const [rangeStart, rangeEnd] =
@@ -695,6 +712,44 @@ export function CreateBookingModal({
                 </span>
               )}
             </div>
+
+            {/* Tour days count pill */}
+            {tourDaysCount !== null && tourDaysCount > 0 && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'var(--color-primary-50, #f0fdf4)',
+                  border: '1px solid var(--color-primary-200, #bbf7d0)',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-primary-700, #15803d)',
+                  fontWeight: 500,
+                  lineHeight: 1.4,
+                }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                {language === 'en'
+                  ? `This tour consists of ${tourDaysCount} day${tourDaysCount !== 1 ? 's' : ''}`
+                  : `Este tour consta de ${tourDaysCount} día${tourDaysCount !== 1 ? 's' : ''}`}
+              </div>
+            )}
 
             {/* Dates */}
             <div>
