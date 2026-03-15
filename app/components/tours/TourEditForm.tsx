@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
-import type { Tour, Language } from '~/types/PayloadTourDataProps';
+import type { Tour, Language, TourDay, TourActivity } from '~/types/PayloadTourDataProps';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
@@ -14,6 +14,9 @@ import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import { setGlobalLoading, openModal } from '~/store/slices/uiSlice';
 import Select from '~/components/ui/Select';
 import { Button } from '~/components/ui/Button';
+import { ActivitiesByDay } from '~/components/tours/ActivitiesByDay';
+import { getActivitiesDropdown } from '~/server/activities';
+import { useTranslation } from '~/lib/i18n/utils';
 
 // Translation API function using LibreTranslate (free)
 async function translateText(
@@ -85,14 +88,6 @@ const LANGUAGE_OPTIONS = [
   { value: 'en', label: 'English' },
 ];
 
-// Activity interface
-interface TourActivity {
-  activityId: string;
-  activityName: string;
-  hora: string;
-  sortOrder: number;
-}
-
 interface TourEditFormProps {
   tourId: string;
   initialTourData?: Partial<Tour> | null;
@@ -107,6 +102,7 @@ export function TourEditForm({
   onCancel,
 }: TourEditFormProps): JSX.Element {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const currentLanguage = useAppSelector(selectLanguage) as Language;
   const currencyCode = useAppSelector(selectSelectedCurrencyCode);
   const rawCities = useAppSelector(selectCities);
@@ -124,7 +120,6 @@ export function TourEditForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Multi-select states
-  const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [selectedRequirements, setSelectedRequirements] = useState<string[]>([]);
   const [selectedIncluded, setSelectedIncluded] = useState<Record<string, boolean>>({});
@@ -135,11 +130,38 @@ export function TourEditForm({
   const [newImages, setNewImages] = useState<File[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // Time slots
-  const [activityTimes, setActivityTimes] = useState<Record<string, string>>({});
+  // Days and activities state
+  const [days, setDays] = useState<TourDay[]>([]);
+  const [availableActivities, setAvailableActivities] = useState<TourActivity[]>([]);
 
   // Track if data has been initialized to prevent re-runs
   const dataInitialized = useRef(false);
+
+  // Fetch available activities from API
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        const result = await getActivitiesDropdown(currentLanguage);
+        if (result.success && result.data) {
+          setAvailableActivities(
+            result.data.map((a, index) => ({
+              id: a.id,
+              activityId: a.id,
+              activity_es: a.activityEs,
+              activity_en: a.activityEn,
+              activity: currentLanguage === 'en' ? a.activityEn : a.activityEs,
+              hora: '09:00 AM',
+              sortOrder: index + 1,
+              category: '',
+            }))
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching activities:', error);
+      }
+    };
+    void fetchActivities();
+  }, [currentLanguage]);
 
   // Load tour data - only runs once on mount if initialTourData is provided
   useEffect(() => {
@@ -155,9 +177,6 @@ export function TourEditForm({
       setOriginalData(JSON.parse(JSON.stringify(data)) as Partial<Tour>); // Deep copy
 
       // Set multi-select states
-      setSelectedActivities(
-        Array.isArray(data.activities) ? data.activities.map((a) => a.activityId ?? '') : []
-      );
       setSelectedAmenities(
         Array.isArray(data.amenities) ? data.amenities.map((a) => a.amenityId ?? '') : []
       );
@@ -176,16 +195,11 @@ export function TourEditForm({
       }
       setSelectedIncluded(included);
 
-      // Set activity times
-      const times: Record<string, string> = {};
-      if (Array.isArray(data.activities)) {
-        data.activities.forEach((activity) => {
-          if (activity.id) {
-            times[activity.id] = activity.hora ?? '09:00';
-          }
-        });
+      // Load days from API response
+      if (Array.isArray(data.days) && data.days.length > 0) {
+        setDays(data.days);
       }
-      setActivityTimes(times);
+
       setLoading(false);
       dataInitialized.current = true;
       return;
@@ -213,9 +227,6 @@ export function TourEditForm({
           setOriginalData(JSON.parse(JSON.stringify(data)) as Partial<Tour>); // Deep copy
 
           // Set multi-select states
-          setSelectedActivities(
-            Array.isArray(data.activities) ? data.activities.map((a) => a.activityId ?? '') : []
-          );
           setSelectedAmenities(
             Array.isArray(data.amenities) ? data.amenities.map((a) => a.amenityId ?? '') : []
           );
@@ -236,16 +247,11 @@ export function TourEditForm({
           }
           setSelectedIncluded(included);
 
-          // Set activity times
-          const times: Record<string, string> = {};
-          if (Array.isArray(data.activities)) {
-            data.activities.forEach((activity) => {
-              if (activity.id) {
-                times[activity.id] = activity.hora ?? '09:00';
-              }
-            });
+          // Load days from API response
+          if (Array.isArray(data.days) && data.days.length > 0) {
+            setDays(data.days);
           }
-          setActivityTimes(times);
+
           dataInitialized.current = true;
         }
       } catch (error) {
@@ -376,9 +382,15 @@ export function TourEditForm({
       newErrors.basePrice = 'Base price is required';
     }
 
-    // Validate that at least 2 activities are assigned
-    if (selectedActivities.length < 2) {
-      newErrors.activities = 'Se requieren al menos 2 actividades (Minimum 2 activities required)';
+    // Validate that at least 1 day exists
+    if (days.length === 0) {
+      newErrors.activities = 'Se requiere al menos un día (Minimum 1 day required)';
+    } else {
+      // Validate that at least 1 activity is assigned across all days
+      const totalActivities = days.reduce((sum, day) => sum + day.activities.length, 0);
+      if (totalActivities < 1) {
+        newErrors.activities = 'Se requiere al menos una actividad (Minimum 1 activity required)';
+      }
     }
 
     // Validate images (minimum 2)
@@ -409,10 +421,8 @@ export function TourEditForm({
         'data',
         JSON.stringify({
           ...tourData,
-          activities: selectedActivities.map((id) => ({
-            activityId: id,
-            hora: activityTimes[id] ?? '09:00',
-          })),
+          days,
+          daysCount: days.length,
           amenities: selectedAmenities,
           requirements: selectedRequirements,
           offers: selectedOffers,
@@ -1191,6 +1201,60 @@ export function TourEditForm({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Activities by Day */}
+      <div style={{ marginBottom: 'var(--space-6)' }}>
+        <ActivitiesByDay
+          days={days}
+          availableActivities={availableActivities}
+          translations={{
+            activitiesByDay: t('tours.activitiesByDay'),
+            addDay: t('tours.addDay'),
+            noDaysAdded: t('tours.noDaysAdded'),
+            noDaysDescription: t('tours.noDaysDescription'),
+            dayLabel: t('tours.dayLabel'),
+            removeDay: t('tours.removeDay'),
+            addActivity: t('tours.addActivity'),
+            selectActivity: t('tours.selectActivity'),
+            noActivitiesInDay: t('tours.noActivitiesInDay'),
+            timeLabel: t('tours.timeLabel'),
+          }}
+          onDaysChange={setDays}
+          onActivityTimeChange={(dayIndex, activityId, time) => {
+            // Update activity time in the state
+            const newDays = [...days];
+            const day = newDays[dayIndex];
+            if (day) {
+              const activity = day.activities.find((a) => a.id === activityId);
+              if (activity) {
+                activity.hora = time;
+              }
+            }
+            setDays(newDays);
+          }}
+          onRemoveActivity={(dayIndex, activityId) => {
+            // Remove activity from day
+            const newDays = [...days];
+            const day = newDays[dayIndex];
+            if (day) {
+              day.activities = day.activities.filter((a) => a.id !== activityId);
+            }
+            setDays(newDays);
+          }}
+          onAddDay={() => {
+            // Add new day
+            const newDay = {
+              day: days.length + 1,
+              activities: [],
+            };
+            setDays([...days, newDay]);
+          }}
+          onRemoveDay={(dayIndex) => {
+            // Remove day
+            setDays(days.filter((_, i) => i !== dayIndex));
+          }}
+        />
       </div>
 
       {/* Activities validation feedback */}

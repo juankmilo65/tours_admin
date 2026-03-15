@@ -19,6 +19,8 @@ import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import { openModal, closeModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { getCachedLanguages, setLanguages as setLanguagesCache } from '~/store/slices/cacheSlice';
 import Select from '~/components/ui/Select';
+import { ActivitiesByDay } from '~/components/tours/ActivitiesByDay';
+import type { TourDay, TourActivity as TourActivityType } from '~/types/PayloadTourDataProps';
 
 // Type definitions
 interface UserDropdownOption {
@@ -71,6 +73,7 @@ interface TourFormData {
   difficulty: 'easy' | 'medium' | 'hard';
   language: string[];
   activities: TourActivity[];
+  days: TourDay[]; // Activities grouped by day
   isActive: boolean;
 }
 
@@ -135,6 +138,7 @@ export function CreateTourModal({
       difficulty: initialData?.difficulty ?? 'easy',
       language: initialData?.language ?? ['es'],
       activities: initialData?.activities ?? [],
+      days: initialData?.days ?? [],
       isActive: initialData?.isActive ?? true,
     }),
     [initialData, currentUser?.id]
@@ -151,124 +155,27 @@ export function CreateTourModal({
   // Drag and drop state
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedActivityId, setSelectedActivityId] = useState<string>('');
 
-  // Activity drag and drop state
-  const [draggedActivityIndex, setDraggedActivityIndex] = useState<number | null>(null);
+  // Available activities for ActivitiesByDay component
+  const availableActivitiesForDays: TourActivityType[] = activities.map((a) => ({
+    id: a.id,
+    activityId: a.id,
+    activity_es: a.activityEs,
+    activity_en: a.activityEn,
+    activity: currentLanguage === 'en' ? a.activityEn : a.activityEs,
+    hora: '09:00 AM',
+    sortOrder: 0,
+    category: 'activity',
+  }));
 
-  // Generate time options (12:00 AM - 11:00 PM)
-  const generateTimeOptions = (): Array<{ value: string; label: string }> => {
-    const options: Array<{ value: string; label: string }> = [];
-    const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-
-    // First all AM hours (12:00 AM, 01:00 AM, ..., 11:00 AM)
-    hours.forEach((hour) => {
-      options.push({
-        value: `${hour.toString().padStart(2, '0')}:00 AM`,
-        label: `${hour.toString().padStart(2, '0')}:00 AM`,
-      });
-    });
-
-    // Then all PM hours (12:00 PM, 01:00 PM, ..., 11:00 PM)
-    hours.forEach((hour) => {
-      options.push({
-        value: `${hour.toString().padStart(2, '0')}:00 PM`,
-        label: `${hour.toString().padStart(2, '0')}:00 PM`,
-      });
-    });
-
-    return options;
-  };
-
-  const timeOptions = generateTimeOptions();
-
-  // Get available time options for a specific activity (excluding times used by other activities)
-  const getAvailableTimeOptions = useCallback(
-    (currentActivityIndex: number): Array<{ value: string; label: string }> => {
-      // Get all hours used by other activities (not the current one)
-      const usedHours = formData.activities
-        .filter((_, index) => index !== currentActivityIndex)
-        .map((activity) => activity.hora);
-
-      // Filter out used hours from the options
-      return timeOptions.filter((option) => !usedHours.includes(option.value));
-    },
-    [formData.activities, timeOptions]
-  );
-
-  // Get the first available hour for a new activity
-  const getFirstAvailableHour = useCallback((): string => {
-    const usedHours = formData.activities.map((activity) => activity.hora);
-    const availableOption = timeOptions.find((option) => !usedHours.includes(option.value));
-    return availableOption?.value ?? '09:00 AM';
-  }, [formData.activities, timeOptions]);
-
-  // Convert time string "HH:MM AM/PM" to minutes from midnight
-  const timeToMinutes = useCallback((timeStr: string): number => {
-    const match = timeStr.match(/^(\d{2}):(\d{2})\s*(AM|PM)$/i);
-    const hourStr = match?.[1];
-    const minStr = match?.[2];
-    const periodStr = match?.[3];
-
-    if (hourStr === undefined || minStr === undefined || periodStr === undefined) {
-      return 0;
-    }
-
-    let hours = parseInt(hourStr, 10);
-    const minutes = parseInt(minStr, 10);
-    const period = periodStr.toUpperCase();
-
-    // Convert to 24-hour format
-    if (period === 'AM' && hours === 12) {
-      hours = 0;
-    } else if (period === 'PM' && hours !== 12) {
-      hours += 12;
-    }
-
-    return hours * 60 + minutes;
-  }, []);
-
-  // Calculate total duration based on activities
-  const calculateDuration = useCallback((): string => {
-    if (formData.activities.length === 0) {
-      return '0 hours';
-    }
-
-    if (formData.activities.length === 1) {
-      return '1 hour';
-    }
-
-    // Get all times and sort them
-    const times = formData.activities.map((a) => timeToMinutes(a.hora)).sort((a, b) => a - b);
-
-    // Calculate duration from first to last activity (assuming 1 hour per activity minimum)
-    const firstTime = times[0] ?? 0;
-    const lastTime = times[times.length - 1] ?? 0;
-
-    // Duration is the difference plus 1 hour for the last activity
-    let durationMinutes = lastTime - firstTime + 60;
-
-    // Handle case where activities span past midnight
-    if (durationMinutes < 0) {
-      durationMinutes += 24 * 60;
-    }
-
-    const hours = Math.floor(durationMinutes / 60);
-    const mins = durationMinutes % 60;
-
-    if (mins === 0) {
-      return hours === 1 ? '1 hour' : `${hours} hours`;
-    }
-    return `${hours}h ${mins}m`;
-  }, [formData.activities, timeToMinutes]);
-
-  // Auto-update duration when activities change
+  // Auto-update duration based on days count
   useEffect(() => {
-    const newDuration = calculateDuration();
-    if (newDuration !== formData.duration) {
+    const daysCount = formData.days.length;
+    const newDuration = daysCount <= 1 ? `${daysCount} day` : `${daysCount} days`;
+    if (formData.days.length > 0 && newDuration !== formData.duration) {
       setFormData((prev) => ({ ...prev, duration: newDuration }));
     }
-  }, [formData.activities, calculateDuration, formData.duration]);
+  }, [formData.days, formData.duration]);
 
   // Fetch languages on mount with caching
   useEffect(() => {
@@ -499,73 +406,7 @@ export function CreateTourModal({
     }));
   };
 
-  // Activity handlers
-  const handleAddActivity = (activityId: string): void => {
-    const activity = activities.find((a) => a.id === activityId);
-    if (!activity) return;
-
-    const newActivity: TourActivity = {
-      activityId,
-      activityName: currentLanguage === 'en' ? activity.activityEn : activity.activityEs,
-      hora: getFirstAvailableHour(),
-      sortOrder: formData.activities.length + 1,
-    };
-
-    setFormData((prev) => ({
-      ...prev,
-      activities: [...prev.activities, newActivity],
-    }));
-    setSelectedActivityId('');
-    if (errors.activities !== undefined) {
-      setErrors((prev) => ({ ...prev, activities: undefined }));
-    }
-  };
-
-  const handleRemoveActivity = (index: number): void => {
-    setFormData((prev) => ({
-      ...prev,
-      activities: prev.activities.filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleActivityTimeChange = (index: number, time: string): void => {
-    setFormData((prev) => ({
-      ...prev,
-      activities: prev.activities.map((activity, i) =>
-        i === index ? { ...activity, hora: time } : activity
-      ),
-    }));
-  };
-
-  // Activity drag and drop handlers
-  const handleActivityDragStart = (index: number): void => {
-    setDraggedActivityIndex(index);
-  };
-
-  const handleActivityDragOver = (e: React.DragEvent<HTMLDivElement>, index: number): void => {
-    e.preventDefault();
-    if (draggedActivityIndex === null || draggedActivityIndex === index) return;
-
-    const reorderedActivities = [...formData.activities];
-    const [draggedActivity] = reorderedActivities.splice(draggedActivityIndex, 1);
-
-    if (draggedActivity === undefined) return;
-
-    reorderedActivities.splice(index, 0, draggedActivity);
-
-    // Update sortOrder for all activities
-    const updatedActivities = reorderedActivities.map((activity, i) => ({
-      ...activity,
-      sortOrder: i + 1,
-    }));
-
-    setFormData((prev) => ({ ...prev, activities: updatedActivities }));
-    setDraggedActivityIndex(index);
-  };
-
-  const handleActivityDragEnd = (): void => {
-    setDraggedActivityIndex(null);
-  };
+  // Activity handlers are now managed by ActivitiesByDay component
 
   const handleLanguageToggle = (lang: string): void => {
     setFormData((prev) => ({
@@ -601,10 +442,16 @@ export function CreateTourModal({
       newErrors.maxCapacity = t('tours.maxCapacityRequired') ?? 'Max capacity is required';
     if (formData.basePrice <= 0)
       newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
-    // Validate that at least 2 activities are provided
-    if (formData.activities.length < 2) {
-      newErrors.activities =
-        t('tours.activitiesMinRequired') ?? 'Se requieren al menos 2 actividades';
+    // Validate that at least 1 day exists
+    if (formData.days.length === 0) {
+      newErrors.activities = t('tours.daysMinRequired') ?? 'Se requiere al menos un día';
+    } else {
+      // Validate that at least 1 activity is provided across all days
+      const totalActivities = formData.days.reduce((sum, day) => sum + day.activities.length, 0);
+      if (totalActivities < 1) {
+        newErrors.activities =
+          t('tours.activitiesMinRequired') ?? 'Se requiere al menos una actividad';
+      }
     }
     // Validate that at least one image is provided (new or existing)
     const totalImages = formData.images.length + formData.existingImageUrls.length;
@@ -648,17 +495,19 @@ export function CreateTourModal({
         descriptionEn: formData.descriptionEn,
         shortDescriptionEs: formData.shortDescriptionEs,
         shortDescriptionEn: formData.shortDescriptionEn,
-        duration: formData.duration,
         maxCapacity: formData.maxCapacity,
         basePrice: formData.basePrice,
         currency: formData.currency,
         difficulty: formData.difficulty,
         language: formData.language,
         isActive: formData.isActive,
-        activities: formData.activities.map((activity) => ({
-          activityId: activity.activityId,
-          hora: activity.hora,
-          sortOrder: activity.sortOrder,
+        activities: formData.days.map((day) => ({
+          day: day.day,
+          activities: day.activities.map((activity) => ({
+            activityId: activity.activityId,
+            hora: activity.hora,
+            sortOrder: activity.sortOrder,
+          })),
         })),
       };
 
@@ -1161,215 +1010,81 @@ export function CreateTourModal({
               )}
             </div>
 
-            {/* Activities */}
+            {/* Activities by Day */}
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: 'var(--space-2)',
-                  fontWeight: 'var(--font-weight-medium)',
-                  color: 'var(--color-neutral-700)',
+              <ActivitiesByDay
+                days={formData.days}
+                availableActivities={availableActivitiesForDays}
+                translations={{
+                  activitiesByDay: t('tours.activitiesByDay'),
+                  addDay: t('tours.addDay'),
+                  noDaysAdded: t('tours.noDaysAdded'),
+                  noDaysDescription: t('tours.noDaysDescription'),
+                  dayLabel: t('tours.dayLabel'),
+                  removeDay: t('tours.removeDay'),
+                  addActivity: t('tours.addActivity'),
+                  selectActivity: t('tours.selectActivity'),
+                  noActivitiesInDay: t('tours.noActivitiesInDay'),
+                  timeLabel: t('tours.timeLabel'),
                 }}
-              >
-                {t('tours.activities')} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
-                  <Select
-                    options={[
-                      { value: '', label: t('tours.selectActivity') ?? 'Seleccionar actividad' },
-                      ...activities
-                        .filter((a) => !formData.activities.some((act) => act.activityId === a.id))
-                        .map((activity) => ({
-                          value: activity.id,
-                          label:
-                            currentLanguage === 'en' ? activity.activityEn : activity.activityEs,
-                        })),
-                    ]}
-                    value={selectedActivityId}
-                    onChange={(value: string) => {
-                      if (value !== '') {
-                        handleAddActivity(value);
-                      }
-                    }}
-                    placeholder={t('tours.selectActivity')}
-                    id="select-activities"
-                  />
-                </div>
-              </div>
-
-              {/* Activities List with Drag and Drop */}
-              {formData.activities.length > 0 && (
+                onDaysChange={(newDays) => {
+                  setFormData((prev) => ({ ...prev, days: newDays }));
+                  if (errors.activities !== undefined) {
+                    setErrors((prev) => ({ ...prev, activities: undefined }));
+                  }
+                }}
+                onActivityTimeChange={(dayIndex, activityId, time) => {
+                  const newDays = [...formData.days];
+                  const day = newDays[dayIndex];
+                  if (day) {
+                    const activity = day.activities.find((a) => a.id === activityId);
+                    if (activity) {
+                      activity.hora = time;
+                    }
+                  }
+                  setFormData((prev) => ({ ...prev, days: newDays }));
+                }}
+                onRemoveActivity={(dayIndex, activityId) => {
+                  const newDays = [...formData.days];
+                  const day = newDays[dayIndex];
+                  if (day) {
+                    day.activities = day.activities.filter((a) => a.id !== activityId);
+                  }
+                  setFormData((prev) => ({ ...prev, days: newDays }));
+                }}
+                onAddDay={() => {
+                  const newDay: TourDay = {
+                    day: formData.days.length + 1,
+                    activities: [],
+                  };
+                  setFormData((prev) => ({ ...prev, days: [...prev.days, newDay] }));
+                }}
+                onRemoveDay={(dayIndex) => {
+                  const newDays = formData.days
+                    .filter((_, i) => i !== dayIndex)
+                    .map((d, i) => ({ ...d, day: i + 1 }));
+                  setFormData((prev) => ({ ...prev, days: newDays }));
+                }}
+              />
+              {errors.activities !== undefined && (
                 <div
                   style={{
-                    marginTop: 'var(--space-4)',
-                    border: '1px solid var(--color-neutral-200)',
+                    marginTop: 'var(--space-2)',
+                    padding: 'var(--space-3) var(--space-4)',
+                    backgroundColor: 'var(--color-error-50, #fef2f2)',
+                    border: '1px solid var(--color-error-200, #fecaca)',
                     borderRadius: 'var(--radius-md)',
-                    overflow: 'visible',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)',
+                    color: 'var(--color-error-700, #b91c1c)',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 500,
                   }}
                 >
-                  <div
-                    style={{
-                      padding: 'var(--space-3)',
-                      backgroundColor: 'var(--color-neutral-50)',
-                      borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '40px 1fr 200px 40px',
-                        gap: 'var(--space-3)',
-                        fontSize: 'var(--text-sm)',
-                        fontWeight: 'var(--font-weight-semibold)',
-                        color: 'var(--color-neutral-600)',
-                      }}
-                    >
-                      <div>#</div>
-                      <div>{t('tours.activity') ?? 'Actividad'}</div>
-                      <div>{t('tours.time') ?? 'Hora'}</div>
-                      <div />
-                    </div>
-                  </div>
-
-                  <div style={{ maxHeight: '300px', overflowY: 'auto', overflowX: 'visible' }}>
-                    {formData.activities.map((activity, index) => (
-                      <div
-                        key={`${activity.activityId}-${index}`}
-                        draggable
-                        onDragStart={() => handleActivityDragStart(index)}
-                        onDragOver={(e) => handleActivityDragOver(e, index)}
-                        onDragEnd={handleActivityDragEnd}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '40px 1fr 200px 40px',
-                          gap: 'var(--space-3)',
-                          padding: 'var(--space-3)',
-                          alignItems: 'center',
-                          borderBottom:
-                            index < formData.activities.length - 1
-                              ? '1px solid var(--color-neutral-200)'
-                              : 'none',
-                          backgroundColor:
-                            draggedActivityIndex === index ? 'var(--color-primary-50)' : 'white',
-                          cursor: 'move',
-                          transition: 'background-color 0.2s',
-                        }}
-                        onMouseOver={(e) => {
-                          if (draggedActivityIndex !== index) {
-                            e.currentTarget.style.backgroundColor = 'var(--color-neutral-50)';
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (draggedActivityIndex !== index) {
-                            e.currentTarget.style.backgroundColor = 'white';
-                          }
-                        }}
-                      >
-                        {/* Drag Handle */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--color-neutral-400)',
-                            cursor: 'grab',
-                          }}
-                        >
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <circle cx="9" cy="12" r="1" />
-                            <circle cx="9" cy="5" r="1" />
-                            <circle cx="9" cy="19" r="1" />
-                            <circle cx="15" cy="12" r="1" />
-                            <circle cx="15" cy="5" r="1" />
-                            <circle cx="15" cy="19" r="1" />
-                          </svg>
-                        </div>
-
-                        {/* Activity Name */}
-                        <div
-                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-neutral-900)' }}
-                        >
-                          {activity.activityName}
-                        </div>
-
-                        {/* Time Selector */}
-                        <div>
-                          <Select
-                            options={getAvailableTimeOptions(index)}
-                            value={activity.hora}
-                            onChange={(value: string) => {
-                              handleActivityTimeChange(index, value);
-                            }}
-                            id={`activity-time-${index}`}
-                            className="w-full"
-                          />
-                        </div>
-
-                        {/* Remove Button */}
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveActivity(index)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: 'var(--radius-md)',
-                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                              color: 'var(--color-error-600)',
-                              border: 'none',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-                            }}
-                            title={t('common.remove') ?? 'Eliminar'}
-                          >
-                            <svg
-                              width="18"
-                              height="18"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            >
-                              <path d="M3 6h18" />
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {errors.activities !== undefined && (
-                <span
-                  style={{
-                    color: 'red',
-                    fontSize: 'var(--text-xs)',
-                    marginTop: 'var(--space-1)',
-                    display: 'block',
-                  }}
-                >
+                  <span>⚠</span>
                   {errors.activities}
-                </span>
+                </div>
               )}
             </div>
 

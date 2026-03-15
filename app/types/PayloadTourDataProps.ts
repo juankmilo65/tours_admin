@@ -23,7 +23,14 @@ export interface TourActivity {
   activity: string; // Default/fallback
   hora: string;
   sortOrder: number;
+  day?: number; // Day number (1, 2, 3, etc.)
   category: string; // pickup, activity, meal, etc.
+}
+
+// Day type for grouped activities
+export interface TourDay {
+  day: number;
+  activities: TourActivity[];
 }
 
 // Amenity Types (with translations)
@@ -105,7 +112,8 @@ export interface Tour {
   shortDescription_es: string;
   shortDescription_en: string;
   // Common fields
-  duration: number;
+  duration: string;
+  daysCount?: number;
   maxCapacity: number;
   basePrice: string;
   currency: string;
@@ -126,6 +134,7 @@ export interface Tour {
   }>;
   offers: Offer[];
   activities: TourActivity[];
+  days?: TourDay[]; // Activities grouped by day
   amenities: TourAmenity[];
   requirements: TourRequirement[];
   included: TourIncludedItem[];
@@ -149,7 +158,8 @@ export interface TranslatedTour {
   title: string;
   description: string;
   shortDescription: string;
-  duration: number;
+  duration: string;
+  daysCount?: number;
   maxCapacity: number;
   basePrice: string;
   currency: string;
@@ -299,7 +309,8 @@ export function translateTour(tour: Tour, lang: Language): TranslatedTour {
     title: getTranslated(tour.title_es || '', tour.title_en || ''),
     description: getTranslated(tour.description_es || '', tour.description_en || ''),
     shortDescription: getTranslated(tour.shortDescription_es || '', tour.shortDescription_en || ''),
-    duration: tour.duration || 0,
+    duration: tour.duration || '',
+    daysCount: tour.daysCount,
     maxCapacity: tour.maxCapacity || 0,
     basePrice: tour.basePrice || '',
     currency: tour.currency || 'MXN',

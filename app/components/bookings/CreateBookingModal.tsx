@@ -25,6 +25,9 @@ import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
 import type { Client } from '~/types/booking';
 import { getMinimumBookingDate } from '~/utilities/timezoneValidation';
+import { getTourAvailabilityBusiness } from '~/server/businessLogic/tourAvailabilityBusinessLogic';
+import { TourAvailabilityDisplay } from '~/components/bookings/TourAvailabilityDisplay';
+import type { TourAvailabilityData } from '~/types/tourAvailability';
 
 // The dropdown endpoint returns minimal tour info (same as offers)
 interface TourOption {
@@ -65,6 +68,9 @@ export function CreateBookingModal({
   const [hourRange, setHourRange] = useState<string | null>(null);
   const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
   const [minBookingDate, setMinBookingDate] = useState<string>('');
+  const [tourAvailability, setTourAvailability] = useState<TourAvailabilityData | null>(null);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string>('');
 
   // Cache-first dropdown loaders
   const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
@@ -105,6 +111,46 @@ export function CreateBookingModal({
 
     void fetchTours();
   }, [language]);
+
+  // Check tour availability when dates are selected
+  useEffect(() => {
+    if (
+      formData.tourId === '' ||
+      formData.startDate === '' ||
+      formData.endDate === '' ||
+      token === null ||
+      token === ''
+    ) {
+      setTourAvailability(null);
+      setAvailabilityError('');
+      return;
+    }
+    const checkAvailability = async () => {
+      setIsLoadingAvailability(true);
+      setAvailabilityError('');
+      try {
+        const result = await getTourAvailabilityBusiness(
+          formData.tourId,
+          formData.startDate,
+          formData.endDate,
+          token
+        );
+        if (result.success && result.data !== undefined) {
+          setTourAvailability(result.data);
+          setAvailabilityError('');
+        } else {
+          setTourAvailability(null);
+          setAvailabilityError(result.message ?? 'Failed to check availability');
+        }
+      } catch {
+        setTourAvailability(null);
+        setAvailabilityError('Failed to check availability');
+      } finally {
+        setIsLoadingAvailability(false);
+      }
+    };
+    void checkAvailability();
+  }, [formData.tourId, formData.startDate, formData.endDate, token]);
 
   // Fetch hour range when tour selection changes
   useEffect(() => {
@@ -806,6 +852,13 @@ export function CreateBookingModal({
                 </div>
               </div>
             </div>
+
+            {/* Tour Availability Display */}
+            <TourAvailabilityDisplay
+              availability={tourAvailability}
+              isLoading={isLoadingAvailability}
+              error={availabilityError}
+            />
 
             {/* Currency */}
             <div>

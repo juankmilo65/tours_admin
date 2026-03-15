@@ -25,7 +25,7 @@ export function TourCard({
   onDelete,
   onClone,
 }: TourCardProps): React.JSX.Element {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const hasActiveOffer =
@@ -187,12 +187,16 @@ export function TourCard({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>⏱️</span>
-            <span>{tour.duration}h</span>
+            <span>📅</span>
+            <span>
+              {tour.daysCount} {language === 'es' ? 'días' : 'days'}
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>👥</span>me
-            <span>{tour.maxCapacity}</span>
+            <span>👥</span>
+            <span>
+              {tour.maxCapacity} {language === 'es' ? 'personas' : 'people'}
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span>🗣️</span>

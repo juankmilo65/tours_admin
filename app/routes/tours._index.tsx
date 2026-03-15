@@ -725,6 +725,40 @@ function ToursClient(): JSX.Element {
             sortOrder: act.sortOrder ?? index + 1,
           }))
         : [],
+      // Map days from API format (activities grouped by day)
+      days: Array.isArray(fullData.days)
+        ? (
+            fullData.days as Array<{
+              day: number;
+              activities: Array<{
+                id?: string;
+                activityId?: string;
+                activity_es?: string;
+                activity_en?: string;
+                activity?: string;
+                hora?: string;
+                sortOrder?: number;
+                day?: number;
+              }>;
+            }>
+          ).map((dayGroup) => ({
+            day: dayGroup.day,
+            activities: dayGroup.activities.map((act, index) => ({
+              id: act.id ?? act.activityId ?? '',
+              activityId: act.activityId ?? act.id ?? '',
+              activity_es: act.activity_es ?? '',
+              activity_en: act.activity_en ?? '',
+              activity:
+                currentLanguage === 'en'
+                  ? (act.activity_en ?? act.activity_es ?? act.activity ?? '')
+                  : (act.activity_es ?? act.activity_en ?? act.activity ?? ''),
+              hora: act.hora ?? '09:00 AM',
+              sortOrder: act.sortOrder ?? index + 1,
+              day: dayGroup.day,
+              category: 'activity',
+            })),
+          }))
+        : [],
     };
 
     console.warn('[tours._index] editInitialData computed:', initialData);
