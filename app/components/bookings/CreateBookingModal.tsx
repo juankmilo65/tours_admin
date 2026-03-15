@@ -24,7 +24,11 @@ import {
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
 import type { Client } from '~/types/booking';
-import { getMinimumBookingDate } from '~/utilities/timezoneValidation';
+import {
+  getMinimumBookingDate,
+  getTimezoneForCountry,
+  buildDateTimeInTimezone,
+} from '~/utilities/timezoneValidation';
 import { getTourAvailabilityBusiness } from '~/server/businessLogic/tourAvailabilityBusinessLogic';
 import { TourAvailabilityDisplay } from '~/components/bookings/TourAvailabilityDisplay';
 import type { TourAvailabilityData } from '~/types/tourAvailability';
@@ -69,6 +73,7 @@ export function CreateBookingModal({
   const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
   const [tourDaysCount, setTourDaysCount] = useState<number | null>(null);
   const [minBookingDate, setMinBookingDate] = useState<string>('');
+  const [tourCountryCode, setTourCountryCode] = useState<string>('');
   const [tourAvailability, setTourAvailability] = useState<TourAvailabilityData | null>(null);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string>('');
@@ -183,6 +188,7 @@ export function CreateBookingModal({
         };
         if (tourResult.success === true && tourResult.data?.city?.countryId !== undefined) {
           const countryCode = tourResult.data.city.countryId;
+          setTourCountryCode(countryCode);
 
           // Calculate minimum booking date if we have tour start time
           if (newHourRange !== null) {
@@ -193,11 +199,13 @@ export function CreateBookingModal({
             setMinBookingDate('');
           }
         } else {
+          setTourCountryCode('');
           setMinBookingDate('');
         }
       } catch {
         setHourRange(null);
         setMinBookingDate('');
+        setTourCountryCode('');
         setTourDaysCount(null);
       } finally {
         setIsLoadingHourRange(false);
@@ -520,8 +528,8 @@ export function CreateBookingModal({
       const buildDateTime = (date: string, time: string): string => {
         if (!date) return '';
         const t24 = to24h(time);
-        const d = new Date(`${date}T${t24}:00`);
-        return isNaN(d.getTime()) ? `${date}T${t24}:00` : d.toISOString();
+        const tz = tourCountryCode ? getTimezoneForCountry(tourCountryCode) : 'UTC';
+        return buildDateTimeInTimezone(date, t24, tz);
       };
 
       const [rangeStart, rangeEnd] =

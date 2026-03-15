@@ -51,6 +51,63 @@ export function getTimezoneForCountry(countryCode: string): string {
 }
 
 /**
+ * Build an ISO 8601 UTC string for a date + time intended in a specific timezone.
+ *
+ * Example: dateStr="2026-03-17", timeStr="01:00", timezone="America/Mexico_City"
+ * → The user means March 17 at 01:00 in Mexico City (UTC-6)
+ * → Returns "2026-03-17T07:00:00.000Z"
+ *
+ * Without this, `new Date("2026-03-17T01:00:00")` would use the browser's
+ * local timezone, giving wrong results when the user is in a different timezone
+ * than the tour.
+ */
+export function buildDateTimeInTimezone(
+  dateStr: string,
+  timeStr: string,
+  timezone: string
+): string {
+  if (!dateStr) return '';
+
+  const [yearStr, monthStr, dayStr] = dateStr.split('-');
+  const [hourStr, minuteStr] = timeStr.split(':');
+  const year = parseInt(yearStr ?? '0', 10);
+  const month = parseInt(monthStr ?? '1', 10) - 1;
+  const day = parseInt(dayStr ?? '1', 10);
+  const hours = parseInt(hourStr ?? '0', 10);
+  const minutes = parseInt(minuteStr ?? '0', 10);
+
+  // Create a "nominal" UTC timestamp for the desired date/time
+  const nominalUtc = Date.UTC(year, month, day, hours, minutes, 0, 0);
+
+  // Format that nominal UTC instant in the target timezone to see how it appears there
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(new Date(nominalUtc));
+
+  const tzYear = parseInt(parts.find((p) => p.type === 'year')?.value ?? '0', 10);
+  const tzMonth = parseInt(parts.find((p) => p.type === 'month')?.value ?? '0', 10) - 1;
+  const tzDay = parseInt(parts.find((p) => p.type === 'day')?.value ?? '0', 10);
+  const tzHour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
+  const tzMinute = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+
+  // The difference tells us the timezone's UTC offset at this approximate point in time
+  const actualInTz = Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMinute, 0, 0);
+  const offset = actualInTz - nominalUtc;
+
+  // The correct UTC time: subtract the offset so the date/time is interpreted in the target tz
+  const correctUtc = nominalUtc - offset;
+  return new Date(correctUtc).toISOString();
+}
+
+/**
  * Parse a time string (e.g., "06:00 AM" or "14:30") to hours and minutes
  */
 export function parseTimeToHoursMinutes(timeStr: string): { hours: number; minutes: number } {

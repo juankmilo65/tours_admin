@@ -14,7 +14,11 @@ import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { selectAuthToken } from '~/store/slices/authSlice';
 import { updateBookingBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
-import { getTourHourRangeBusiness } from '~/server/businessLogic/toursBusinessLogic';
+import {
+  getTourHourRangeBusiness,
+  getTourByIdBusiness,
+} from '~/server/businessLogic/toursBusinessLogic';
+import { getTimezoneForCountry, buildDateTimeInTimezone } from '~/utilities/timezoneValidation';
 import {
   useDropdownCache,
   useCachedNationalities,
@@ -73,6 +77,7 @@ export function EditBookingModal({
   const [hourRange, setHourRange] = useState<string | null>(null);
   const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
   const [tourDaysCount, setTourDaysCount] = useState<number | null>(null);
+  const [tourCountryCode, setTourCountryCode] = useState<string>('');
 
   const [clientNationalities, setClientNationalities] = useState<Record<number, string>>({});
 
@@ -135,9 +140,22 @@ export function EditBookingModal({
           setTourDaysCount(null);
         })
         .finally(() => setIsLoadingHourRange(false));
+
+      // Fetch tour country code for timezone-aware date construction
+      void getTourByIdBusiness(booking.tourId, language, 'MXN', token)
+        .then((tourResult: unknown) => {
+          const res = tourResult as { success?: boolean; data?: { city?: { countryId?: string } } };
+          if (res.success === true && res.data?.city?.countryId !== undefined) {
+            setTourCountryCode(res.data.city.countryId);
+          } else {
+            setTourCountryCode('');
+          }
+        })
+        .catch(() => setTourCountryCode(''));
     } else {
       setHourRange(null);
       setTourDaysCount(null);
+      setTourCountryCode('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, booking]);
@@ -282,8 +300,8 @@ export function EditBookingModal({
       const buildDateTime = (date: string, time: string): string => {
         if (!date) return '';
         const t24 = to24h(time);
-        const d = new Date(`${date}T${t24}:00`);
-        return isNaN(d.getTime()) ? `${date}T${t24}:00` : d.toISOString();
+        const tz = tourCountryCode ? getTimezoneForCountry(tourCountryCode) : 'UTC';
+        return buildDateTimeInTimezone(date, t24, tz);
       };
 
       const [rangeStart, rangeEnd] =
