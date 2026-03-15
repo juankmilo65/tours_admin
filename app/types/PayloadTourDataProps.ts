@@ -56,6 +56,15 @@ export interface TourRequirement {
   category: string; // physical, equipment, health, etc.
 }
 
+// Tour Image (from GET /tours/:id)
+export interface TourImage {
+  id: string;
+  url: string;
+  isCover: boolean;
+  sortOrder: number;
+  storageKey?: string;
+}
+
 // Included/Excluded Item Types
 export interface TourIncludedItem {
   id: string;
@@ -146,9 +155,8 @@ export interface Tour {
   // Converted price
   base_price: number;
   convertedCurrency: string;
+  bookingCount?: number;
 }
-
-// Helper type for getting translated value
 export type Language = 'es' | 'en';
 
 // Helper function type for translation
@@ -212,6 +220,7 @@ export interface TranslatedTour {
   };
   base_price: number;
   convertedCurrency: string;
+  bookingCount: number;
 }
 
 // Pagination
@@ -314,7 +323,10 @@ export function translateTour(tour: Tour, lang: Language): TranslatedTour {
     maxCapacity: tour.maxCapacity || 0,
     basePrice: tour.basePrice || '',
     currency: tour.currency || 'MXN',
-    imageUrl: tour.imageUrl || '',
+    imageUrl:
+      tour.imageUrl ??
+      (Array.isArray(tour.images) && tour.images.length > 0 ? tour.images[0] : '') ??
+      '',
     images: Array.isArray(tour.images) ? tour.images : [],
     difficulty: tour.difficulty || '',
     language: Array.isArray(tour.language) ? tour.language : [],
@@ -406,6 +418,7 @@ export function translateTour(tour: Tour, lang: Language): TranslatedTour {
     },
     base_price: tour.base_price || 0,
     convertedCurrency: tour.convertedCurrency || '',
+    bookingCount: tour.bookingCount ?? 0,
   };
 }
 

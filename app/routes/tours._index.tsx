@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLoaderData, useNavigation, useSearchParams, useFetcher } from '@remix-run/react';
 import { data, type LoaderFunctionArgs } from '@remix-run/node';
 import { requireAuth } from '~/utilities/auth.loader';
-import type { Tour, TranslatedTour, Language } from '~/types/PayloadTourDataProps';
+import type { Tour, TranslatedTour, Language, TourImage } from '~/types/PayloadTourDataProps';
 import { translateTours } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
 import { CreateTourModal } from '~/components/tours/CreateTourModal';
@@ -658,8 +658,24 @@ function ToursClient(): JSX.Element {
     // API uses snake_case field names: title_es, title_en, shortDescription_es, shortDescription_en
     const rawData = rawTourForEdit as unknown as Record<string, unknown>;
 
-    // Get existing image URLs from the raw tour data
-    const existingImageUrls: string[] = rawTourForEdit.images ?? [];
+    // Get existing images from the raw tour data (API returns objects for /api/tours/:id)
+    const existingImages: TourImage[] = Array.isArray(rawTourForEdit.images)
+      ? (
+          rawTourForEdit.images as unknown as Array<{
+            id: string;
+            url: string;
+            isCover: boolean;
+            sortOrder: number;
+            storageKey?: string;
+          }>
+        ).map((img) => ({
+          id: img.id,
+          url: img.url,
+          isCover: img.isCover ?? false,
+          sortOrder: img.sortOrder ?? 0,
+          storageKey: img.storageKey,
+        }))
+      : [];
 
     // Use fullTourData if available (has owners and long descriptions), fallback to rawData
     const fullData = fullTourData ?? {};
@@ -699,7 +715,23 @@ function ToursClient(): JSX.Element {
       currency: (fullData.currency as string) ?? rawTourForEdit.currency ?? 'MXN',
       imageUrl: (fullData.imageUrl as string) ?? rawTourForEdit.imageUrl ?? '',
       images: [] as File[],
-      existingImageUrls: (fullData.images as string[]) ?? existingImageUrls,
+      existingImages: Array.isArray(fullData.images)
+        ? (
+            fullData.images as unknown as Array<{
+              id: string;
+              url: string;
+              isCover: boolean;
+              sortOrder: number;
+              storageKey?: string;
+            }>
+          ).map((img) => ({
+            id: img.id,
+            url: img.url,
+            isCover: img.isCover ?? false,
+            sortOrder: img.sortOrder ?? 0,
+            storageKey: img.storageKey,
+          }))
+        : existingImages,
       difficulty:
         ((fullData.difficulty ?? rawTourForEdit.difficulty) as 'easy' | 'medium' | 'hard') ??
         'easy',

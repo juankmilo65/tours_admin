@@ -6,6 +6,7 @@ import {
   createTourBusiness,
   updateTourBusiness,
   uploadTourImages,
+  setImageAsCover,
 } from '~/server/businessLogic/toursBusinessLogic';
 import {
   getLanguagesDropdownBusiness,
@@ -20,7 +21,11 @@ import { openModal, closeModal, setGlobalLoading } from '~/store/slices/uiSlice'
 import { getCachedLanguages, setLanguages as setLanguagesCache } from '~/store/slices/cacheSlice';
 import Select from '~/components/ui/Select';
 import { ActivitiesByDay } from '~/components/tours/ActivitiesByDay';
-import type { TourDay, TourActivity as TourActivityType } from '~/types/PayloadTourDataProps';
+import type {
+  TourDay,
+  TourActivity as TourActivityType,
+  TourImage,
+} from '~/types/PayloadTourDataProps';
 
 // Type definitions
 interface UserDropdownOption {
@@ -69,7 +74,7 @@ interface TourFormData {
   currency: string;
   imageUrl: string;
   images: File[];
-  existingImageUrls: string[]; // URLs of existing images (for edit mode)
+  existingImages: TourImage[]; // Image objects from server (for edit mode)
   difficulty: 'easy' | 'medium' | 'hard';
   language: string[];
   activities: TourActivity[];
@@ -134,7 +139,7 @@ export function CreateTourModal({
       currency: initialData?.currency ?? 'MXN',
       imageUrl: initialData?.imageUrl ?? '',
       images: initialData?.images ?? [],
-      existingImageUrls: initialData?.existingImageUrls ?? [],
+      existingImages: initialData?.existingImages ?? [],
       difficulty: initialData?.difficulty ?? 'easy',
       language: initialData?.language ?? ['es'],
       activities: initialData?.activities ?? [],
@@ -150,7 +155,15 @@ export function CreateTourModal({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [imageErrors, setImageErrors] = useState<string[]>([]);
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
-  const [setFirstImageAsCover, setSetFirstImageAsCover] = useState(true);
+  // Cover image tracking: store the image ID that should be cover
+  const [selectedCoverId, setSelectedCoverId] = useState<string | null>(() => {
+    const coverImage = initialData?.existingImages?.find((img: TourImage) => img.isCover);
+    return coverImage?.id ?? null;
+  });
+  const [originalCoverId, setOriginalCoverId] = useState<string | null>(() => {
+    const coverImage = initialData?.existingImages?.find((img: TourImage) => img.isCover);
+    return coverImage?.id ?? null;
+  });
 
   // Drag and drop state
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
@@ -215,7 +228,8 @@ export function CreateTourModal({
     setErrors({});
     setImageErrors([]);
     setUploadProgress(0);
-    setSetFirstImageAsCover(true);
+    setSelectedCoverId(null);
+    setOriginalCoverId(null);
     setShowCloseConfirmation(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -278,7 +292,7 @@ export function CreateTourModal({
     if (files.length === 0) return;
 
     // Check if adding would exceed maximum (including existing images)
-    const totalImages = formData.images.length + formData.existingImageUrls.length + files.length;
+    const totalImages = formData.images.length + formData.existingImages.length + files.length;
     if (totalImages > MAX_IMAGES) {
       setImageErrors([t('tours.maxImagesExceeded') ?? `Máximo ${MAX_IMAGES} imágenes permitidas`]);
       return;
@@ -362,11 +376,16 @@ export function CreateTourModal({
     setFormData((prev) => ({ ...prev, images: newImages }));
   };
 
-  // Remove existing image URL
+  // Remove existing image
   const handleRemoveExistingImage = (index: number): void => {
+    const removedImage = formData.existingImages[index];
+    // If the removed image was the selected cover, clear cover selection
+    if (removedImage?.id === selectedCoverId) {
+      setSelectedCoverId(null);
+    }
     setFormData((prev) => ({
       ...prev,
-      existingImageUrls: prev.existingImageUrls.filter((_, i) => i !== index),
+      existingImages: prev.existingImages.filter((_, i) => i !== index),
     }));
   };
 
@@ -379,7 +398,7 @@ export function CreateTourModal({
     if (files.length === 0) return;
 
     // Check if adding would exceed maximum (including existing images)
-    const totalImages = formData.images.length + formData.existingImageUrls.length + files.length;
+    const totalImages = formData.images.length + formData.existingImages.length + files.length;
     if (totalImages > MAX_IMAGES) {
       setImageErrors([t('tours.maxImagesExceeded') ?? `Máximo ${MAX_IMAGES} imágenes permitidas`]);
       return;
@@ -464,7 +483,7 @@ export function CreateTourModal({
       }
     }
     // Validate that at least one image is provided (new or existing)
-    const totalImages = formData.images.length + formData.existingImageUrls.length;
+    const totalImages = formData.images.length + formData.existingImages.length;
     if (totalImages === 0) {
       const imagesRequiredMsg = t('tours.imagesRequired');
       newErrors.images = imagesRequiredMsg ?? 'Al menos una imagen es requerida';
@@ -569,10 +588,11 @@ export function CreateTourModal({
 
       // Step 2: Upload images (only new images for edit mode)
       if (formData.images.length > 0) {
+        // For new uploads, don't auto-set cover — let the radio button handle it
         const uploadResult = await uploadTourImages(
           currentTourId,
           formData.images,
-          setFirstImageAsCover,
+          false,
           token ?? '',
           (progress) => {
             setUploadProgress(progress);
@@ -583,6 +603,19 @@ export function CreateTourModal({
           const error = uploadResult.error as { message?: string };
           console.error('Error uploading images:', error);
           // Continue even if image upload fails, but warn user
+        }
+      }
+
+      // Step 3: Set cover image if changed (edit mode only)
+      if (
+        isEditMode &&
+        selectedCoverId !== null &&
+        selectedCoverId !== originalCoverId &&
+        currentTourId !== ''
+      ) {
+        const coverResult = await setImageAsCover(currentTourId, selectedCoverId, token ?? '');
+        if (coverResult !== null && typeof coverResult === 'object' && 'error' in coverResult) {
+          console.error('Error setting cover image:', coverResult);
         }
       }
 
@@ -1502,7 +1535,7 @@ export function CreateTourModal({
                     fontSize: 'var(--text-sm)',
                   }}
                 >
-                  {`(${formData.existingImageUrls.length + formData.images.length}/${MAX_IMAGES} - ${t('tours.maxFileSize')}, ${t('tours.imageFormats')})`}
+                  {`(${formData.existingImages.length + formData.images.length}/${MAX_IMAGES} - ${t('tours.maxFileSize')}, ${t('tours.imageFormats')})`}
                 </span>
               </label>
 
@@ -1580,8 +1613,8 @@ export function CreateTourModal({
                 </div>
               )}
 
-              {/* Existing Image previews (from URLs) */}
-              {formData.existingImageUrls.length > 0 && (
+              {/* Existing Image previews (from server) */}
+              {formData.existingImages.length > 0 && (
                 <div style={{ marginTop: 'var(--space-3)' }}>
                   <p
                     style={{
@@ -1590,7 +1623,7 @@ export function CreateTourModal({
                       color: 'var(--color-neutral-600)',
                     }}
                   >
-                    Imágenes existentes:
+                    {currentLanguage === 'es' ? 'Imágenes existentes:' : 'Existing images:'}
                   </p>
                   <div
                     style={{
@@ -1599,70 +1632,110 @@ export function CreateTourModal({
                       gap: 'var(--space-2)',
                     }}
                   >
-                    {formData.existingImageUrls.map((imageUrl, index) => (
-                      <div
-                        key={`existing-${index}`}
-                        style={{
-                          position: 'relative',
-                          aspectRatio: '1',
-                          borderRadius: 'var(--radius-md)',
-                          overflow: 'hidden',
-                          border: '2px solid var(--color-success-300)',
-                        }}
-                      >
-                        <img
-                          src={imageUrl}
-                          alt={`Existing ${index + 1}`}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveExistingImage(index);
-                          }}
-                          style={{
-                            position: 'absolute',
-                            top: 4,
-                            right: 4,
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                            color: 'white',
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '16px',
-                          }}
-                        >
-                          ×
-                        </button>
+                    {formData.existingImages.map((image, index) => {
+                      const isCover = image.id === selectedCoverId;
+                      return (
                         <div
+                          key={`existing-${image.id}`}
                           style={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            backgroundColor: 'rgba(34, 197, 94, 0.9)',
-                            color: 'white',
-                            padding: '4px 8px',
-                            fontSize: '12px',
-                            textAlign: 'center',
+                            position: 'relative',
+                            borderRadius: 'var(--radius-md)',
+                            overflow: 'hidden',
+                            border: isCover
+                              ? '2px solid var(--color-primary-500)'
+                              : '2px solid var(--color-neutral-200)',
+                            transition: 'border-color 0.2s ease',
                           }}
                         >
-                          {index === 0 && formData.images.length === 0
-                            ? 'Portada'
-                            : `#${index + 1}`}
+                          <div style={{ aspectRatio: '1', overflow: 'hidden' }}>
+                            <img
+                              src={image.url}
+                              alt={`Existing ${index + 1}`}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveExistingImage(index);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: 4,
+                              right: 4,
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                              color: 'white',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '16px',
+                            }}
+                          >
+                            ×
+                          </button>
+                          {isCover && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 4,
+                                left: 4,
+                                backgroundColor: 'var(--color-primary-500)',
+                                color: 'white',
+                                padding: '2px 8px',
+                                borderRadius: 'var(--radius-full)',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {currentLanguage === 'es' ? 'Portada' : 'Cover'}
+                            </div>
+                          )}
+                          {/* Radio button for cover selection */}
+                          <div
+                            style={{
+                              padding: '6px 8px',
+                              backgroundColor: isCover
+                                ? 'var(--color-primary-50)'
+                                : 'var(--color-neutral-100)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => setSelectedCoverId(image.id)}
+                          >
+                            <input
+                              type="radio"
+                              name="coverImage"
+                              checked={isCover}
+                              onChange={() => setSelectedCoverId(image.id)}
+                              style={{ cursor: 'pointer', accentColor: 'var(--color-primary-500)' }}
+                            />
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: isCover ? 600 : 400,
+                                color: isCover
+                                  ? 'var(--color-primary-700)'
+                                  : 'var(--color-neutral-600)',
+                              }}
+                            >
+                              {currentLanguage === 'es' ? 'Portada' : 'Cover'}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1670,7 +1743,7 @@ export function CreateTourModal({
               {/* New Image previews */}
               {formData.images.length > 0 && (
                 <div style={{ marginTop: 'var(--space-3)' }}>
-                  {formData.existingImageUrls.length > 0 && (
+                  {formData.existingImages.length > 0 && (
                     <p
                       style={{
                         margin: '0 0 var(--space-2) 0',
@@ -1678,7 +1751,7 @@ export function CreateTourModal({
                         color: 'var(--color-neutral-600)',
                       }}
                     >
-                      Nuevas imágenes:
+                      {currentLanguage === 'es' ? 'Nuevas imágenes:' : 'New images:'}
                     </p>
                   )}
                   <div
@@ -1689,7 +1762,7 @@ export function CreateTourModal({
                     }}
                   >
                     {formData.images.map((image, index) => {
-                      const displayIndex = formData.existingImageUrls.length + index;
+                      const displayIndex = formData.existingImages.length + index;
                       return (
                         <div
                           key={(image as ImageFile).id || index}
@@ -1753,7 +1826,7 @@ export function CreateTourModal({
                               textAlign: 'center',
                             }}
                           >
-                            {displayIndex === 0 ? 'Portada' : `#${displayIndex + 1}`}
+                            #{displayIndex + 1}
                           </div>
                         </div>
                       );
@@ -1775,28 +1848,6 @@ export function CreateTourModal({
                 </span>
               )}
             </div>
-
-            {/* Set first image as cover option */}
-            {(formData.images.length > 0 || formData.existingImageUrls.length > 0) && (
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <input
-                    type="checkbox"
-                    checked={setFirstImageAsCover}
-                    onChange={(e) => setSetFirstImageAsCover(e.target.checked)}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <span
-                    style={{
-                      fontWeight: 'var(--font-weight-medium)',
-                      color: 'var(--color-neutral-700)',
-                    }}
-                  >
-                    {t('tours.setFirstImageAsCover') ?? 'Establecer primera imagen como portada'}
-                  </span>
-                </label>
-              </div>
-            )}
 
             {/* Active */}
             <div>
