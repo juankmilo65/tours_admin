@@ -304,6 +304,9 @@ export const es: Translation = {
     imagesRequired: 'Al menos una imagen es requerida',
     daysMinRequired: 'Se requiere al menos un día',
     activitiesMinRequired: 'Se requiere al menos una actividad',
+    emptyDaysNotAllowed:
+      'Todos los días deben tener al menos una actividad. El día {day} está vacío.',
+    validationErrorsTitle: 'Por favor corrige los siguientes errores:',
     activitiesByDay: 'Actividades por Día',
     addDay: '+ Agregar Día',
     noDaysAdded: 'No hay días agregados',

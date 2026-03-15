@@ -136,6 +136,7 @@ export function TourEditForm({
 
   // Track if data has been initialized to prevent re-runs
   const dataInitialized = useRef(false);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
 
   // Fetch available activities from API
   useEffect(() => {
@@ -349,54 +350,66 @@ export function TourEditForm({
     const newErrors: Record<string, string> = {};
 
     if (tourData.cityId === undefined || tourData.cityId === '') {
-      newErrors.cityId = 'City is required';
+      newErrors.cityId = t('tours.cityIdRequired') ?? 'City is required';
     }
     if (tourData.categoryId === undefined || tourData.categoryId === '') {
-      newErrors.categoryId = 'Category is required';
+      newErrors.categoryId = t('tours.categoryIdRequired') ?? 'Category is required';
     }
     if (tourData.title_es === undefined || tourData.title_es === '') {
-      newErrors.title_es = 'Title (ES) is required';
+      newErrors.title_es = t('tours.titleEsRequired') ?? 'Title (ES) is required';
     }
     if (tourData.title_en === undefined || tourData.title_en === '') {
-      newErrors.title_en = 'Title (EN) is required';
+      newErrors.title_en = t('tours.titleEnRequired') ?? 'Title (EN) is required';
     }
     if (tourData.description_es === undefined || tourData.description_es === '') {
-      newErrors.description_es = 'Description (ES) is required';
+      newErrors.description_es = t('tours.descriptionEsRequired') ?? 'Description (ES) is required';
     }
     if (tourData.description_en === undefined || tourData.description_en === '') {
-      newErrors.description_en = 'Description (EN) is required';
+      newErrors.description_en = t('tours.descriptionEnRequired') ?? 'Description (EN) is required';
     }
     if (tourData.shortDescription_es === undefined || tourData.shortDescription_es === '') {
-      newErrors.shortDescription_es = 'Short description (ES) is required';
+      newErrors.shortDescription_es =
+        t('tours.shortDescriptionEsRequired') ?? 'Short description (ES) is required';
     }
     if (tourData.shortDescription_en === undefined || tourData.shortDescription_en === '') {
-      newErrors.shortDescription_en = 'Short description (EN) is required';
+      newErrors.shortDescription_en =
+        t('tours.shortDescriptionEnRequired') ?? 'Short description (EN) is required';
     }
     if (tourData.duration === undefined || Number(tourData.duration) < 1) {
-      newErrors.duration = 'Duration is required';
+      newErrors.duration = t('tours.durationRequired') ?? 'Duration is required';
     }
     if (tourData.maxCapacity === undefined || Number(tourData.maxCapacity) < 1) {
-      newErrors.maxCapacity = 'Max capacity is required';
+      newErrors.maxCapacity = t('tours.maxCapacityRequired') ?? 'Max capacity is required';
     }
     if (tourData.basePrice === undefined || Number(tourData.basePrice) <= 0) {
-      newErrors.basePrice = 'Base price is required';
+      newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
     }
 
     // Validate that at least 1 day exists
     if (days.length === 0) {
-      newErrors.activities = 'Se requiere al menos un día (Minimum 1 day required)';
+      newErrors.activities = t('tours.daysMinRequired') ?? 'At least one day is required';
     } else {
-      // Validate that at least 1 activity is assigned across all days
+      // Validate that at least 1 activity is provided across all days
       const totalActivities = days.reduce((sum, day) => sum + day.activities.length, 0);
       if (totalActivities < 1) {
-        newErrors.activities = 'Se requiere al menos una actividad (Minimum 1 activity required)';
+        newErrors.activities =
+          t('tours.activitiesMinRequired') ?? 'At least one activity is required';
+      } else {
+        // Validate that NO day is empty
+        const emptyDay = days.find((day) => day.activities.length === 0);
+        if (emptyDay) {
+          const msg =
+            t('tours.emptyDaysNotAllowed') ??
+            `All days must have at least one activity. Day ${emptyDay.day} is empty.`;
+          newErrors.activities = msg.replace('{day}', String(emptyDay.day));
+        }
       }
     }
 
     // Validate images (minimum 2)
     const totalImages = (tourData.images?.length ?? 0) + newImages.length;
     if (totalImages < 2) {
-      newErrors.images = 'Minimum 2 images required';
+      newErrors.images = t('tours.imagesRequired') ?? 'At least one image is required';
     }
 
     setErrors(newErrors);
@@ -406,6 +419,9 @@ export function TourEditForm({
   // Save tour
   const handleSave = async () => {
     if (!validateForm()) {
+      window.setTimeout(() => {
+        errorSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
       return;
     }
 
@@ -1257,25 +1273,52 @@ export function TourEditForm({
         />
       </div>
 
-      {/* Activities validation feedback */}
-      {errors.activities !== undefined && errors.activities !== '' && (
+      {/* Error Summary */}
+      {Object.keys(errors).length > 0 && (
         <div
+          ref={errorSummaryRef}
           style={{
             marginBottom: 'var(--space-6)',
-            padding: 'var(--space-3) var(--space-4)',
+            padding: 'var(--space-4)',
             backgroundColor: 'var(--color-error-50, #fef2f2)',
-            border: '1px solid var(--color-error-200, #fecaca)',
+            border: '1px solid var(--color-error-300, #fca5a5)',
             borderRadius: 'var(--radius-md)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            color: 'var(--color-error-700, #b91c1c)',
-            fontSize: 'var(--text-sm)',
-            fontWeight: 500,
           }}
         >
-          <span>⚠</span>
-          {errors.activities}
+          <p
+            style={{
+              margin: '0 0 var(--space-2) 0',
+              fontWeight: 'var(--font-weight-semibold)',
+              color: 'var(--color-error-700, #b91c1c)',
+              fontSize: 'var(--text-sm)',
+            }}
+          >
+            ⚠ {t('tours.validationErrorsTitle') ?? 'Por favor corrige los siguientes errores:'}
+          </p>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 'var(--space-4)',
+              listStyleType: 'disc',
+            }}
+          >
+            {Object.entries(errors).map(
+              ([key, message]) =>
+                message !== undefined &&
+                message !== '' && (
+                  <li
+                    key={key}
+                    style={{
+                      color: 'var(--color-error-700, #b91c1c)',
+                      fontSize: 'var(--text-sm)',
+                      marginBottom: 'var(--space-1)',
+                    }}
+                  >
+                    {message}
+                  </li>
+                )
+            )}
+          </ul>
         </div>
       )}
 

@@ -155,6 +155,7 @@ export function CreateTourModal({
   // Drag and drop state
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
 
   // Available activities for ActivitiesByDay component
   const availableActivitiesForDays: TourActivityType[] = activities.map((a) => ({
@@ -451,6 +452,15 @@ export function CreateTourModal({
       if (totalActivities < 1) {
         newErrors.activities =
           t('tours.activitiesMinRequired') ?? 'Se requiere al menos una actividad';
+      } else {
+        // Validate that NO day is empty (all days must have at least 1 activity)
+        const emptyDay = formData.days.find((day) => day.activities.length === 0);
+        if (emptyDay) {
+          const msg =
+            t('tours.emptyDaysNotAllowed') ??
+            `All days must have at least one activity. Day ${emptyDay.day} is empty.`;
+          newErrors.activities = msg.replace('{day}', String(emptyDay.day));
+        }
       }
     }
     // Validate that at least one image is provided (new or existing)
@@ -470,6 +480,9 @@ export function CreateTourModal({
     e.preventDefault();
 
     if (!validateForm()) {
+      window.setTimeout(() => {
+        errorSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
       return;
     }
 
@@ -837,7 +850,7 @@ export function CreateTourModal({
           </button>
         </div>
 
-        <form onSubmit={(e) => void handleSubmit(e)}>
+        <form noValidate onSubmit={(e) => void handleSubmit(e)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             {/* User/Provider Selection */}
             <div>
@@ -1107,7 +1120,6 @@ export function CreateTourModal({
                   name="titleEs"
                   value={formData.titleEs}
                   onChange={handleInputChange}
-                  required
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1140,7 +1152,6 @@ export function CreateTourModal({
                   name="titleEn"
                   value={formData.titleEn}
                   onChange={handleInputChange}
-                  required
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1173,7 +1184,6 @@ export function CreateTourModal({
                   name="shortDescriptionEs"
                   value={formData.shortDescriptionEs}
                   onChange={handleInputChange}
-                  required
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1208,7 +1218,6 @@ export function CreateTourModal({
                   name="shortDescriptionEn"
                   value={formData.shortDescriptionEn}
                   onChange={handleInputChange}
-                  required
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1242,7 +1251,6 @@ export function CreateTourModal({
                   name="descriptionEs"
                   value={formData.descriptionEs}
                   onChange={handleInputChange}
-                  required
                   rows={4}
                   style={{
                     width: '100%',
@@ -1278,7 +1286,6 @@ export function CreateTourModal({
                   name="descriptionEn"
                   value={formData.descriptionEn}
                   onChange={handleInputChange}
-                  required
                   rows={4}
                   style={{
                     width: '100%',
@@ -1358,7 +1365,6 @@ export function CreateTourModal({
                   value={formData.maxCapacity}
                   onChange={handleInputChange}
                   min={1}
-                  required
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1395,7 +1401,6 @@ export function CreateTourModal({
                   onChange={handleInputChange}
                   min={0}
                   step={0.01}
-                  required
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1847,6 +1852,55 @@ export function CreateTourModal({
                     }}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Error Summary */}
+            {Object.keys(errors).length > 0 && (
+              <div
+                ref={errorSummaryRef}
+                style={{
+                  marginTop: 'var(--space-4)',
+                  padding: 'var(--space-4)',
+                  backgroundColor: 'var(--color-error-50, #fef2f2)',
+                  border: '1px solid var(--color-error-300, #fca5a5)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0 0 var(--space-2) 0',
+                    fontWeight: 'var(--font-weight-semibold)',
+                    color: 'var(--color-error-700, #b91c1c)',
+                    fontSize: 'var(--text-sm)',
+                  }}
+                >
+                  ⚠{' '}
+                  {t('tours.validationErrorsTitle') ?? 'Por favor corrige los siguientes errores:'}
+                </p>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 'var(--space-4)',
+                    listStyleType: 'disc',
+                  }}
+                >
+                  {Object.entries(errors).map(
+                    ([key, message]) =>
+                      message !== undefined && (
+                        <li
+                          key={key}
+                          style={{
+                            color: 'var(--color-error-700, #b91c1c)',
+                            fontSize: 'var(--text-sm)',
+                            marginBottom: 'var(--space-1)',
+                          }}
+                        >
+                          {message}
+                        </li>
+                      )
+                  )}
+                </ul>
               </div>
             )}
 
