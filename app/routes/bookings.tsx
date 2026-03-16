@@ -15,7 +15,11 @@ import { Button } from '~/components/ui/Button';
 import { Table, type Column } from '~/components/ui/Table';
 import Select from '~/components/ui/Select';
 import { Input } from '~/components/ui/Input';
-import { getAllBookingsBusiness, type Booking } from '~/server/businessLogic/bookingsBusinessLogic';
+import {
+  getAllBookingsBusiness,
+  getBookingByIdBusiness,
+  type Booking,
+} from '~/server/businessLogic/bookingsBusinessLogic';
 import citiesBL from '~/server/businessLogic/citiesBusinessLogic';
 import countriesBL from '~/server/businessLogic/countriesBusinessLogic';
 import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
@@ -341,6 +345,22 @@ export default function Bookings(): JSX.Element {
     navigate(`/bookings/${booking.id}`);
   };
 
+  const handleEditBooking = async (bookingId: string) => {
+    dispatch(setGlobalLoading({ isLoading: true, message: t('common.loading') ?? 'Cargando...' }));
+    try {
+      const result = await getBookingByIdBusiness(bookingId, token ?? '', language);
+      if (result.success === true && result.data !== undefined) {
+        setEditModal({ isOpen: true, booking: result.data });
+      } else {
+        showError({ messageKey: 'common.loadError', fallback: result.error });
+      }
+    } catch {
+      showError({ messageKey: 'common.loadError' });
+    } finally {
+      dispatch(setGlobalLoading({ isLoading: false, message: '' }));
+    }
+  };
+
   const handleClearFilters = () => {
     setStatusFilter('');
     setUserFilter('');
@@ -356,158 +376,22 @@ export default function Bookings(): JSX.Element {
   // Table columns
   const columns: Column<Booking>[] = [
     {
-      key: 'confirmationCode',
-      label: bookingsT.confirmationCode,
-      render: (value: unknown) => {
-        const code = value as string;
-        return (
-          <div className="font-mono text-xs font-semibold text-gray-900 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
-            {code}
-          </div>
-        );
-      },
-    },
-    {
       key: 'tourTitle',
-      label: bookingsT.tour,
+      label: bookingsT.tourInfo,
       render: (value: unknown, record: Booking) => {
-        const title = (value as string | undefined) ?? record.tour?.title ?? bookingsT.notSpecified;
-        return (
-          <div className="text-sm text-gray-900 font-medium max-w-[180px] truncate" title={title}>
-            {title}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'user',
-      label: bookingsT.customer,
-      render: (value: unknown, record: Booking) => {
-        const user = value as Booking['user'];
-        const fullName =
-          user?.fullName ??
-          (user?.firstName !== undefined ? `${user.firstName} ${user.lastName}` : undefined) ??
-          (record.firstName1 !== undefined
-            ? `${record.firstName1} ${record.lastName1 ?? ''}`
-            : bookingsT.notSpecified);
-        const email = user?.email;
-        const clients = record.clients;
-        const count = clients?.length ?? record.numberOfPeople ?? 0;
-        const hasClients = clients !== undefined && clients.length > 0;
-        return (
-          <div>
-            <div className="text-sm font-semibold text-gray-900 whitespace-nowrap">{fullName}</div>
-            {email !== undefined && <div className="text-xs text-gray-500">{email}</div>}
-            <button
-              type="button"
-              title={count > 0 ? bookingsT.viewCompanions : undefined}
-              onClick={() => {
-                if (hasClients) {
-                  setClientsModal({
-                    isOpen: true,
-                    clients: clients ?? [],
-                    confirmationCode: record.confirmationCode ?? '',
-                  });
-                }
-              }}
-              style={{
-                marginTop: 4,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: hasClients ? 'pointer' : 'default',
-                color: hasClients ? '#1d4ed8' : '#6b7280',
-                fontSize: '0.7rem',
-                fontWeight: 500,
-              }}
-            >
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 18,
-                  height: 18,
-                  borderRadius: '50%',
-                  background: hasClients ? '#dbeafe' : '#f3f4f6',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                }}
-              >
-                {count}
-              </span>
-              {bookingsT.companions}
-            </button>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'startDate',
-      label: bookingsT.startDate,
-      render: (value: unknown) => {
-        const dateValue = value as string;
-        return (
-          <div className="text-sm text-gray-600 whitespace-nowrap">
-            {new Date(dateValue).toLocaleDateString('es-ES', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'endDate',
-      label: bookingsT.endDate,
-      render: (value: unknown) => {
-        const dateValue = value as string;
-        return (
-          <div className="text-sm text-gray-600 whitespace-nowrap">
-            {new Date(dateValue).toLocaleDateString('es-ES', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'bookingDate',
-      label: bookingsT.bookingDate,
-      render: (value: unknown, record: Booking) => {
-        const dateValue = (value as string | undefined) ?? record.createdAt;
-        return (
-          <div className="text-sm text-gray-600 whitespace-nowrap">
-            {new Date(dateValue).toLocaleDateString('es-ES', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'status',
-      label: bookingsT.status,
-      render: (value: unknown) => {
-        const statusValue = value as string;
-        const statusColors: Record<string, string> = {
-          pending: 'bg-yellow-100 text-yellow-700',
-          partial: 'bg-orange-100 text-orange-700',
-          paid: 'bg-green-100 text-green-700',
-          cancelled: 'bg-red-100 text-red-700',
-          urgent: 'bg-red-100 text-red-700',
-          requested: 'bg-blue-100 text-blue-700',
-          confirmed: 'bg-indigo-100 text-indigo-700',
-          pending_payment: 'bg-yellow-100 text-yellow-700',
-          partially_paid: 'bg-orange-100 text-orange-700',
+        const title = (value as string | undefined) ?? bookingsT.notSpecified;
+        const code = record.confirmationCode ?? '';
+        const statusValue = record.status ?? '';
+        const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
+          pending: { bg: '#fef9c3', text: '#a16207', dot: '#eab308' },
+          partial: { bg: '#ffedd5', text: '#c2410c', dot: '#f97316' },
+          paid: { bg: '#dcfce7', text: '#15803d', dot: '#22c55e' },
+          cancelled: { bg: '#fee2e2', text: '#b91c1c', dot: '#ef4444' },
+          urgent: { bg: '#fee2e2', text: '#b91c1c', dot: '#ef4444' },
+          requested: { bg: '#dbeafe', text: '#1d4ed8', dot: '#3b82f6' },
+          confirmed: { bg: '#e0e7ff', text: '#4338ca', dot: '#6366f1' },
+          pending_payment: { bg: '#fef9c3', text: '#a16207', dot: '#eab308' },
+          partially_paid: { bg: '#ffedd5', text: '#c2410c', dot: '#f97316' },
         };
         const statusLabels: Record<string, string> = {
           pending: bookingsT.pending,
@@ -520,14 +404,193 @@ export default function Bookings(): JSX.Element {
           pending_payment: bookingsT.pendingPayment,
           partially_paid: bookingsT.partiallyPaid,
         };
-        const colorClass = statusColors[statusValue] ?? 'bg-gray-100 text-gray-700';
+        const colors = statusColors[statusValue] ?? {
+          bg: '#f3f4f6',
+          text: '#374151',
+          dot: '#9ca3af',
+        };
         const labelText = statusLabels[statusValue] ?? statusValue;
         return (
-          <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${colorClass}`}
-          >
-            {labelText}
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div
+              style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', maxWidth: 200 }}
+              title={title}
+            >
+              {title}
+            </div>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+                fontSize: '0.7rem',
+                color: '#6b7280',
+              }}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ opacity: 0.5 }}
+              >
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M16 2v4M8 2v4M3 10h18" />
+              </svg>
+              {code}
+            </div>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '3px 10px',
+                borderRadius: '9999px',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                backgroundColor: colors.bg,
+                color: colors.text,
+                width: 'fit-content',
+              }}
+            >
+              <span
+                style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: colors.dot }}
+              />
+              {labelText}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'user',
+      label: bookingsT.customer,
+      render: (value: unknown, record: Booking) => {
+        const user = value as Booking['user'];
+        const fullName =
+          user?.fullName ??
+          (user?.firstName !== undefined ? `${user.firstName} ${user.lastName}` : undefined) ??
+          bookingsT.notSpecified;
+        const email = user?.email;
+        const count = record.numberOfPeople ?? 0;
+        return (
+          <div>
+            <div className="text-sm font-semibold text-gray-900 whitespace-nowrap">{fullName}</div>
+            {email !== undefined && <div className="text-xs text-gray-500">{email}</div>}
+            <div
+              style={{
+                marginTop: 4,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                color: '#6b7280',
+                fontSize: '0.7rem',
+                fontWeight: 500,
+              }}
+            >
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: '#f3f4f6',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                }}
+              >
+                {count}
+              </span>
+              {bookingsT.companions}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'startDate',
+      label: bookingsT.tourDate,
+      render: (value: unknown, record: Booking) => {
+        const startStr = value as string;
+        const endStr = record.endDate;
+        const dateOpts: Intl.DateTimeFormatOptions = {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        };
+        const locale = language === 'en' ? 'en-US' : 'es-ES';
+        const startFormatted = new Date(startStr).toLocaleDateString(locale, dateOpts);
+        const endFormatted = new Date(endStr).toLocaleDateString(locale, dateOpts);
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 110 }}>
+            <div>
+              <div
+                style={{
+                  fontSize: '0.65rem',
+                  fontWeight: 600,
+                  color: '#9ca3af',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  lineHeight: 1.2,
+                }}
+              >
+                {bookingsT.tourStart}
+              </div>
+              <div
+                style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827', lineHeight: 1.3 }}
+              >
+                {startFormatted}
+              </div>
+            </div>
+            <div style={{ marginTop: '2px' }}>
+              <div
+                style={{
+                  fontSize: '0.65rem',
+                  fontWeight: 600,
+                  color: '#b0b5be',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  lineHeight: 1.2,
+                }}
+              >
+                {bookingsT.tourEnd}
+              </div>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 400,
+                  color: '#9ca3af',
+                  lineHeight: 1.3,
+                }}
+              >
+                {endFormatted}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'bookingDate',
+      label: bookingsT.bookingDate,
+      render: (value: unknown) => {
+        const dateValue = value as string;
+        const locale = language === 'en' ? 'en-US' : 'es-ES';
+        return (
+          <div style={{ fontSize: '0.8rem', color: '#4b5563', whiteSpace: 'nowrap' }}>
+            {new Date(dateValue).toLocaleDateString(locale, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </div>
         );
       },
     },
@@ -535,67 +598,89 @@ export default function Bookings(): JSX.Element {
       key: 'actions',
       label: t('common.actions') ?? 'Acciones',
       render: (_value: unknown, row: Booking) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* View details */}
           <button
             type="button"
             onClick={() => handleViewBooking(row)}
             style={{
-              padding: 7,
-              borderRadius: 8,
-              backgroundColor: 'rgba(59,130,246,0.1)',
-              color: '#2563eb',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 38,
+              height: 38,
+              borderRadius: 'var(--radius-lg, 10px)',
               border: 'none',
               cursor: 'pointer',
+              backgroundColor: 'var(--color-primary-50, #eff6ff)',
+              color: 'var(--color-primary-500, #3b82f6)',
+              transition: 'all .18s ease',
+              lineHeight: 1,
             }}
             title={bookingsT.viewDetails}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-100, #dbeafe)';
+              e.currentTarget.style.color = 'var(--color-primary-600, #2563eb)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-50, #eff6ff)';
+              e.currentTarget.style.color = 'var(--color-primary-500, #3b82f6)';
+            }}
           >
             <svg
-              style={{ width: 16, height: 16 }}
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              viewBox="0 0 24 24"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-              />
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
             </svg>
           </button>
           {/* Edit booking */}
           <button
             type="button"
-            onClick={() => setEditModal({ isOpen: true, booking: row })}
+            onClick={() => void handleEditBooking(row.id)}
             style={{
-              padding: 7,
-              borderRadius: 8,
-              backgroundColor: 'rgba(234,179,8,0.1)',
-              color: '#ca8a04',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 38,
+              height: 38,
+              borderRadius: 'var(--radius-lg, 10px)',
               border: 'none',
               cursor: 'pointer',
+              backgroundColor: 'var(--color-neutral-100, #f3f4f6)',
+              color: 'var(--color-neutral-600, #4b5563)',
+              transition: 'all .18s ease',
+              lineHeight: 1,
             }}
             title={language === 'en' ? 'Edit' : 'Editar'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-neutral-200, #e5e7eb)';
+              e.currentTarget.style.color = 'var(--color-neutral-800, #1f2937)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-neutral-100, #f3f4f6)';
+              e.currentTarget.style.color = 'var(--color-neutral-600, #4b5563)';
+            }}
           >
             <svg
-              style={{ width: 16, height: 16 }}
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              viewBox="0 0 24 24"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              <path d="m15 5 4 4" />
             </svg>
           </button>
           {/* Status history */}
@@ -603,27 +688,40 @@ export default function Bookings(): JSX.Element {
             type="button"
             onClick={() => setStatusModal({ isOpen: true, booking: row })}
             style={{
-              padding: 7,
-              borderRadius: 8,
-              backgroundColor: 'rgba(34,197,94,0.1)',
-              color: '#16a34a',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 38,
+              height: 38,
+              borderRadius: 'var(--radius-lg, 10px)',
               border: 'none',
               cursor: 'pointer',
+              backgroundColor: 'var(--color-success-50, #f0fdf4)',
+              color: 'var(--color-success-500, #22c55e)',
+              transition: 'all .18s ease',
+              lineHeight: 1,
             }}
             title={language === 'en' ? 'Status' : 'Estado'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-success-100, #dcfce7)';
+              e.currentTarget.style.color = 'var(--color-success-600, #16a34a)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-success-50, #f0fdf4)';
+              e.currentTarget.style.color = 'var(--color-success-500, #22c55e)';
+            }}
           >
             <svg
-              style={{ width: 16, height: 16 }}
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              viewBox="0 0 24 24"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-              />
+              <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
             </svg>
           </button>
         </div>

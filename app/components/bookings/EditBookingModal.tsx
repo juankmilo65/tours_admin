@@ -14,17 +14,13 @@ import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { selectAuthToken } from '~/store/slices/authSlice';
 import { updateBookingBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
-import {
-  getTourHourRangeBusiness,
-  getTourByIdBusiness,
-} from '~/server/businessLogic/toursBusinessLogic';
 import { getTimezoneForCountry, buildDateTimeInTimezone } from '~/utilities/timezoneValidation';
 import {
   useDropdownCache,
   useCachedNationalities,
   useAllCachedIdentificationTypes,
 } from '~/hooks/useDropdownCache';
-import type { Booking, BookingClient } from '~/types/booking';
+import type { Booking, BookingClient, BookingTourActivity } from '~/types/booking';
 
 interface EditBookingModalProps {
   isOpen: boolean;
@@ -75,7 +71,6 @@ export function EditBookingModal({
   const [apiError, setApiError] = useState<string | null>(null);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const [hourRange, setHourRange] = useState<string | null>(null);
-  const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
   const [tourDaysCount, setTourDaysCount] = useState<number | null>(null);
   const [tourCountryCode, setTourCountryCode] = useState<string>('');
 
@@ -106,7 +101,7 @@ export function EditBookingModal({
     setApiError(null);
   }, [booking]);
 
-  // On modal open: load nationality dropdown + init per-client nationalities + preload ID types
+  // On modal open: load nationality dropdown + init per-client nationalities + preload ID types + set tour data
   useEffect(() => {
     if (!isOpen) return;
 
@@ -127,31 +122,11 @@ export function EditBookingModal({
       });
     }
 
-    // Fetch hour range for the tour
-    if (booking?.tourId !== undefined && booking.tourId !== '' && token !== null && token !== '') {
-      setIsLoadingHourRange(true);
-      void getTourHourRangeBusiness(booking.tourId, token, language)
-        .then((result) => {
-          setHourRange(result.success ? (result.data?.hourRange ?? null) : null);
-          setTourDaysCount(result.success ? (result.data?.daysCount ?? null) : null);
-        })
-        .catch(() => {
-          setHourRange(null);
-          setTourDaysCount(null);
-        })
-        .finally(() => setIsLoadingHourRange(false));
-
-      // Fetch tour country code for timezone-aware date construction
-      void getTourByIdBusiness(booking.tourId, language, 'MXN', token)
-        .then((tourResult: unknown) => {
-          const res = tourResult as { success?: boolean; data?: { city?: { countryId?: string } } };
-          if (res.success === true && res.data?.city?.countryId !== undefined) {
-            setTourCountryCode(res.data.city.countryId);
-          } else {
-            setTourCountryCode('');
-          }
-        })
-        .catch(() => setTourCountryCode(''));
+    // Use tour data directly from the booking response (no extra API calls)
+    if (booking?.tour) {
+      setHourRange(booking.tour.hourRange ?? null);
+      setTourDaysCount(booking.tour.daysCount ?? null);
+      setTourCountryCode(booking.tour.city?.countryId ?? '');
     } else {
       setHourRange(null);
       setTourDaysCount(null);
@@ -556,6 +531,130 @@ export function EditBookingModal({
             </div>
           )}
 
+          {/* Read-only: Tour Activities / Itinerary */}
+          {(() => {
+            const activities: BookingTourActivity[] = booking.tour?.activities ?? [];
+            if (activities.length === 0) return null;
+
+            // Group by day
+            const dayMap = new Map<number, BookingTourActivity[]>();
+            activities.forEach((act) => {
+              const d = act.day ?? 1;
+              if (!dayMap.has(d)) dayMap.set(d, []);
+              const group = dayMap.get(d);
+              if (group) group.push(act);
+            });
+            const sortedDays = [...dayMap.entries()].sort(([a], [b]) => a - b);
+            sortedDays.forEach(([, acts]) => acts.sort((a, b) => a.sortOrder - b.sortOrder));
+
+            return (
+              <div>
+                <h3
+                  style={{
+                    margin: '0 0 var(--space-3) 0',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    color: '#111827',
+                  }}
+                >
+                  {bookingsT.tourItinerary}
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {sortedDays.map(([dayNum, acts]) => (
+                    <div
+                      key={`day-${dayNum}`}
+                      style={{
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 'var(--radius-lg, 10px)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: '8px 14px',
+                          background: '#f9fafb',
+                          borderBottom: '1px solid #e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            background: '#dbeafe',
+                            color: '#1d4ed8',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {dayNum}
+                        </span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
+                          {bookingsT.dayLabel} {dayNum}
+                        </span>
+                      </div>
+                      <div>
+                        {acts.map((act, idx) => (
+                          <div
+                            key={act.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              padding: '10px 14px',
+                              borderBottom: idx < acts.length - 1 ? '1px solid #f3f4f6' : 'none',
+                              background: idx % 2 === 0 ? 'white' : '#fafbfc',
+                            }}
+                          >
+                            <div
+                              style={{
+                                flexShrink: 0,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 8px',
+                                borderRadius: 9999,
+                                background: '#f0f9ff',
+                                border: '1px solid #bae6fd',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                color: '#0369a1',
+                                minWidth: 60,
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <svg
+                                width="10"
+                                height="10"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                              >
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                              </svg>
+                              {act.hora}
+                            </div>
+                            <span style={{ fontSize: '0.8rem', color: '#374151', fontWeight: 500 }}>
+                              {language === 'en' ? act.activity_en : act.activity_es}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Editable: Dates */}
           <div>
             <div style={sectionStyle}>
@@ -595,20 +694,10 @@ export function EditBookingModal({
                       padding: '3px 10px',
                       borderRadius: 9999,
                       whiteSpace: 'nowrap',
-                      backgroundColor: isLoadingHourRange
-                        ? '#f3f4f6'
-                        : hourRange !== null
-                          ? '#eff6ff'
-                          : '#f3f4f6',
-                      border: `1px solid ${
-                        isLoadingHourRange ? '#e5e7eb' : hourRange !== null ? '#bfdbfe' : '#e5e7eb'
-                      }`,
+                      backgroundColor: hourRange !== null ? '#eff6ff' : '#f3f4f6',
+                      border: `1px solid ${hourRange !== null ? '#bfdbfe' : '#e5e7eb'}`,
                       fontSize: '0.875rem',
-                      color: isLoadingHourRange
-                        ? '#9ca3af'
-                        : hourRange !== null
-                          ? '#1d4ed8'
-                          : '#9ca3af',
+                      color: hourRange !== null ? '#1d4ed8' : '#9ca3af',
                       fontWeight: 500,
                     }}
                   >
@@ -623,12 +712,8 @@ export function EditBookingModal({
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    {isLoadingHourRange
-                      ? language === 'en'
-                        ? 'Loading...'
-                        : 'Cargando...'
-                      : (hourRange?.split(' - ')[0] ??
-                        (language === 'en' ? 'No schedule' : 'Sin horario'))}
+                    {hourRange?.split(' - ')[0] ??
+                      (language === 'en' ? 'No schedule' : 'Sin horario')}
                   </div>
                 </div>
               </div>
@@ -660,20 +745,10 @@ export function EditBookingModal({
                       padding: '3px 10px',
                       borderRadius: 9999,
                       whiteSpace: 'nowrap',
-                      backgroundColor: isLoadingHourRange
-                        ? '#f3f4f6'
-                        : hourRange !== null
-                          ? '#eff6ff'
-                          : '#f3f4f6',
-                      border: `1px solid ${
-                        isLoadingHourRange ? '#e5e7eb' : hourRange !== null ? '#bfdbfe' : '#e5e7eb'
-                      }`,
+                      backgroundColor: hourRange !== null ? '#eff6ff' : '#f3f4f6',
+                      border: `1px solid ${hourRange !== null ? '#bfdbfe' : '#e5e7eb'}`,
                       fontSize: '0.875rem',
-                      color: isLoadingHourRange
-                        ? '#9ca3af'
-                        : hourRange !== null
-                          ? '#1d4ed8'
-                          : '#9ca3af',
+                      color: hourRange !== null ? '#1d4ed8' : '#9ca3af',
                       fontWeight: 500,
                     }}
                   >
@@ -688,12 +763,8 @@ export function EditBookingModal({
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    {isLoadingHourRange
-                      ? language === 'en'
-                        ? 'Loading...'
-                        : 'Cargando...'
-                      : (hourRange?.split(' - ')[1] ??
-                        (language === 'en' ? 'No schedule' : 'Sin horario'))}
+                    {hourRange?.split(' - ')[1] ??
+                      (language === 'en' ? 'No schedule' : 'Sin horario')}
                   </div>
                 </div>
               </div>

@@ -45,6 +45,16 @@ export interface Booking {
   clients?: BookingClient[];
 }
 
+export interface BookingTourActivity {
+  id: string;
+  activityId: string;
+  activity_es: string;
+  activity_en: string;
+  hora: string;
+  sortOrder: number;
+  day?: number;
+}
+
 export interface Tour {
   id: string;
   title: string;
@@ -54,10 +64,13 @@ export interface Tour {
   duration?: number;
   basePrice?: number | string;
   currency?: string;
+  hourRange?: string;
+  daysCount?: number;
   city?: {
     id: string;
     name_es?: string;
     name_en?: string;
+    countryId?: string;
     country?: {
       id: string;
       name_es?: string;
@@ -65,6 +78,7 @@ export interface Tour {
       isoCode?: string;
     };
   };
+  activities?: BookingTourActivity[];
 }
 
 export interface User {

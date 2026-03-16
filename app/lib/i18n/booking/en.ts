@@ -16,6 +16,10 @@ export const bookingEn = {
   tourDateRange: 'Tour Date Range',
   startDate: 'Start Date',
   endDate: 'End Date',
+  tourDate: 'Tour Date',
+  tourStart: 'Start',
+  tourEnd: 'End',
+  tourInfo: 'Tour Info',
   numberOfPeople: 'Number of People',
   totalPrice: 'Total Price',
   currency: 'Currency',
@@ -113,4 +117,6 @@ export const bookingEn = {
   specialRequestsMaxLength: 'Special requests cannot exceed 500 characters',
   validationErrorsTitle: 'Please fix the following errors:',
   loadIdTypesError: 'Error loading identification types',
+  tourItinerary: 'Tour Itinerary',
+  dayLabel: 'Day',
 };

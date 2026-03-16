@@ -54,10 +54,10 @@ export default function BookingDetails(): JSX.Element {
       dispatch(fetchBookingByIdStart());
       const bookingResponse = await getBookingByIdBusiness(id, token);
 
-      if (bookingResponse !== null) {
-        dispatch(fetchBookingByIdSuccess(bookingResponse));
+      if (bookingResponse.success === true && bookingResponse.data !== undefined) {
+        dispatch(fetchBookingByIdSuccess(bookingResponse.data));
       } else {
-        dispatch(fetchBookingByIdFailure('Failed to load booking'));
+        dispatch(fetchBookingByIdFailure(bookingResponse.error ?? 'Failed to load booking'));
       }
     } catch (err) {
       dispatch(

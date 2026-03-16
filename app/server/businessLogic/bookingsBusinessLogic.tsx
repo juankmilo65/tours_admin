@@ -80,6 +80,12 @@ export const getAllBookingsBusiness = async (
   }
 };
 
+export interface BookingByIdResponse {
+  success: boolean;
+  data?: Booking;
+  error?: string;
+}
+
 /**
  * Get booking by ID
  */
@@ -87,21 +93,49 @@ export const getBookingByIdBusiness = async (
   bookingId: string,
   token: string,
   language = 'es'
-): Promise<Booking | null> => {
+): Promise<BookingByIdResponse> => {
   try {
     const result = (await getBookingById(bookingId, token, language)) as {
       success?: boolean;
       data?: Booking;
+      error?: unknown;
     };
 
     if (result.success === true && result.data !== undefined) {
-      return result.data;
+      return { success: true, data: result.data };
     }
 
-    return null;
+    // Extract error message from response
+    let errorMessage = language === 'en' ? 'Booking not found' : 'Reserva no encontrada';
+    if (result.error !== undefined) {
+      const err = result.error as {
+        response?: { data?: { error?: string }; status?: number };
+        message?: string;
+      };
+      const status = err.response?.status;
+      if (status === 404) {
+        errorMessage = language === 'en' ? 'Booking not found' : 'Reserva no encontrada';
+      } else if (status === 403) {
+        errorMessage =
+          language === 'en'
+            ? 'You do not have access to this booking'
+            : 'No tienes acceso a esta reserva';
+      } else if (status === 401) {
+        errorMessage = language === 'en' ? 'Authentication required' : 'Autenticación requerida';
+      } else if (err.response?.data?.error !== undefined) {
+        errorMessage = err.response.data.error;
+      } else if (err.message !== undefined) {
+        errorMessage = err.message;
+      }
+    }
+
+    return { success: false, error: errorMessage };
   } catch (error) {
     console.error('Error in getBookingByIdBusiness:', error);
-    return null;
+    return {
+      success: false,
+      error: language === 'en' ? 'Error loading booking' : 'Error al cargar la reserva',
+    };
   }
 };
 

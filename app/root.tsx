@@ -6,7 +6,7 @@ import {
   ScrollRestoration,
   useLocation,
   useLoaderData,
-  Navigate,
+  useNavigate,
 } from '@remix-run/react';
 import { data, redirect, type LinksFunction, type LoaderFunctionArgs } from '@remix-run/node';
 import { useMemo, useState, useEffect, createContext, type ReactNode } from 'react';
@@ -86,6 +86,8 @@ function AuthGuard({ children }: { children: ReactNode }): ReactNode {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isOtpVerified = useAppSelector(selectIsOtpVerified);
   const location = useLocation();
+  const navigate = useNavigate();
+  const isClient = typeof document !== 'undefined';
 
   // If not authenticated or OTP not verified, redirect to login
   if (!isAuthenticated || !isOtpVerified) {
@@ -98,8 +100,11 @@ function AuthGuard({ children }: { children: ReactNode }): ReactNode {
     ) {
       return children;
     }
-    // For protected routes, redirect to login
-    return <Navigate to="/" replace />;
+    // For protected routes, redirect to login (only on client to avoid SSR warning)
+    if (isClient) {
+      navigate('/', { replace: true });
+    }
+    return null;
   }
 
   return children;

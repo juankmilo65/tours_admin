@@ -86,7 +86,7 @@ export const getAllBookings = async (params: {
       headers,
     });
 
-    console.warn('✅ [GET ALL BOOKINGS] Success! Result:', JSON.stringify(result, null, 2));
+    console.warn('✅ [GET ALL BOOKINGS] Success!');
     return result;
   } catch (error) {
     console.error('❌ [GET ALL BOOKINGS] Error caught:', error);
