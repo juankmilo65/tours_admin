@@ -5,7 +5,7 @@
 import type { JSX } from 'react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { requireAuth } from '~/utilities/auth.loader';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Table, type Column } from '~/components/ui/Table';
@@ -28,6 +28,11 @@ import { setGlobalLoading } from '~/store/slices/uiSlice';
 import { useTranslation } from '~/lib/i18n/utils';
 import { selectAuthToken } from '~/store/slices/authSlice';
 import { useAppSelector } from '~/store/hooks';
+import {
+  useDropdownCache,
+  useCachedNationalities,
+  useCachedIdentificationTypes,
+} from '~/hooks/useDropdownCache';
 
 export async function loader(args: LoaderFunctionArgs): Promise<null> {
   await requireAuth(args);
@@ -79,7 +84,40 @@ export default function Users(): JSX.Element {
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [avatarUserId, setAvatarUserId] = useState<string | null>(null);
 
+  const [selectedNationality, setSelectedNationality] = useState('');
+
   const dispatch = useAppDispatch();
+  const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
+  const nationalities = useCachedNationalities(language);
+  const identificationTypes = useCachedIdentificationTypes(selectedNationality);
+
+  const nationalityOptions = useMemo(
+    () =>
+      nationalities.map((c) => ({
+        value: c.code,
+        label: (language === 'es' ? c.nationality_es : c.nationality_en) ?? c.code,
+      })),
+    [nationalities, language]
+  );
+
+  const idTypeOptions = useMemo(
+    () =>
+      identificationTypes.map((it) => ({
+        value: it.id,
+        label: language === 'es' ? it.name_es : it.name_en,
+      })),
+    [identificationTypes, language]
+  );
+
+  const loadDropdownData = useCallback(
+    async (countryCode?: string) => {
+      await loadNationalities(language);
+      if (countryCode !== undefined && countryCode !== '') {
+        await loadIdentificationTypes(countryCode, language);
+      }
+    },
+    [language, loadNationalities, loadIdentificationTypes]
+  );
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -132,6 +170,9 @@ export default function Users(): JSX.Element {
       firstName: '',
       lastName: '',
       role: 'user',
+      countryCode: '',
+      identificationTypeId: '',
+      identificationNumber: '',
     });
     setConfirmPassword('');
     setSelectedAvatar(null);
@@ -139,6 +180,7 @@ export default function Users(): JSX.Element {
     setErrors({});
     setIsEditMode(false);
     setEditingUserId(null);
+    setSelectedNationality('');
   };
 
   const handleCreateUser = async () => {
@@ -179,6 +221,25 @@ export default function Users(): JSX.Element {
       newErrors.role = t('users.validation.roleRequired') ?? 'Required';
     }
 
+    if (newUser.countryCode === undefined || newUser.countryCode === '') {
+      newErrors.countryCode =
+        t('users.validation_nationalityRequired') ?? 'Nationality is required';
+    }
+    if (newUser.identificationTypeId === undefined || newUser.identificationTypeId === '') {
+      newErrors.identificationTypeId =
+        t('users.validation_idTypeRequired') ?? 'ID type is required';
+    }
+    if (newUser.identificationNumber === undefined || newUser.identificationNumber.trim() === '') {
+      newErrors.identificationNumber =
+        t('users.validation_identificationNumberRequired') ?? 'ID number is required';
+    } else if (newUser.identificationNumber.trim().length < 3) {
+      newErrors.identificationNumber =
+        t('users.validation_identificationNumberMinLength') ?? 'Min 3 characters';
+    } else if (newUser.identificationNumber.trim().length > 50) {
+      newErrors.identificationNumber =
+        t('users.validation_identificationNumberMaxLength') ?? 'Max 50 characters';
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -204,6 +265,11 @@ export default function Users(): JSX.Element {
           firstName: newUser.firstName,
           lastName: newUser.lastName,
           role: newUser.role,
+          countryCode: newUser.countryCode !== '' ? newUser.countryCode : undefined,
+          identificationTypeId:
+            newUser.identificationTypeId !== '' ? newUser.identificationTypeId : undefined,
+          identificationNumber:
+            newUser.identificationNumber !== '' ? newUser.identificationNumber : undefined,
         };
 
         const result = await updateUserBusiness(userId, updateData, token, language);
@@ -302,18 +368,24 @@ export default function Users(): JSX.Element {
   };
 
   const handleOpenEditModal = (user: User) => {
+    const countryCode = user.nationality?.code ?? '';
     setNewUser({
       email: user.email,
       password: '',
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
+      countryCode,
+      identificationTypeId: user.identificationType?.id ?? '',
+      identificationNumber: user.identificationNumber ?? '',
     });
+    setSelectedNationality(countryCode);
     setConfirmPassword('');
     setExistingAvatarUrl(user.avatarUrl ?? null);
     setIsEditMode(true);
     setEditingUserId(user.id);
     setIsCreateModalOpen(true);
+    void loadDropdownData(countryCode);
   };
 
   const handleToggleStatus = async (user: User) => {
@@ -697,6 +769,7 @@ export default function Users(): JSX.Element {
             onClick={() => {
               resetForm();
               setIsCreateModalOpen(true);
+              void loadDropdownData();
             }}
           >
             {t('users.addNewUser')}
@@ -914,6 +987,106 @@ export default function Users(): JSX.Element {
               </p>
             ) : null}
           </div>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 'var(--space-1)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--font-weight-medium)',
+                color: 'var(--color-neutral-700)',
+              }}
+            >
+              {t('users.nationality')} <span style={{ color: 'var(--color-error-500)' }}>*</span>
+            </label>
+            <Select
+              options={[
+                { value: '', label: t('users.selectNationality') ?? 'Select nationality' },
+                ...nationalityOptions,
+              ]}
+              value={newUser.countryCode ?? ''}
+              onChange={(v: string) => {
+                setNewUser({ ...newUser, countryCode: v, identificationTypeId: '' });
+                setSelectedNationality(v);
+                if (errors.countryCode !== undefined && errors.countryCode !== '') {
+                  setErrors({ ...errors, countryCode: '' });
+                }
+                if (v !== '') {
+                  void loadIdentificationTypes(v, language);
+                }
+              }}
+              className="w-full"
+            />
+            {errors.countryCode !== undefined && errors.countryCode !== '' ? (
+              <p
+                style={{
+                  marginTop: '4px',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-error-500)',
+                }}
+              >
+                {errors.countryCode}
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 'var(--space-1)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--font-weight-medium)',
+                color: 'var(--color-neutral-700)',
+              }}
+            >
+              {t('users.idType')} <span style={{ color: 'var(--color-error-500)' }}>*</span>
+            </label>
+            <Select
+              options={[
+                { value: '', label: t('users.selectIdType') ?? 'Select ID type' },
+                ...idTypeOptions,
+              ]}
+              value={newUser.identificationTypeId ?? ''}
+              onChange={(v: string) => {
+                setNewUser({ ...newUser, identificationTypeId: v });
+                if (
+                  errors.identificationTypeId !== undefined &&
+                  errors.identificationTypeId !== ''
+                ) {
+                  setErrors({ ...errors, identificationTypeId: '' });
+                }
+              }}
+              className="w-full"
+              disabled={selectedNationality === ''}
+            />
+            {errors.identificationTypeId !== undefined && errors.identificationTypeId !== '' ? (
+              <p
+                style={{
+                  marginTop: '4px',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-error-500)',
+                }}
+              >
+                {errors.identificationTypeId}
+              </p>
+            ) : null}
+          </div>
+
+          <Input
+            label={t('users.identificationNumber') ?? 'Identification Number'}
+            placeholder={t('users.enterIdentificationNumber') ?? 'Enter identification number'}
+            value={newUser.identificationNumber ?? ''}
+            onChange={(e) => {
+              setNewUser({ ...newUser, identificationNumber: e.target.value });
+              if (errors.identificationNumber !== undefined && errors.identificationNumber !== '') {
+                setErrors({ ...errors, identificationNumber: '' });
+              }
+            }}
+            error={errors.identificationNumber}
+            required
+          />
         </div>
       </Dialog>
 

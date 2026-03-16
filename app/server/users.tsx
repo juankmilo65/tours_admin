@@ -30,6 +30,18 @@ export interface User {
   role: string;
   isActive: boolean;
   emailVerified: boolean;
+  identificationNumber?: string;
+  nationality?: {
+    code: string;
+    nationality_es: string;
+    nationality_en: string;
+  };
+  identificationType?: {
+    id: string;
+    code: string;
+    name_es: string;
+    name_en: string;
+  };
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string;
@@ -42,6 +54,9 @@ export interface CreateUserDto {
   lastName: string;
   phoneNumber?: string;
   role: string;
+  countryCode?: string;
+  identificationTypeId?: string;
+  identificationNumber?: string;
 }
 
 export interface UpdateUserDto {
@@ -50,6 +65,9 @@ export interface UpdateUserDto {
   lastName?: string;
   phoneNumber?: string;
   role?: string;
+  countryCode?: string;
+  identificationTypeId?: string;
+  identificationNumber?: string;
 }
 
 export interface UsersResponse {
