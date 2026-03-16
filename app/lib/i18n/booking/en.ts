@@ -119,4 +119,7 @@ export const bookingEn = {
   loadIdTypesError: 'Error loading identification types',
   tourItinerary: 'Tour Itinerary',
   dayLabel: 'Day',
+  editClient: 'Edit Client',
+  primaryLabel: 'Primary',
+  yearsOld: 'years old',
 };

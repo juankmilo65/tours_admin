@@ -9,18 +9,15 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 import { bookingEs, bookingEn } from '~/lib/i18n';
 import { Input } from '~/components/ui/Input';
-import Select from '~/components/ui/Select';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { selectAuthToken } from '~/store/slices/authSlice';
 import { updateBookingBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
 import { getTimezoneForCountry, buildDateTimeInTimezone } from '~/utilities/timezoneValidation';
-import {
-  useDropdownCache,
-  useCachedNationalities,
-  useAllCachedIdentificationTypes,
-} from '~/hooks/useDropdownCache';
+import { useDropdownCache } from '~/hooks/useDropdownCache';
 import type { Booking, BookingClient, BookingTourActivity } from '~/types/booking';
+import { ClientFormModal } from '~/components/bookings/ClientFormModal';
+import type { ClientFormData } from '~/components/bookings/ClientFormModal';
 
 interface EditBookingModalProps {
   isOpen: boolean;
@@ -76,10 +73,20 @@ export function EditBookingModal({
 
   const [clientNationalities, setClientNationalities] = useState<Record<number, string>>({});
 
+  const clearErrors = (...keys: string[]): void => {
+    setErrors((prev) => {
+      const next = { ...prev };
+      for (const k of keys) delete next[k];
+      return next;
+    });
+  };
+
   // Cache-first dropdown loaders
   const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
-  const countries = useCachedNationalities(language);
-  const allIdTypesByCountry = useAllCachedIdentificationTypes();
+
+  // Client modal state
+  const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [editingClientIndex, setEditingClientIndex] = useState<number | null>(null);
 
   // Populate form when booking changes
   useEffect(() => {
@@ -135,41 +142,55 @@ export function EditBookingModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, booking]);
 
-  const handleClientChange = (
-    index: number,
-    field: keyof BookingClient,
-    value: string | number
-  ): void => {
+  const handleOpenAddClient = (): void => {
+    setEditingClientIndex(null);
+    setClientModalOpen(true);
+  };
+
+  const handleOpenEditClient = (index: number): void => {
+    setEditingClientIndex(index);
+    setClientModalOpen(true);
+  };
+
+  const handleClientModalSave = (data: ClientFormData): void => {
     if (apiError !== null) setApiError(null);
-    setFormData((prev) => {
-      const updated = [...prev.clients];
-      const cur = updated[index];
-      if (cur !== undefined) {
-        updated[index] = { ...cur, [field]: field === 'clientAge' ? Number(value) : value };
-      }
-      return { ...prev, clients: updated };
-    });
-    const key = `clients.${index}.${field}`;
-    if (errors[key] !== undefined) setErrors((p) => ({ ...p, [key]: undefined }));
-  };
+    const updatedClient: BookingClient = {
+      ...(editingClientIndex !== null ? formData.clients[editingClientIndex] : {}),
+      clientName: data.clientName,
+      clientAge: data.clientAge,
+      countryCode: data.countryCode,
+      identificationTypeId: data.identificationTypeId,
+      clientId: data.clientId,
+    };
 
-  const handleNationalityChange = (index: number, code: string): void => {
-    setClientNationalities((p) => ({ ...p, [index]: code }));
-    handleClientChange(index, 'identificationTypeId' as keyof BookingClient, '');
-    if (code) void loadIdentificationTypes(code, language);
-    // Clear nationality error
-    setErrors((p) => ({ ...p, [`clients.${index}.nationality`]: undefined }));
-  };
+    if (editingClientIndex !== null) {
+      // Update existing
+      setFormData((p) => ({
+        ...p,
+        clients: p.clients.map((c, i) => (i === editingClientIndex ? updatedClient : c)),
+      }));
+      setClientNationalities((p) => ({ ...p, [editingClientIndex]: data.countryCode }));
+    } else {
+      // Add new
+      const newIndex = formData.clients.length;
+      setFormData((p) => ({ ...p, clients: [...p.clients, updatedClient] }));
+      setClientNationalities((p) => ({ ...p, [newIndex]: data.countryCode }));
+    }
 
-  const handleAddClient = (): void => {
-    setFormData((p) => ({
-      ...p,
-      clients: [...p.clients, { clientName: '', clientAge: 0 }],
-    }));
+    // Clear related errors
+    const idx = editingClientIndex ?? formData.clients.length;
+    clearErrors(
+      `clients.${idx}.clientName`,
+      `clients.${idx}.clientAge`,
+      `clients.${idx}.nationality`,
+      `clients.${idx}.identificationTypeId`,
+      'clients.minorWithoutAdult'
+    );
+
+    setClientModalOpen(false);
   };
 
   const handleRemoveClient = (index: number): void => {
-    if (formData.clients.length <= 1) return;
     setFormData((p) => ({ ...p, clients: p.clients.filter((_, i) => i !== index) }));
     setClientNationalities((p) => {
       const updated: Record<number, string> = {};
@@ -180,6 +201,19 @@ export function EditBookingModal({
       });
       return updated;
     });
+  };
+
+  const getClientModalInitialData = (): ClientFormData | null => {
+    if (editingClientIndex === null) return null;
+    const c = formData.clients[editingClientIndex];
+    if (!c) return null;
+    return {
+      clientName: c.clientName,
+      clientAge: c.clientAge,
+      countryCode: clientNationalities[editingClientIndex] ?? c.countryCode ?? '',
+      identificationTypeId: c.identificationTypeId ?? '',
+      clientId: c.clientId ?? '',
+    };
   };
 
   const validate = (): boolean => {
@@ -675,11 +709,11 @@ export function EditBookingModal({
                         start.setDate(start.getDate() + (tourDaysCount - 1));
                         const endDate = start.toISOString().split('T')[0] ?? '';
                         setFormData((p) => ({ ...p, startDate: value, endDate }));
-                        setErrors((p) => ({ ...p, startDate: undefined, endDate: undefined }));
+                        clearErrors('startDate', 'endDate');
                       } else {
                         setFormData((p) => ({ ...p, startDate: value }));
                         if (errors.startDate !== undefined) {
-                          setErrors((p) => ({ ...p, startDate: undefined }));
+                          clearErrors('startDate');
                         }
                       }
                     }}
@@ -730,7 +764,7 @@ export function EditBookingModal({
                       if (apiError !== null) setApiError(null);
                       setFormData((p) => ({ ...p, endDate: e.target.value }));
                       if (errors.endDate !== undefined) {
-                        setErrors((p) => ({ ...p, endDate: undefined }));
+                        clearErrors('endDate');
                       }
                     }}
                     error={errors.endDate}
@@ -784,7 +818,7 @@ export function EditBookingModal({
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#111827' }}>
                 {bookingsT.clients}
               </h3>
-              <button type="button" onClick={handleAddClient} className="modal-btn-add-client">
+              <button type="button" onClick={handleOpenAddClient} className="modal-btn-add-client">
                 <svg
                   width="14"
                   height="14"
@@ -799,184 +833,97 @@ export function EditBookingModal({
               </button>
             </div>
 
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
-              {/* Header */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '36px 1fr 90px 170px 150px 140px 40px',
-                  gap: 'var(--space-3)',
-                  padding: '10px 14px',
-                  background: '#f9fafb',
-                  borderBottom: '1px solid #e5e7eb',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                }}
-              >
-                <div>#</div>
-                <div>{bookingsT.clientName}</div>
-                <div>{bookingsT.clientAge}</div>
-                <div>{bookingsT.nationality}</div>
-                <div>{language === 'en' ? 'ID Type' : 'Tipo ID'}</div>
-                <div>{language === 'en' ? 'Client ID' : 'ID Cliente'}</div>
-                <div />
-              </div>
-
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {formData.clients.map((client, index) => (
                 <div
                   key={`ec-${index}`}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '36px 1fr 90px 170px 150px 140px 40px',
-                    gap: 'var(--space-3)',
-                    padding: '10px 14px',
+                    display: 'flex',
                     alignItems: 'center',
-                    borderBottom:
-                      index < formData.clients.length - 1 ? '1px solid #e5e7eb' : 'none',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 'var(--radius-md, 8px)',
                     background: index % 2 === 0 ? 'white' : '#f9fafb',
                   }}
                 >
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      fontSize: '0.85rem',
-                      color: '#6b7280',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {index + 1}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        background: client.isPrimary === true ? '#dbeafe' : '#f3f4f6',
+                        color: client.isPrimary === true ? '#1d4ed8' : '#6b7280',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {index + 1}
+                    </span>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>
+                          {client.clientName || (language === 'en' ? 'Unnamed' : 'Sin nombre')}
+                        </span>
+                        {client.isPrimary === true && (
+                          <span
+                            style={{
+                              fontSize: '0.65rem',
+                              fontWeight: 600,
+                              padding: '1px 8px',
+                              borderRadius: 9999,
+                              background: '#dbeafe',
+                              color: '#1d4ed8',
+                            }}
+                          >
+                            {bookingsT.primaryLabel ??
+                              (language === 'en' ? 'Primary' : 'Principal')}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                        {client.clientAge}{' '}
+                        {bookingsT.yearsOld ?? (language === 'en' ? 'years old' : 'años')}
+                      </span>
+                    </div>
                   </div>
-                  <Input
-                    type="text"
-                    value={client.clientName}
-                    onChange={(e) => handleClientChange(index, 'clientName', e.target.value)}
-                    placeholder={bookingsT.clientNamePlaceholder}
-                    error={errors[`clients.${index}.clientName`]}
-                  />
-                  <Input
-                    type="number"
-                    value={client.clientAge}
-                    onChange={(e) => handleClientChange(index, 'clientAge', e.target.value)}
-                    placeholder={bookingsT.clientAgePlaceholder}
-                    min={0}
-                    max={120}
-                    error={errors[`clients.${index}.clientAge`]}
-                  />
-                  <div>
-                    <Select
-                      options={[
-                        { value: '', label: bookingsT.selectNationality },
-                        ...countries.map((c) => ({
-                          value: c.code,
-                          label:
-                            language === 'en'
-                              ? (c.nationality_en ?? c.name_en)
-                              : (c.nationality_es ?? c.name_es),
-                        })),
-                      ]}
-                      value={clientNationalities[index] ?? client.countryCode ?? ''}
-                      onChange={(v) => handleNationalityChange(index, v)}
-                      placeholder={bookingsT.selectNationality}
-                      id={`edit-nat-${index}`}
-                    />
-                    {errors[`clients.${index}.nationality`] !== undefined && (
-                      <p
-                        style={{
-                          fontSize: 'var(--text-sm)',
-                          color: 'var(--color-error-500)',
-                          marginTop: '0.25rem',
-                        }}
-                      >
-                        {errors[`clients.${index}.nationality`]}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <Select
-                      options={[
-                        { value: '', label: language === 'en' ? 'Select ID Type' : 'Tipo ID' },
-                        ...(
-                          allIdTypesByCountry[
-                            clientNationalities[index] ?? client.countryCode ?? ''
-                          ] ?? []
-                        ).map((it) => ({
-                          value: it.id,
-                          label: language === 'en' ? it.name_en : it.name_es,
-                        })),
-                      ]}
-                      value={client.identificationTypeId ?? ''}
-                      onChange={(v) =>
-                        handleClientChange(index, 'identificationTypeId' as keyof BookingClient, v)
-                      }
-                      placeholder={language === 'en' ? 'Select ID Type' : 'Tipo ID'}
-                      id={`edit-idtype-${index}`}
-                      disabled={(clientNationalities[index] ?? client.countryCode ?? '') === ''}
-                    />
-                    {errors[`clients.${index}.identificationTypeId`] !== undefined && (
-                      <p
-                        style={{
-                          fontSize: 'var(--text-sm)',
-                          color: 'var(--color-error-500)',
-                          marginTop: '0.25rem',
-                        }}
-                      >
-                        {errors[`clients.${index}.identificationTypeId`]}
-                      </p>
-                    )}
-                  </div>
-                  <Input
-                    type="text"
-                    value={client.clientId ?? ''}
-                    onChange={(e) =>
-                      handleClientChange(index, 'clientId' as keyof BookingClient, e.target.value)
-                    }
-                    placeholder={language === 'en' ? 'ID' : 'ID'}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {/* Edit button */}
                     <button
                       type="button"
-                      onClick={() => handleRemoveClient(index)}
-                      disabled={formData.clients.length <= 1}
+                      onClick={() => handleOpenEditClient(index)}
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: 38,
+                        height: 38,
                         borderRadius: 'var(--radius-md, 6px)',
-                        border:
-                          formData.clients.length <= 1
-                            ? '1px solid var(--color-neutral-200, #e5e7eb)'
-                            : '1px solid rgba(239,68,68,0.25)',
-                        cursor: formData.clients.length <= 1 ? 'not-allowed' : 'pointer',
-                        background:
-                          formData.clients.length <= 1
-                            ? 'var(--color-neutral-100, #f3f4f6)'
-                            : 'rgba(239,68,68,0.08)',
-                        color:
-                          formData.clients.length <= 1
-                            ? 'var(--color-neutral-400, #d1d5db)'
-                            : '#dc2626',
+                        border: '1px solid var(--color-primary-200, #bfdbfe)',
+                        cursor: 'pointer',
+                        background: 'var(--color-primary-50, #eff6ff)',
+                        color: 'var(--color-primary-600, #2563eb)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'all 0.2s',
                       }}
                       onMouseOver={(e) => {
-                        if (formData.clients.length > 1) {
-                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.15)';
-                          e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)';
-                        }
+                        e.currentTarget.style.background = 'var(--color-primary-100, #dbeafe)';
                       }}
                       onMouseOut={(e) => {
-                        if (formData.clients.length > 1) {
-                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.08)';
-                          e.currentTarget.style.borderColor = 'rgba(239,68,68,0.25)';
-                        }
+                        e.currentTarget.style.background = 'var(--color-primary-50, #eff6ff)';
                       }}
-                      title={t('common.remove') ?? 'Eliminar'}
+                      title={
+                        bookingsT.editClient ??
+                        (language === 'en' ? 'Edit Client' : 'Editar Cliente')
+                      }
                     >
                       <svg
-                        width="20"
-                        height="20"
+                        width="18"
+                        height="18"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -984,18 +931,99 @@ export function EditBookingModal({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d="M3 6h18" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        <line x1="10" y1="11" x2="10" y2="17" />
-                        <line x1="14" y1="11" x2="14" y2="17" />
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                       </svg>
                     </button>
+
+                    {/* Delete button — only for non-primary clients */}
+                    {client.isPrimary !== true && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveClient(index)}
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 'var(--radius-md, 6px)',
+                          border: '1px solid rgba(239,68,68,0.25)',
+                          cursor: 'pointer',
+                          background: 'rgba(239,68,68,0.08)',
+                          color: '#dc2626',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.15)';
+                          e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.08)';
+                          e.currentTarget.style.borderColor = 'rgba(239,68,68,0.25)';
+                        }}
+                        title={t('common.remove') ?? 'Eliminar'}
+                      >
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
+
+              {formData.clients.length === 0 && (
+                <div
+                  style={{
+                    padding: '20px',
+                    textAlign: 'center',
+                    color: '#9ca3af',
+                    fontSize: '0.875rem',
+                    border: '1px dashed #e5e7eb',
+                    borderRadius: 'var(--radius-md, 8px)',
+                  }}
+                >
+                  {language === 'en' ? 'No clients added yet' : 'No hay clientes agregados'}
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Client Form Modal */}
+          <ClientFormModal
+            isOpen={clientModalOpen}
+            language={language}
+            initialData={getClientModalInitialData()}
+            onSave={handleClientModalSave}
+            onClose={() => setClientModalOpen(false)}
+            translations={{
+              clientName: bookingsT.clientName,
+              clientAge: bookingsT.clientAge,
+              clientNamePlaceholder: bookingsT.clientNamePlaceholder,
+              clientAgePlaceholder: bookingsT.clientAgePlaceholder,
+              selectNationality: bookingsT.selectNationality,
+              selectIdType: bookingsT.selectIdType,
+              enterClientId:
+                bookingsT.enterClientId ?? (language === 'en' ? 'Enter ID' : 'Ingrese ID'),
+              isPrimary: bookingsT.isPrimary,
+              clientNameMinLength: bookingsT.clientNameMinLength,
+              clientNameMaxLength: bookingsT.clientNameMaxLength,
+              clientAgeMin: bookingsT.clientAgeMin,
+              clientAgeMax: bookingsT.clientAgeMax,
+            }}
+          />
 
           {/* Editable: Special Requests */}
           <div>
@@ -1132,7 +1160,7 @@ export function EditBookingModal({
           )}
 
           {/* Error Summary */}
-          {Object.keys(errors).length > 0 && (
+          {Object.values(errors).some((v) => v !== undefined) && (
             <div
               ref={errorSummaryRef}
               style={{

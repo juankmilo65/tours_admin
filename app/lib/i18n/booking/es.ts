@@ -119,4 +119,7 @@ export const bookingEs = {
   loadIdTypesError: 'Error al cargar los tipos de identificación',
   tourItinerary: 'Itinerario del Tour',
   dayLabel: 'Día',
+  editClient: 'Editar Cliente',
+  primaryLabel: 'Principal',
+  yearsOld: 'años',
 };
