@@ -87,22 +87,24 @@ function AuthGuard({ children }: { children: ReactNode }): ReactNode {
   const isOtpVerified = useAppSelector(selectIsOtpVerified);
   const location = useLocation();
   const navigate = useNavigate();
-  const isClient = typeof document !== 'undefined';
 
-  // If not authenticated or OTP not verified, redirect to login
-  if (!isAuthenticated || !isOtpVerified) {
-    // Allow access to public routes (/, /register, /newPassword, /forgot-password)
-    if (
-      location.pathname === '/' ||
-      location.pathname === '/register' ||
-      location.pathname === '/newPassword' ||
-      location.pathname === '/forgot-password'
-    ) {
-      return children;
-    }
-    // For protected routes, redirect to login (only on client to avoid SSR warning)
-    if (isClient) {
+  const isPublicRoute =
+    location.pathname === '/' ||
+    location.pathname === '/register' ||
+    location.pathname === '/newPassword' ||
+    location.pathname === '/forgot-password';
+
+  const needsRedirect = (!isAuthenticated || !isOtpVerified) && !isPublicRoute;
+
+  useEffect(() => {
+    if (needsRedirect) {
       navigate('/', { replace: true });
+    }
+  }, [needsRedirect, navigate]);
+
+  if (!isAuthenticated || !isOtpVerified) {
+    if (isPublicRoute) {
+      return children;
     }
     return null;
   }

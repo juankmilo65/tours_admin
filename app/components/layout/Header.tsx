@@ -3,10 +3,11 @@
  */
 
 import type { JSX } from 'react';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { translateCountries, translateCountry, type Country } from '~/store/slices/countriesSlice';
-import { selectCurrentUser } from '~/store/slices/authSlice';
+import { selectCurrentUser, selectAuthToken, updateUser } from '~/store/slices/authSlice';
+import { getUserByIdBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import {
   setGlobalLoading,
   setLanguage,
@@ -49,6 +50,28 @@ export function Header({
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector(selectLanguage);
   const currentUser = useAppSelector(selectCurrentUser);
+  const authToken = useAppSelector(selectAuthToken);
+
+  // One-time profile refresh to load avatarUrl if missing
+  const profileFetchedRef = useRef(false);
+  const refreshUserProfile = useCallback(async () => {
+    if (
+      currentUser !== null &&
+      authToken !== null &&
+      profileFetchedRef.current === false &&
+      currentUser.avatarUrl === undefined
+    ) {
+      profileFetchedRef.current = true;
+      const fullUser = await getUserByIdBusiness(currentUser.id, authToken, currentLanguage);
+      if (fullUser !== null) {
+        dispatch(updateUser(fullUser));
+      }
+    }
+  }, [currentUser, authToken, currentLanguage, dispatch]);
+
+  useEffect(() => {
+    void refreshUserProfile();
+  }, [refreshUserProfile]);
 
   // Get user initials for avatar
   const userInitials = useMemo(() => {

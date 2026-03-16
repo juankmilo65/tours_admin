@@ -305,6 +305,7 @@ export const selectAuth = (state: RootState): AuthState => state.auth;
 export const selectCurrentUser = (state: RootState): User | null => state.auth.user;
 export const selectAuthToken = (state: RootState): string | null => state.auth.token;
 export const selectPendingToken = (state: RootState): string | null => state.auth.pendingToken;
+export const selectPendingUser = (state: RootState): User | null => state.auth.pendingUser;
 export const selectIsAuthenticated = (state: RootState): boolean => state.auth.isAuthenticated;
 export const selectIsOtpVerified = (state: RootState): boolean => state.auth.isOtpVerified;
 export const selectAuthLoading = (state: RootState): boolean => state.auth.isLoading;

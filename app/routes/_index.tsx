@@ -13,6 +13,7 @@ import {
   loginUserBusinessLogic,
   requestEmailVerificationBusinessLogic,
 } from '~/server/businessLogic/authBusinessLogic';
+import { getUserByIdBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import {
   loginStart,
   loginSuccess,
@@ -24,11 +25,13 @@ import {
   verifyOtpSuccess,
   verifyOtpFailure,
   clearOtpState,
+  updateUser,
   selectIsAuthenticated,
   selectPendingEmail,
   selectOtpSent,
   selectRequiresOtp,
   selectPendingToken,
+  selectPendingUser,
 } from '~/store/slices/authSlice';
 import { setGlobalLoading, setLanguage } from '~/store/slices/uiSlice';
 import Select from '~/components/ui/Select';
@@ -61,6 +64,7 @@ export default function IndexRoute(): JSX.Element {
   const otpEmail = useAppSelector(selectPendingEmail);
   const otpSent = useAppSelector(selectOtpSent);
   const authToken = useAppSelector(selectPendingToken);
+  const pendingUser = useAppSelector(selectPendingUser);
 
   // Wizard step: 'login', 'otp', or 'forgot-password'
   const [step, setStep] = useState<'login' | 'otp' | 'forgot-password'>('login');
@@ -351,6 +355,15 @@ export default function IndexRoute(): JSX.Element {
 
       if (response.ok && result.success === true) {
         dispatch(verifyOtpSuccess());
+
+        // Fetch full user profile to get avatarUrl and other fields
+        if (pendingUser?.id !== undefined && authToken !== null) {
+          const fullUser = await getUserByIdBusiness(pendingUser.id, authToken, currentLang);
+          if (fullUser !== null) {
+            dispatch(updateUser(fullUser));
+          }
+        }
+
         // Navigate to dashboard
         navigate('/dashboard');
       } else {

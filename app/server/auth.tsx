@@ -79,6 +79,7 @@ export interface LoginResponse {
       firstName: string;
       lastName: string;
       role: string;
+      avatarUrl?: string | null;
     };
     accessToken: string;
     refreshToken: string;
