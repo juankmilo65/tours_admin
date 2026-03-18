@@ -41,7 +41,9 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   const session = await getSession(args.request.headers.get('Cookie'));
   let selectedCountryId = session.get('selectedCountryId') as string | undefined;
   const authToken = session.get('authToken') as string | undefined;
-  const authUser = session.get('authUser') as { id: string; role: string } | undefined;
+  const authUser = session.get('authUser') as
+    | { id: string; role: string; firstName?: string; lastName?: string; email?: string }
+    | undefined;
 
   // Si no hay countryId en sesión, obtener el default (México) de los países
   // Esto sincroniza con la lógica del root.tsx loader
@@ -138,12 +140,35 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
         : [];
   }
 
-  // Fetch users for dropdown - ONLY if user is admin
-  let users: Array<{ id: string; name: string; email: string }> = [];
-  if (authUser?.role === 'admin' && authToken !== undefined) {
-    const usersResult = await getUsersDropdownBusiness(authToken, 'es');
-    users = usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
+  // Fetch users for dropdown - ALWAYS fetch for admin, and for non-admin fetch only current user
+  let users: Array<{ id: string; firstName: string; email: string }> = [];
+  if (authToken !== undefined && authToken !== null && authToken !== '') {
+    if (authUser?.role === 'admin') {
+      const usersResult = await getUsersDropdownBusiness(authToken, 'es');
+
+      users =
+        usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
+    } else if (authUser?.id !== undefined && authUser.id !== null && authUser.id !== '') {
+      // For non-admin, only set the current user
+      const firstName = authUser.firstName ?? '';
+      const lastName = authUser.lastName ?? '';
+      const trimmedName = (firstName + ' ' + lastName).trim();
+      const email = authUser.email ?? '';
+      const fullName = trimmedName !== '' ? trimmedName : (email ?? 'Usuario');
+      users = [
+        {
+          id: authUser.id,
+          firstName: fullName,
+          email: email ?? 'usuario@ejemplo.com',
+        },
+      ];
+    }
   }
+  // DEBUG: Log authUser and users for troubleshooting
+  // eslint-disable-next-line no-console
+  console.log('[tours._index][loader] authUser:', authUser);
+  // eslint-disable-next-line no-console
+  console.log('[tours._index][loader] users:', users);
 
   // Fetch activities for dropdown
   const activitiesResult = await getActivitiesDropdownBusiness('es');
@@ -340,7 +365,7 @@ function extractLoaderData(loaderData: unknown): {
   cityId: string | null;
   categories: Category[];
   activeCities: City[];
-  users: Array<{ id: string; name: string; email: string }>;
+  users: Array<{ id: string; firstName: string; email: string }>;
   activities: Array<{ id: string; activityEs: string; activityEn: string }>;
   priceRange: PriceRange | null;
   tours: { data: Tour[]; pagination: unknown };
@@ -359,7 +384,7 @@ function extractLoaderData(loaderData: unknown): {
         cityId?: string | null;
         categories?: Category[];
         activeCities?: City[];
-        users?: Array<{ id: string; name: string; email: string }>;
+        users?: Array<{ id: string; firstName: string; email: string }>;
         activities?: Array<{ id: string; activityEs: string; activityEn: string }>;
         priceRange?: PriceRange | null;
         tours?: { data: Tour[]; pagination: unknown };
@@ -738,7 +763,7 @@ function ToursClient(): JSX.Element {
     console.warn('[tours._index] fullData owners:', fullData.owners);
 
     // Helper to safely get owner ID from owners array
-    // API returns: owners: [{ id, name, email }]
+    // API returns: owners: [{ id, firstName, email }]
     const getOwnerIdFromArray = (): string => {
       const owners = fullData.owners;
       if (Array.isArray(owners) && owners.length > 0) {
@@ -1357,75 +1382,84 @@ function ToursClient(): JSX.Element {
             }}
           >
             {/* User Filter - ONLY shown to admins. Non-admin users are auto-selected */}
-            {isAdmin ? (
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: 'var(--text-xs)',
-                    fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
-                    marginBottom: 'var(--space-1)',
-                  }}
-                >
-                  {t('tours.provider')}
-                </label>
-                <Select
-                  options={[
-                    { value: '', label: t('common.selectProvider') || 'Seleccionar proveedor' },
-                  ].concat(loaderData.users.map((u) => ({ value: u.id, label: u.name })))}
-                  value={selectedUserId}
-                  onChange={(v: string) => {
-                    setSelectedUserId(v);
-                    // Clear search results when provider changes
-                    setRawTours([]);
-                    setHasSearched(false);
-                    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
-                      page: number;
-                      limit: number;
-                      total: number;
-                      totalPages: number;
-                    });
-                    // Clear city, category and price filters when provider changes
-                    setSelectedCityId('');
-                    setSelectedCategory('');
-                    if (priceRange !== null) {
-                      setSelectedMinPrice(priceRange.minPrice);
-                      setSelectedMaxPrice(priceRange.maxPrice);
-                    }
-                  }}
-                  placeholder={t('common.selectProvider') || 'Seleccionar proveedor'}
-                  id="select-provider"
-                />
-              </div>
-            ) : (
-              // Non-admin users see their name as selected provider
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: 'var(--text-xs)',
-                    fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
-                    marginBottom: 'var(--space-1)',
-                  }}
-                >
-                  {t('tours.provider')}
-                </label>
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: 'var(--color-neutral-100)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--color-neutral-700)',
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: 'var(--font-weight-medium)',
-                  }}
-                >
-                  {currentUser?.firstName} {currentUser?.lastName}
-                </div>
-              </div>
-            )}
+            {(() => {
+              // Console log for loaded users in filters section
+              // eslint-disable-next-line no-console
+              console.log('[tours._index] Usuarios cargados para filtro:', loaderData.users);
+              if (isAdmin) {
+                return (
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 'var(--font-weight-medium)',
+                        color: 'var(--color-neutral-700)',
+                        marginBottom: 'var(--space-1)',
+                      }}
+                    >
+                      {t('tours.provider')}
+                    </label>
+                    <Select
+                      options={[
+                        { value: '', label: t('common.selectProvider') || 'Seleccionar proveedor' },
+                      ].concat(loaderData.users.map((u) => ({ value: u.id, label: u.firstName })))}
+                      value={selectedUserId}
+                      onChange={(v: string) => {
+                        setSelectedUserId(v);
+                        // Clear search results when provider changes
+                        setRawTours([]);
+                        setHasSearched(false);
+                        setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
+                          page: number;
+                          limit: number;
+                          total: number;
+                          totalPages: number;
+                        });
+                        // Clear city, category and price filters when provider changes
+                        setSelectedCityId('');
+                        setSelectedCategory('');
+                        if (priceRange !== null) {
+                          setSelectedMinPrice(priceRange.minPrice);
+                          setSelectedMaxPrice(priceRange.maxPrice);
+                        }
+                      }}
+                      placeholder={t('common.selectProvider') || 'Seleccionar proveedor'}
+                      id="select-provider"
+                    />
+                  </div>
+                );
+              } else {
+                // Non-admin users see their firstName as selected provider
+                return (
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 'var(--font-weight-medium)',
+                        color: 'var(--color-neutral-700)',
+                        marginBottom: 'var(--space-1)',
+                      }}
+                    >
+                      {t('tours.provider')}
+                    </label>
+                    <div
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: 'var(--color-neutral-100)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--color-neutral-700)',
+                        fontSize: 'var(--text-sm)',
+                        fontWeight: 'var(--font-weight-medium)',
+                      }}
+                    >
+                      {currentUser?.firstName} {currentUser?.lastName}
+                    </div>
+                  </div>
+                );
+              }
+            })()}
 
             {/* City Filter - Optional, disabled until user is selected and filter is clicked */}
             <div>

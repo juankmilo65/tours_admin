@@ -9,10 +9,7 @@ import { useNavigate, Link, type MetaFunction } from '@remix-run/react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { requireNoAuth } from '~/utilities/auth.loader';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
-import {
-  loginUserBusinessLogic,
-  requestEmailVerificationBusinessLogic,
-} from '~/server/businessLogic/authBusinessLogic';
+import { requestEmailVerificationBusinessLogic } from '~/server/businessLogic/authBusinessLogic';
 import { getUserByIdBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import {
   loginStart,
@@ -131,15 +128,42 @@ export default function IndexRoute(): JSX.Element {
     try {
       // eslint-disable-next-line no-console
       console.log('🔐 [LOGIN] Starting login process for email:', email);
-      const result = await loginUserBusinessLogic({ email, password });
+
+      // Call Remix API route instead of direct business logic
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('password', password);
+
+      const response = await window.fetch('/api/auth/login', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: {
+          user: unknown;
+          accessToken: string;
+          refreshToken?: string;
+        };
+        error?: string;
+      };
+
       // eslint-disable-next-line no-console
       console.log('🔐 [LOGIN] Full result from backend:', JSON.stringify(result, null, 2));
+      // eslint-disable-next-line no-console
+      console.log('🔐 [LOGIN] Response status:', response.status);
       // eslint-disable-next-line no-console
       console.log('🔐 [LOGIN] Result success:', result.success);
       // eslint-disable-next-line no-console
       console.log('🔐 [LOGIN] Result data:', result.data);
       // eslint-disable-next-line no-console
       console.log('🔐 [LOGIN] Result error:', result.error);
+
+      // Check if response was successful
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Login failed');
+      }
 
       const isSuccess = result.success === true;
       const hasData = result.data !== undefined && result.data !== null;
@@ -193,51 +217,17 @@ export default function IndexRoute(): JSX.Element {
         // Request OTP for 2FA
         await requestOtpCode(email);
       } else {
-        // Extract error message from various possible formats
+        // Extract error message from result
         let errorMessage: string = t('auth.errorGenericLogin');
 
-        if (result.error !== null && result.error !== undefined) {
-          if (typeof result.error === 'string') {
-            errorMessage = result.error;
-          } else if (result.error instanceof Error) {
-            // Handle Axios error
-            const axiosError = result.error as { response?: { data?: unknown } };
-            if (
-              axiosError.response?.data !== undefined &&
-              typeof axiosError.response.data === 'object'
-            ) {
-              const data = axiosError.response.data as Record<string, unknown>;
-              if (data.error !== undefined && typeof data.error === 'string') {
-                errorMessage = data.error;
-              } else if (data.message !== undefined && typeof data.message === 'string') {
-                errorMessage = data.message;
-              } else if (data.msg !== undefined && typeof data.msg === 'string') {
-                errorMessage = data.msg;
-              } else if (typeof axiosError.response.data === 'string') {
-                errorMessage = axiosError.response.data;
-              } else {
-                // Try to find any string property that might contain the error
-                const possibleKeys = ['error', 'message', 'msg', 'detail', 'description'];
-                for (const key of possibleKeys) {
-                  if (data[key] !== undefined && typeof data[key] === 'string') {
-                    errorMessage = data[key];
-                    break;
-                  }
-                }
-              }
-            } else if (result.error.message) {
-              errorMessage = result.error.message;
-            } else {
-              errorMessage = 'Error de autenticación';
-            }
-          } else if (
-            typeof result.error === 'object' &&
-            'message' in result.error &&
-            result.error.message !== undefined
-          ) {
-            errorMessage = result.error.message as string;
-          } else {
-            errorMessage = t('auth.errorGenericLogin');
+        if (typeof result.error === 'string') {
+          errorMessage = result.error;
+        } else if (result.error !== null && result.error !== undefined) {
+          const errorObj = result.error as Record<string, unknown>;
+          if (typeof errorObj.message === 'string') {
+            errorMessage = errorObj.message;
+          } else if (typeof errorObj.error === 'string') {
+            errorMessage = errorObj.error;
           }
         }
 
@@ -267,48 +257,14 @@ export default function IndexRoute(): JSX.Element {
         setStep('otp');
       } else {
         let errorMessage: string = t('auth.errorGenericLogin');
-        if (result.error !== null && result.error !== undefined) {
-          if (typeof result.error === 'string') {
-            errorMessage = result.error;
-          } else if (result.error instanceof Error) {
-            // Handle Axios error
-            const axiosError = result.error as { response?: { data?: unknown } };
-            if (
-              axiosError.response?.data !== undefined &&
-              typeof axiosError.response.data === 'object'
-            ) {
-              const data = axiosError.response.data as Record<string, unknown>;
-              if (data.error !== undefined && typeof data.error === 'string') {
-                errorMessage = data.error;
-              } else if (data.message !== undefined && typeof data.message === 'string') {
-                errorMessage = data.message;
-              } else if (data.msg !== undefined && typeof data.msg === 'string') {
-                errorMessage = data.msg;
-              } else if (typeof axiosError.response.data === 'string') {
-                errorMessage = axiosError.response.data;
-              } else {
-                // Try to find any string property that might contain the error
-                const possibleKeys = ['error', 'message', 'msg', 'detail', 'description'];
-                for (const key of possibleKeys) {
-                  if (data[key] !== undefined && typeof data[key] === 'string') {
-                    errorMessage = data[key];
-                    break;
-                  }
-                }
-              }
-            } else if (result.error.message) {
-              errorMessage = result.error.message;
-            } else {
-              errorMessage = 'Error de autenticación';
-            }
-          } else if (
-            typeof result.error === 'object' &&
-            'message' in result.error &&
-            result.error.message !== undefined
-          ) {
-            errorMessage = result.error.message as string;
-          } else {
-            errorMessage = t('auth.errorGenericLogin');
+        if (typeof result.error === 'string') {
+          errorMessage = result.error;
+        } else if (result.error !== null && result.error !== undefined) {
+          const errorObj = result.error as Record<string, unknown>;
+          if (typeof errorObj.message === 'string') {
+            errorMessage = errorObj.message;
+          } else if (typeof errorObj.error === 'string') {
+            errorMessage = errorObj.error;
           }
         }
         dispatch(requestOtpFailure(errorMessage));
@@ -447,22 +403,15 @@ export default function IndexRoute(): JSX.Element {
       } else {
         let errorMessage = t('auth.errorGenericLogin');
 
-        if (result.error !== null && result.error !== undefined) {
-          if (typeof result.error === 'string') {
-            errorMessage = result.error;
-          } else if (result.error instanceof Error) {
-            errorMessage = result.error.message;
-          } else if (
-            typeof result.error === 'object' &&
-            'message' in result.error &&
-            result.error.message !== undefined
-          ) {
-            errorMessage = result.error.message as string;
-          } else {
-            errorMessage = t('auth.errorGenericLogin');
+        if (typeof result.error === 'string') {
+          errorMessage = result.error;
+        } else if (result.error !== null && result.error !== undefined) {
+          const errorObj = result.error as Record<string, unknown>;
+          if (typeof errorObj.message === 'string') {
+            errorMessage = errorObj.message;
+          } else if (typeof errorObj.error === 'string') {
+            errorMessage = errorObj.error;
           }
-        } else {
-          errorMessage = t('auth.errorGenericLogin');
         }
 
         setForgotError(errorMessage);

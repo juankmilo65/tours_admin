@@ -27,7 +27,6 @@ export async function action({ request }: ActionFunctionArgs): Promise<Response>
     formData.append('action', 'loginUserBusinessLogic');
 
     const result = (await authBL(formData)) as ServiceResult<LoginResult>;
-    console.warn('authBL result for login:', result);
 
     // Check if result is an error object (including AxiosError)
     if (result !== null && typeof result === 'object' && 'error' in result) {
@@ -50,6 +49,7 @@ export async function action({ request }: ActionFunctionArgs): Promise<Response>
 
     // Check if result has success property and data
     const loginResult = result;
+
     if (
       loginResult?.success === true &&
       loginResult?.data &&
@@ -59,18 +59,23 @@ export async function action({ request }: ActionFunctionArgs): Promise<Response>
       const session = await getSession(request.headers.get('Cookie'));
       const token = loginResult.data.accessToken;
       session.set('authToken', token);
+      // Guardar el usuario en la sesión para que esté disponible en loaders
+      const user = loginResult.data?.user;
+      if (user !== undefined && user !== null) {
+        session.set('authUser', user);
+      }
 
-      // Return success with session cookie
       return json(result, {
         headers: {
           'Set-Cookie': await commitSession(session),
         },
       });
     } else {
-      return json({ error: loginResult?.error ?? 'Login failed' }, { status: 400 });
+      const errorMsg = loginResult?.error ?? 'Login failed';
+
+      return json({ error: errorMsg }, { status: 400 });
     }
   } catch (error) {
-    console.error('Error in login action:', error);
     return json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }

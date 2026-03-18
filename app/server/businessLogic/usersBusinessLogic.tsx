@@ -2,6 +2,7 @@
  * Users Business Logic - Business layer for User Management
  */
 
+import type { User, UsersResponse, GetUsersParams, CreateUserDto, UpdateUserDto } from '../users';
 import {
   getAllUsers,
   getUserById,
@@ -10,11 +11,7 @@ import {
   toggleUserStatus,
   uploadUserAvatar,
   deleteUserAvatar,
-  type User,
-  type CreateUserDto,
-  type UpdateUserDto,
-  type UsersResponse,
-  type GetUsersParams,
+  getUsersDropdown,
 } from '../users';
 
 export type { User, CreateUserDto, UpdateUserDto, UsersResponse, GetUsersParams };
@@ -24,10 +21,21 @@ export type { User, CreateUserDto, UpdateUserDto, UsersResponse, GetUsersParams 
  */
 export const getAllUsersBusiness = async (params?: GetUsersParams): Promise<UsersResponse> => {
   try {
-    const result = (await getAllUsers(params)) as UsersResponse;
+    const result = (await getAllUsers(params)) as {
+      success?: boolean;
+      data?: {
+        users: User[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      };
+    };
 
     if (result.success === true && result.data !== undefined) {
-      return result;
+      return result as UsersResponse;
     }
 
     return {
@@ -246,19 +254,20 @@ export const deleteUserAvatarBusiness = async (
 export const getUsersDropdownBusiness = async (
   token: string | undefined,
   language = 'es'
-): Promise<{ success: boolean; data?: Array<{ id: string; name: string; email: string }> }> => {
+): Promise<{
+  success: boolean;
+  data?: Array<{ id: string; firstName: string; email: string }>;
+}> => {
   try {
-    const result = await getAllUsersBusiness({
-      limit: 1000,
-      isActive: true,
-      token,
-      language,
-    });
+    const result = (await getUsersDropdown(null, 'true', token, language)) as {
+      success?: boolean;
+      data?: User[];
+    };
 
-    if (result.success === true && result.data?.users !== undefined) {
-      const users = result.data.users.map((user) => ({
+    if (result.success === true && result.data !== undefined) {
+      const users = result.data.map((user) => ({
         id: user.id,
-        name: `${user.firstName} ${user.lastName}`,
+        firstName: `${user.firstName} ${user.lastName}`,
         email: user.email,
       }));
       return { success: true, data: users };

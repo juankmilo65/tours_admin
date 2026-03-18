@@ -383,7 +383,7 @@ export const getUsersDropdown = async (
     const usersService = createServiceREST(
       BASE_URL,
       usersEndpoint,
-      token !== undefined && token !== '' ? 'Bearer' : ''
+      token !== undefined && token !== '' ? `Bearer ${token}` : ''
     );
     console.warn('📡 [GET USERS DROPDOWN] Calling backend with headers:', {
       'X-Language': language,
