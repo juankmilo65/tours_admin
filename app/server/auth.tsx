@@ -120,33 +120,59 @@ export const login = async (payload: {
   email: string;
   password: string;
 }): Promise<LoginResponse> => {
-  try {
-    const authService = createServiceREST(BASE_URL, 'users/login', '');
+  console.log('[auth.tsx][login] Sending login request with payload:', {
+    email: payload.email,
+    password: '***', // Mask password for security
+  });
 
-    const result = await authService.create(payload);
+  const authService = createServiceREST(BASE_URL, 'users/login', '');
 
-    return result as LoginResponse;
-  } catch (error: unknown) {
-    // Handle Axios errors to extract backend error message
-    let errorMessage = 'Internal server error';
+  const result = await authService.create(payload);
 
-    if (error instanceof Error) {
-      const axiosError = error as { response?: { data?: { error?: string } } };
+  console.log('[auth.tsx][login] Response received:', result);
 
-      if (
-        axiosError.response?.data?.error !== undefined &&
-        axiosError.response?.data?.error !== null
-      ) {
-        errorMessage = axiosError.response.data.error;
-      } else {
-        errorMessage = error.message;
+  // Check if result has error property (from createServiceREST catch)
+  if (result !== null && typeof result === 'object' && 'error' in result) {
+    const errorResult = result as { error?: unknown };
+    console.log('[auth.tsx][login] Error detected:', errorResult.error);
+
+    // Extract error message from Axios error response
+    if (
+      errorResult.error !== null &&
+      typeof errorResult.error === 'object' &&
+      'response' in errorResult.error
+    ) {
+      const axiosError = errorResult.error as { response?: { data?: unknown; status?: number } };
+      console.log('[auth.tsx][login] axiosError.response:', axiosError.response);
+
+      if (axiosError.response?.data !== undefined && axiosError.response?.data !== null) {
+        const responseData = axiosError.response.data as { error?: string; message?: string };
+        console.log('[auth.tsx][login] responseData:', responseData);
+
+        if (typeof responseData.error === 'string' && responseData.error !== '') {
+          return {
+            error: responseData.error,
+            success: false,
+          };
+        }
+        if (typeof responseData.message === 'string' && responseData.message !== '') {
+          return {
+            error: responseData.message,
+            success: false,
+          };
+        }
       }
     }
+
+    // If we can't extract a specific message, return a generic one
     return {
-      error: errorMessage,
+      error: errorResult.error instanceof Error ? errorResult.error.message : 'Login failed',
       success: false,
     };
   }
+
+  // Return successful response
+  return result as LoginResponse;
 };
 
 /**
