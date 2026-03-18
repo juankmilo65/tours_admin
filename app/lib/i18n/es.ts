@@ -246,6 +246,7 @@ export const es: Translation = {
     capacity: 'Capacidad',
     maxCapacity: 'Capacidad Máxima',
     basePrice: 'Precio Base',
+    minimumPayment: 'Pago Mínimo',
     availability: 'Disponibilidad',
     language: 'Idioma',
     languages: 'Idiomas',

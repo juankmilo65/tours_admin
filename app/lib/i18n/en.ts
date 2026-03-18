@@ -241,6 +241,7 @@ export const en: Translation = {
     capacity: 'Capacity',
     maxCapacity: 'Maximum Capacity',
     basePrice: 'Base Price',
+    minimumPayment: 'Minimum Payment',
     availability: 'Availability',
     language: 'Language',
     languages: 'Languages',

@@ -17,6 +17,7 @@ import {
   fetchCategoriesSuccess,
   type Category,
 } from '~/store/slices/categoriesSlice';
+import { fetchCitiesSuccess } from '~/store/slices/citiesSlice';
 import { selectLanguage, setGlobalLoading, openModal } from '~/store/slices/uiSlice';
 import type { City } from '~/server/cities';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
@@ -36,9 +37,11 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   // Verificar autenticación
   await requireAuth(args);
 
-  // Load session to get selected countryId
+  // Load session to get selected countryId and user info
   const session = await getSession(args.request.headers.get('Cookie'));
   let selectedCountryId = session.get('selectedCountryId') as string | undefined;
+  const authToken = session.get('authToken') as string | undefined;
+  const authUser = session.get('authUser') as { id: string; role: string } | undefined;
 
   // Si no hay countryId en sesión, obtener el default (México) de los países
   // Esto sincroniza con la lógica del root.tsx loader
@@ -135,13 +138,12 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
         : [];
   }
 
-  // Fetch users for dropdown
-  const usersResult = await getUsersDropdownBusiness(
-    session.get('authToken') as string | undefined,
-    'es'
-  );
-  const users =
-    usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
+  // Fetch users for dropdown - ONLY if user is admin
+  let users: Array<{ id: string; name: string; email: string }> = [];
+  if (authUser?.role === 'admin' && authToken !== undefined) {
+    const usersResult = await getUsersDropdownBusiness(authToken, 'es');
+    users = usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
+  }
 
   // Fetch activities for dropdown
   const activitiesResult = await getActivitiesDropdownBusiness('es');
@@ -515,9 +517,62 @@ function ToursClient(): JSX.Element {
   // Track if filters have been changed but not applied
   const [filtersChanged, setFiltersChanged] = useState(false);
 
+  // Check if current user is admin
+  const isAdmin = currentUser?.role === 'admin';
+
   // Country ID from Redux (selected from Header)
   const selectedCountry = useAppSelector(selectSelectedCountry);
   const countryId = selectedCountry?.id ?? null;
+
+  // Auto-select current user as provider if not admin
+  useEffect(() => {
+    if (!isAdmin && currentUser !== undefined && currentUser !== null) {
+      setSelectedUserId(currentUser.id);
+    }
+  }, [isAdmin, currentUser]);
+
+  // Auto-load tours for non-admin users when userId and countryId are available
+  useEffect(() => {
+    // Only for non-admin users
+    if (isAdmin === false && selectedUserId !== '' && countryId !== null && countryId !== '') {
+      // Check if tours are already loaded from URL params
+      const urlUserId = searchParams.get('userId');
+      const urlCountryId = searchParams.get('countryId');
+
+      // If not already loaded via URL, automatically trigger filter
+      if (urlUserId !== selectedUserId || urlCountryId !== countryId) {
+        const params: Record<string, string> = {
+          userId: selectedUserId,
+          countryId: countryId,
+          page: '1',
+          category: selectedCategory,
+        };
+
+        // Include cityId if selected (optional filter)
+        if (selectedCityId !== '') {
+          params.cityId = selectedCityId;
+        }
+
+        // Include isActive filter based on dropdown selection
+        if (activeStatusFilter === 'active') {
+          params.isActive = 'true';
+        } else if (activeStatusFilter === 'inactive') {
+          params.isActive = 'false';
+        }
+
+        setSearchParams(params);
+      }
+    }
+  }, [
+    isAdmin,
+    selectedUserId,
+    countryId,
+    searchParams,
+    selectedCategory,
+    selectedCityId,
+    activeStatusFilter,
+    setSearchParams,
+  ]);
 
   // Create tour modal state
   const [isCreateTourModalOpen, setIsCreateTourModalOpen] = useState(false);
@@ -712,6 +767,7 @@ function ToursClient(): JSX.Element {
       duration: String(fullData.duration ?? rawTourForEdit.duration ?? 1),
       maxCapacity: (fullData.maxCapacity as number) ?? rawTourForEdit.maxCapacity ?? 1,
       basePrice: (fullData.base_price as number) ?? rawTourForEdit.base_price ?? 0,
+      minimumPayment: (fullData.minimumPayment as number) ?? rawTourForEdit.minimumPayment ?? 0,
       currency: (fullData.currency as string) ?? rawTourForEdit.currency ?? 'MXN',
       imageUrl: (fullData.imageUrl as string) ?? rawTourForEdit.imageUrl ?? '',
       images: [] as File[],
@@ -987,6 +1043,13 @@ function ToursClient(): JSX.Element {
     }
   }, [loaderData.categories, dispatch]);
 
+  // Dispatch cities to Redux when loaded from server
+  useEffect(() => {
+    if (loaderData.activeCities !== undefined && loaderData.activeCities.length > 0) {
+      dispatch(fetchCitiesSuccess(loaderData.activeCities));
+    }
+  }, [loaderData.activeCities, dispatch]);
+
   // Update price range when loader data changes
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -1030,6 +1093,28 @@ function ToursClient(): JSX.Element {
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [loaderData.tours, searchParams]);
+
+  // Deactivate global loading when tours are loaded (either manually or automatically)
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const urlUserId = searchParams.get('userId');
+      const urlCountryId = searchParams.get('countryId');
+
+      // If we have userId and countryId in URL, deactivate loading
+      // loaderData.tours.data is always defined after loader runs (even if empty array)
+      if (
+        urlUserId !== null &&
+        urlUserId !== undefined &&
+        urlUserId !== '' &&
+        urlCountryId !== null &&
+        urlCountryId !== undefined &&
+        urlCountryId !== ''
+      ) {
+        dispatch(setGlobalLoading({ isLoading: false }));
+      }
+    }, 500); // Slight delay to ensure data is processed
+    return () => window.clearTimeout(timeoutId);
+  }, [searchParams, dispatch]);
 
   // Handle city selection change - clear tours
   const handleCityChange = (newCityId: string): void => {
@@ -1168,7 +1253,10 @@ function ToursClient(): JSX.Element {
 
   // Clear all filters
   const handleClearFilters = (): void => {
-    setSelectedUserId('');
+    // For non-admin users, keep their own ID selected
+    if (isAdmin) {
+      setSelectedUserId('');
+    }
     setSelectedCityId('');
     setSelectedCategory('');
     setActiveStatusFilter('all'); // Reset to show all tours
@@ -1268,47 +1356,76 @@ function ToursClient(): JSX.Element {
               alignItems: 'center',
             }}
           >
-            {/* User Filter - Cascading: enables city filter after selection + filter click */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: 'var(--font-weight-medium)',
-                  color: 'var(--color-neutral-700)',
-                  marginBottom: 'var(--space-1)',
-                }}
-              >
-                {t('tours.provider')}
-              </label>
-              <Select
-                options={[
-                  { value: '', label: t('common.selectProvider') || 'Seleccionar proveedor' },
-                ].concat(loaderData.users.map((u) => ({ value: u.id, label: u.name })))}
-                value={selectedUserId}
-                onChange={(v: string) => {
-                  setSelectedUserId(v);
-                  // Clear search results when provider changes
-                  setRawTours([]);
-                  setHasSearched(false);
-                  setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
-                    page: number;
-                    limit: number;
-                    total: number;
-                    totalPages: number;
-                  });
-                  // Clear city, category and price filters when provider changes
-                  setSelectedCityId('');
-                  setSelectedCategory('');
-                  if (priceRange !== null) {
-                    setSelectedMinPrice(priceRange.minPrice);
-                    setSelectedMaxPrice(priceRange.maxPrice);
-                  }
-                }}
-                placeholder={t('common.selectProvider') || 'Seleccionar proveedor'}
-                id="select-provider"
-              />
-            </div>
+            {/* User Filter - ONLY shown to admins. Non-admin users are auto-selected */}
+            {isAdmin ? (
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    color: 'var(--color-neutral-700)',
+                    marginBottom: 'var(--space-1)',
+                  }}
+                >
+                  {t('tours.provider')}
+                </label>
+                <Select
+                  options={[
+                    { value: '', label: t('common.selectProvider') || 'Seleccionar proveedor' },
+                  ].concat(loaderData.users.map((u) => ({ value: u.id, label: u.name })))}
+                  value={selectedUserId}
+                  onChange={(v: string) => {
+                    setSelectedUserId(v);
+                    // Clear search results when provider changes
+                    setRawTours([]);
+                    setHasSearched(false);
+                    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
+                      page: number;
+                      limit: number;
+                      total: number;
+                      totalPages: number;
+                    });
+                    // Clear city, category and price filters when provider changes
+                    setSelectedCityId('');
+                    setSelectedCategory('');
+                    if (priceRange !== null) {
+                      setSelectedMinPrice(priceRange.minPrice);
+                      setSelectedMaxPrice(priceRange.maxPrice);
+                    }
+                  }}
+                  placeholder={t('common.selectProvider') || 'Seleccionar proveedor'}
+                  id="select-provider"
+                />
+              </div>
+            ) : (
+              // Non-admin users see their name as selected provider
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    color: 'var(--color-neutral-700)',
+                    marginBottom: 'var(--space-1)',
+                  }}
+                >
+                  {t('tours.provider')}
+                </label>
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--color-neutral-100)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--color-neutral-700)',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 'var(--font-weight-medium)',
+                  }}
+                >
+                  {currentUser?.firstName} {currentUser?.lastName}
+                </div>
+              </div>
+            )}
 
             {/* City Filter - Optional, disabled until user is selected and filter is clicked */}
             <div>
