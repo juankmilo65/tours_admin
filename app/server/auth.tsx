@@ -120,21 +120,13 @@ export const login = async (payload: {
   email: string;
   password: string;
 }): Promise<LoginResponse> => {
-  console.log('[auth.tsx][login] Sending login request with payload:', {
-    email: payload.email,
-    password: '***', // Mask password for security
-  });
-
   const authService = createServiceREST(BASE_URL, 'users/login', '');
 
   const result = await authService.create(payload);
 
-  console.log('[auth.tsx][login] Response received:', result);
-
   // Check if result has error property (from createServiceREST catch)
   if (result !== null && typeof result === 'object' && 'error' in result) {
     const errorResult = result as { error?: unknown };
-    console.log('[auth.tsx][login] Error detected:', errorResult.error);
 
     // Extract error message from Axios error response
     if (
@@ -143,11 +135,9 @@ export const login = async (payload: {
       'response' in errorResult.error
     ) {
       const axiosError = errorResult.error as { response?: { data?: unknown; status?: number } };
-      console.log('[auth.tsx][login] axiosError.response:', axiosError.response);
 
       if (axiosError.response?.data !== undefined && axiosError.response?.data !== null) {
         const responseData = axiosError.response.data as { error?: string; message?: string };
-        console.log('[auth.tsx][login] responseData:', responseData);
 
         if (typeof responseData.error === 'string' && responseData.error !== '') {
           return {
