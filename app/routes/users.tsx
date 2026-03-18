@@ -23,6 +23,7 @@ import {
   type CreateUserDto,
   type UpdateUserDto,
 } from '~/server/businessLogic/usersBusinessLogic';
+import { getRolesBusiness, type Role } from '~/server/businessLogic/rolesBusinessLogic';
 import { useAppDispatch } from '~/store/hooks';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
 import { useTranslation } from '~/lib/i18n/utils';
@@ -85,6 +86,7 @@ export default function Users(): JSX.Element {
   const [avatarUserId, setAvatarUserId] = useState<string | null>(null);
 
   const [selectedNationality, setSelectedNationality] = useState('');
+  const [roles, setRoles] = useState<Role[]>([]);
 
   const dispatch = useAppDispatch();
   const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
@@ -112,6 +114,27 @@ export default function Users(): JSX.Element {
     [identificationTypes, language]
   );
 
+  const roleOptions = useMemo(() => {
+    const baseOptions = [{ value: '', label: t('users.allRoles') ?? 'All Roles' }];
+    if (roles.length > 0) {
+      roles.forEach((role) => {
+        baseOptions.push({
+          value: role.name,
+          label: language === 'es' ? (role.name_es ?? role.name) : (role.name_en ?? role.name),
+        });
+      });
+    } else {
+      // Fallback to hardcoded values if no roles loaded
+      baseOptions.push(
+        { value: 'admin', label: t('users.admin') ?? 'Admin' },
+        { value: 'staff', label: t('users.staff') ?? 'Staff' },
+        { value: 'user', label: t('users.user') ?? 'User' }
+      );
+    }
+
+    return baseOptions;
+  }, [roles, language, t]);
+
   const loadDropdownData = useCallback(
     async (countryCode?: string) => {
       await loadNationalities(language);
@@ -121,6 +144,27 @@ export default function Users(): JSX.Element {
     },
     [language, loadNationalities, loadIdentificationTypes]
   );
+
+  useEffect(() => {
+    const fetchRoles = async () => {
+      if (token === undefined) return;
+      try {
+        const result = await getRolesBusiness({
+          page: 1,
+          limit: 100,
+          language,
+          token,
+        });
+        if (result.success === true && result.data !== undefined) {
+          setRoles(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+      }
+    };
+
+    void fetchRoles();
+  }, [token, language]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -737,12 +781,7 @@ export default function Users(): JSX.Element {
           </div>
 
           <Select
-            options={[
-              { value: '', label: t('users.allRoles') ?? 'All Roles' },
-              { value: 'admin', label: t('users.admin') ?? 'Admin' },
-              { value: 'staff', label: t('users.staff') ?? 'Staff' },
-              { value: 'user', label: t('users.user') ?? 'User' },
-            ]}
+            options={roleOptions}
             value={roleFilter}
             onChange={(v: string) => {
               setRoleFilter(v);
@@ -964,11 +1003,7 @@ export default function Users(): JSX.Element {
               {t('users.role')}
             </label>
             <Select
-              options={[
-                { value: 'user', label: t('users.user') ?? 'User' },
-                { value: 'staff', label: t('users.staff') ?? 'Staff' },
-                { value: 'admin', label: t('users.admin') ?? 'Admin' },
-              ]}
+              options={roleOptions.filter((opt) => opt.value !== '')}
               value={newUser.role}
               onChange={(v: string) => {
                 setNewUser({ ...newUser, role: v });
