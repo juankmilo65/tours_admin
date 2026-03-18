@@ -1,5 +1,6 @@
 import type { AxiosRequestConfig } from 'axios';
 import axios from 'axios';
+import { logCurlGet, logCurlPost } from './curlHelper';
 
 /*
  * Service wrapper: uses axios generics to type responses.
@@ -67,42 +68,96 @@ function createServiceREST<T = unknown>(url: string, endpoint: string, token: st
   }
 
   const service = customService;
+  const baseURL = url + '/api/';
+
   return {
-    get: (config?: AxiosRequestConfig): Promise<ServiceResult<T>> =>
-      service(token, config)
+    get: (config?: AxiosRequestConfig): Promise<ServiceResult<T>> => {
+      const fullUrl = `${baseURL}${endpoint}`;
+      logCurlGet({
+        url: fullUrl,
+        params: config?.params as Record<string, string> | undefined,
+        headers: config?.headers as Record<string, string> | undefined,
+        token: token !== '' ? token : undefined,
+        label: `GET ${endpoint}`,
+      });
+      return service(token, config)
         .get<T>(`/${endpoint}`, config)
         .then((response: import('axios').AxiosResponse<T>) => response.data)
-        .catch((error: unknown) => ({ error })),
+        .catch((error: unknown) => ({ error }));
+    },
 
-    count: (payload: Record<string, unknown>): Promise<ServiceResult<T>> =>
-      service(token)
+    count: (payload: Record<string, unknown>): Promise<ServiceResult<T>> => {
+      const fullUrl = `${baseURL}count/${endpoint}`;
+      logCurlGet({
+        url: fullUrl,
+        params: payload as Record<string, string>,
+        token: token !== '' ? token : undefined,
+        label: `COUNT ${endpoint}`,
+      });
+      return service(token)
         .get<T>(`/count/${endpoint}`, { params: payload })
         .then((response: import('axios').AxiosResponse<T>) => response.data)
-        .catch((error: unknown) => ({ error })),
+        .catch((error: unknown) => ({ error }));
+    },
 
-    create: (payload: unknown, config?: AxiosRequestConfig): Promise<ServiceResult<T>> =>
-      service(token, config)
+    create: (payload: unknown, config?: AxiosRequestConfig): Promise<ServiceResult<T>> => {
+      const fullUrl = `${baseURL}${endpoint}`;
+      logCurlPost({
+        url: fullUrl,
+        method: 'POST',
+        body: payload,
+        headers: config?.headers as Record<string, string> | undefined,
+        token: token !== '' ? token : undefined,
+        label: `POST ${endpoint}`,
+      });
+      return service(token, config)
         .post<T>(`/${endpoint}`, payload)
         .then((response: import('axios').AxiosResponse<T>) => response.data)
-        .catch((error: unknown) => ({ error })),
+        .catch((error: unknown) => ({ error }));
+    },
 
-    update: (payload: unknown, config?: AxiosRequestConfig): Promise<ServiceResult<T>> =>
-      service(token, config)
+    update: (payload: unknown, config?: AxiosRequestConfig): Promise<ServiceResult<T>> => {
+      const fullUrl = `${baseURL}${config?.url ?? endpoint}`;
+      logCurlPost({
+        url: fullUrl,
+        method: 'PATCH',
+        body: payload,
+        headers: config?.headers as Record<string, string> | undefined,
+        token: token !== '' ? token : undefined,
+        label: `PATCH ${config?.url ?? endpoint}`,
+      });
+      return service(token, config)
         .patch<T>(config?.url ?? `/${endpoint}`, payload, config)
         .then((response: import('axios').AxiosResponse<T>) => response.data)
-        .catch((error: unknown) => ({ error })),
+        .catch((error: unknown) => ({ error }));
+    },
 
-    delete: (): Promise<ServiceResult<T>> =>
-      service(token)
+    delete: (): Promise<ServiceResult<T>> => {
+      const fullUrl = `${baseURL}${endpoint}`;
+      logCurlPost({
+        url: fullUrl,
+        method: 'DELETE',
+        token: token !== '' ? token : undefined,
+        label: `DELETE ${endpoint}`,
+      });
+      return service(token)
         .delete<T>(`/${endpoint}`)
         .then((response: import('axios').AxiosResponse<T>) => response.data)
-        .catch((error: unknown) => ({ error })),
+        .catch((error: unknown) => ({ error }));
+    },
 
-    getById: (payload: string | number): Promise<ServiceResult<T>> =>
-      service(token)
+    getById: (payload: string | number): Promise<ServiceResult<T>> => {
+      const fullUrl = `${baseURL}${endpoint}/${payload}`;
+      logCurlGet({
+        url: fullUrl,
+        token: token !== '' ? token : undefined,
+        label: `GET ${endpoint}/${payload}`,
+      });
+      return service(token)
         .get<T>(`/${endpoint}/${payload}`)
         .then((response: import('axios').AxiosResponse<T>) => response.data)
-        .catch((error: unknown) => ({ error })),
+        .catch((error: unknown) => ({ error }));
+    },
   };
 }
 

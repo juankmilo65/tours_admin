@@ -159,7 +159,13 @@ export const getTourHourRangeBusiness = async (
   _language = 'es'
 ): Promise<{
   success: boolean;
-  data?: { tourId: string; hourRange: string | null; daysCount: number };
+  data?: {
+    tourId: string;
+    hourRange: string | null;
+    daysCount: number;
+    basePrice?: number;
+    currency?: string;
+  };
   message?: string;
 }> => {
   if (token === '' || token === undefined) {
@@ -173,7 +179,14 @@ export const getTourHourRangeBusiness = async (
   try {
     const result = (await getTourHourRange(tourId, token)) as {
       success?: boolean;
-      data?: { tourId?: string; startHour?: string; endHour?: string; daysCount?: number };
+      data?: {
+        tourId?: string;
+        startHour?: string;
+        endHour?: string;
+        daysCount?: number;
+        basePrice?: number;
+        currency?: string;
+      };
       message?: string;
     };
 
@@ -181,12 +194,15 @@ export const getTourHourRangeBusiness = async (
       return { success: false, message: result.message ?? 'Hour range not found' };
     }
 
-    const { startHour, endHour, daysCount } = result.data;
+    const { startHour, endHour, daysCount, basePrice, currency } = result.data;
     const start = startHour ?? '';
     const end = endHour ?? '';
 
     if (start === '' && end === '') {
-      return { success: true, data: { tourId, hourRange: null, daysCount: daysCount ?? 1 } };
+      return {
+        success: true,
+        data: { tourId, hourRange: null, daysCount: daysCount ?? 1, basePrice, currency },
+      };
     }
 
     const hourRange =
@@ -198,7 +214,10 @@ export const getTourHourRangeBusiness = async (
             ? end
             : null;
 
-    return { success: true, data: { tourId, hourRange, daysCount: daysCount ?? 1 } };
+    return {
+      success: true,
+      data: { tourId, hourRange, daysCount: daysCount ?? 1, basePrice, currency },
+    };
   } catch (error) {
     console.error('Error in getTourHourRangeBusiness:', error);
     return { success: false, message: 'Error fetching tour hour range' };

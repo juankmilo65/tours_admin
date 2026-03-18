@@ -14,6 +14,7 @@ export interface Booking {
   bookingDate?: string; // UTC
   numberOfPeople: number;
   totalPrice: number | string;
+  minimumPayment?: number;
   currency: string;
   totalPriceConverted?: number;
   convertedCurrency?: string;

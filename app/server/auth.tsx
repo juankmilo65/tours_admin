@@ -194,6 +194,31 @@ export const verifyEmail = async (
 };
 
 /**
+ * Verify email with token from URL
+ */
+export const verifyEmailToken = async (
+  payload: { token: string },
+  language: string
+): Promise<VerifyEmailResponse> => {
+  try {
+    const authService = createServiceREST(BASE_URL, 'users/verify-email-token', '');
+
+    const result = await authService.create(payload, {
+      headers: {
+        'x-Language': language,
+      },
+    });
+
+    return result as VerifyEmailResponse;
+  } catch (error: unknown) {
+    return {
+      error: error instanceof Error ? error.message : 'Internal server error',
+      success: false,
+    };
+  }
+};
+
+/**
  * Request password reset
  */
 export const requestPasswordReset = async (

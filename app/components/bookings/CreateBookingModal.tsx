@@ -4,9 +4,10 @@
  */
 
 import React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type { JSX } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
+import { bookingEn, bookingEs } from '~/lib/i18n';
 import { createBookingBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken, selectAuth } from '~/store/slices/authSlice';
@@ -59,6 +60,7 @@ export function CreateBookingModal({
   onClose,
 }: CreateBookingModalProps): JSX.Element | null {
   const { t, language } = useTranslation();
+  const bookingsT = language === 'en' ? bookingEn : bookingEs;
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectAuth).user;
@@ -75,6 +77,8 @@ export function CreateBookingModal({
   const [tourAvailability, setTourAvailability] = useState<TourAvailabilityData | null>(null);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string>('');
+  const [tourBasePrice, setTourBasePrice] = useState<number | null>(null);
+  const [tourMinimumPayment, setTourMinimumPayment] = useState<number | null>(null);
 
   // Cache-first dropdown loaders
   const { loadNationalities } = useDropdownCache();
@@ -118,6 +122,7 @@ export function CreateBookingModal({
     setTourCountryCode('');
     setTourAvailability(null);
     setAvailabilityError('');
+    setTourBasePrice(null);
   }, [isOpen]);
 
   // Load nationality dropdown into cache when modal opens or language changes
@@ -203,6 +208,16 @@ export function CreateBookingModal({
         setTourDaysCount(
           hourRangeResult.success ? (hourRangeResult.data?.daysCount ?? null) : null
         );
+        setTourBasePrice(
+          hourRangeResult.success && hourRangeResult.data?.basePrice !== undefined
+            ? Number(hourRangeResult.data.basePrice)
+            : null
+        );
+        setTourMinimumPayment(
+          hourRangeResult.success && hourRangeResult.data?.minimumPayment !== undefined
+            ? Number(hourRangeResult.data.minimumPayment)
+            : null
+        );
 
         // Fetch tour details to get country code
         const tourResult = (await getTourByIdBusiness(formData.tourId, language, 'MXN', token)) as {
@@ -230,6 +245,7 @@ export function CreateBookingModal({
         setMinBookingDate('');
         setTourCountryCode('');
         setTourDaysCount(null);
+        setTourBasePrice(null);
       } finally {
         setIsLoadingHourRange(false);
       }
@@ -328,6 +344,29 @@ export function CreateBookingModal({
     });
 
     setClientModalOpen(false);
+  };
+
+  // Price calculation
+  const priceSummary = useMemo(() => {
+    const basePrice = tourBasePrice ?? 0;
+    const filled = formData.clients.filter((c) => c.clientName.trim() !== '');
+    const minors = filled.filter((c) => c.clientAge > 0 && c.clientAge < 18).length;
+    const validClients = filled.length;
+    const subtotal = basePrice * validClients;
+    const minorDiscount = basePrice * minors * 0.1;
+    const total = subtotal - minorDiscount;
+    return { basePrice, validClients, minors, subtotal, minorDiscount, total };
+  }, [tourBasePrice, formData.clients]);
+
+  const formatCurrency = (amount: number, currency: string): string => {
+    try {
+      return new Intl.NumberFormat(language === 'en' ? 'en-US' : 'es-MX', {
+        style: 'currency',
+        currency,
+      }).format(amount);
+    } catch {
+      return `${currency} ${amount.toFixed(2)}`;
+    }
   };
 
   const getClientModalInitialData = (): ClientFormData | undefined => {
@@ -544,7 +583,7 @@ export function CreateBookingModal({
       const [rangeStart, rangeEnd] =
         hourRange !== null ? hourRange.split(' - ') : ['00:00', '00:00'];
 
-      const payloadWithCountry: BookingFormData = {
+      const payloadWithCountry = {
         ...formData,
         startDate: buildDateTime(formData.startDate, rangeStart ?? '00:00'),
         endDate: buildDateTime(formData.endDate, rangeEnd ?? '00:00'),
@@ -553,6 +592,8 @@ export function CreateBookingModal({
           countryCode: clientNationalities[index] ?? '',
         })),
         specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
+        totalPrice: priceSummary.total,
+        minimumPayment: tourMinimumPayment ?? undefined,
       };
 
       const result = await createBookingBusiness(payloadWithCountry, token ?? '', language);
@@ -1310,6 +1351,94 @@ export function CreateBookingModal({
                 )}
               </div>
             </div>
+
+            {/* Price Summary */}
+            {tourBasePrice !== null && priceSummary.validClients > 0 && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: '16px 20px',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: 'var(--radius-md, 8px)',
+                }}
+              >
+                <h4
+                  style={{
+                    margin: '0 0 12px 0',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#166534',
+                  }}
+                >
+                  {bookingsT.priceSummary}
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '0.8125rem',
+                      color: '#374151',
+                    }}
+                  >
+                    <span>
+                      {bookingsT.basePricePerPerson}:{' '}
+                      <strong>{formatCurrency(priceSummary.basePrice, formData.currency)}</strong> ×{' '}
+                      {priceSummary.validClients}
+                    </span>
+                    <span>{formatCurrency(priceSummary.subtotal, formData.currency)}</span>
+                  </div>
+                  {priceSummary.minorDiscount > 0 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '0.8125rem',
+                        color: '#dc2626',
+                      }}
+                    >
+                      <span>
+                        {bookingsT.minorDiscount} ({priceSummary.minors})
+                      </span>
+                      <span>-{formatCurrency(priceSummary.minorDiscount, formData.currency)}</span>
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '0.9375rem',
+                      fontWeight: 700,
+                      color: '#166534',
+                      borderTop: '1px solid #bbf7d0',
+                      paddingTop: 8,
+                      marginTop: 4,
+                    }}
+                  >
+                    <span>{bookingsT.totalPrice}</span>
+                    <span>{formatCurrency(priceSummary.total, formData.currency)}</span>
+                  </div>
+                  {tourMinimumPayment !== null && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '0.9375rem',
+                        fontWeight: 500,
+                        color: '#0e7490',
+                        borderTop: '1px dashed #bbf7d0',
+                        paddingTop: 8,
+                        marginTop: 4,
+                      }}
+                    >
+                      <span>{bookingsT.minimumPayment ?? 'Pago mínimo'}</span>
+                      <span>{formatCurrency(tourMinimumPayment, formData.currency)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Client Form Modal */}
             <ClientFormModal

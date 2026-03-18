@@ -122,4 +122,8 @@ export const bookingEn = {
   editClient: 'Edit Client',
   primaryLabel: 'Primary',
   yearsOld: 'years old',
+  priceSummary: 'Price Summary',
+  basePricePerPerson: 'Base price per person',
+  subtotal: 'Subtotal',
+  minorDiscount: 'Minor discount (10%)',
 };

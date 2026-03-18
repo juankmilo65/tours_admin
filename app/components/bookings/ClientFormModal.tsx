@@ -93,7 +93,7 @@ export function ClientFormModal({
     // Only reset when the modal transitions from closed → open
     if (wasOpen) return;
 
-    if (initialData !== undefined) {
+    if (initialData !== undefined && initialData !== null) {
       setForm({ ...initialData });
       if (initialData.countryCode !== '') {
         void loadIdentificationTypes(initialData.countryCode, language);

@@ -95,7 +95,10 @@ export default function Users(): JSX.Element {
     () =>
       nationalities.map((c) => ({
         value: c.code,
-        label: (language === 'es' ? c.nationality_es : c.nationality_en) ?? c.code,
+        label:
+          (language === 'es' ? c.nationality_es : c.nationality_en)?.trim() ??
+          (language === 'es' ? c.name_es : c.name_en) ??
+          c.code,
       })),
     [nationalities, language]
   );

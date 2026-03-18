@@ -5,7 +5,7 @@
  */
 
 import type { JSX, CSSProperties, FormEvent } from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 import { bookingEs, bookingEn } from '~/lib/i18n';
 import { Input } from '~/components/ui/Input';
@@ -203,6 +203,30 @@ export function EditBookingModal({
     });
   };
 
+  // Price calculation
+  const priceSummary = useMemo(() => {
+    const rawBase = booking?.tour?.basePrice;
+    const basePrice = typeof rawBase === 'string' ? parseFloat(rawBase) : (rawBase ?? 0);
+    const filled = formData.clients.filter((c) => c.clientName.trim() !== '');
+    const minors = filled.filter((c) => c.clientAge > 0 && c.clientAge < 18).length;
+    const validClients = filled.length;
+    const subtotal = basePrice * validClients;
+    const minorDiscount = basePrice * minors * 0.1;
+    const total = subtotal - minorDiscount;
+    return { basePrice, validClients, minors, subtotal, minorDiscount, total };
+  }, [booking?.tour?.basePrice, formData.clients]);
+
+  const formatCurrency = (amount: number, currency: string): string => {
+    try {
+      return new Intl.NumberFormat(language === 'en' ? 'en-US' : 'es-MX', {
+        style: 'currency',
+        currency,
+      }).format(amount);
+    } catch {
+      return `${currency} ${amount.toFixed(2)}`;
+    }
+  };
+
   const getClientModalInitialData = (): ClientFormData | null => {
     if (editingClientIndex === null) return null;
     const c = formData.clients[editingClientIndex];
@@ -326,6 +350,7 @@ export function EditBookingModal({
         endDate: buildDateTime(formData.endDate, rangeEnd ?? '00:00'),
         specialRequests: hasSpecialRequests ? formData.specialRequests : '',
         clients: clientsWithCountry,
+        totalPrice: priceSummary.total,
       };
 
       const result = await updateBookingBusiness(booking.id, payload, token ?? undefined, language);
@@ -1000,6 +1025,81 @@ export function EditBookingModal({
               )}
             </div>
           </div>
+
+          {/* Price Summary */}
+          {priceSummary.validClients > 0 && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: '16px 20px',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                border: '1px solid #bbf7d0',
+                borderRadius: 'var(--radius-md, 8px)',
+              }}
+            >
+              <h4
+                style={{
+                  margin: '0 0 12px 0',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#166534',
+                }}
+              >
+                {bookingsT.priceSummary}
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '0.8125rem',
+                    color: '#374151',
+                  }}
+                >
+                  <span>
+                    {bookingsT.basePricePerPerson}:{' '}
+                    <strong>
+                      {formatCurrency(priceSummary.basePrice, booking?.currency ?? 'MXN')}
+                    </strong>{' '}
+                    × {priceSummary.validClients}
+                  </span>
+                  <span>{formatCurrency(priceSummary.subtotal, booking?.currency ?? 'MXN')}</span>
+                </div>
+                {priceSummary.minorDiscount > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '0.8125rem',
+                      color: '#dc2626',
+                    }}
+                  >
+                    <span>
+                      {bookingsT.minorDiscount} ({priceSummary.minors})
+                    </span>
+                    <span>
+                      -{formatCurrency(priceSummary.minorDiscount, booking?.currency ?? 'MXN')}
+                    </span>
+                  </div>
+                )}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '0.9375rem',
+                    fontWeight: 700,
+                    color: '#166534',
+                    borderTop: '1px solid #bbf7d0',
+                    paddingTop: 8,
+                    marginTop: 4,
+                  }}
+                >
+                  <span>{bookingsT.totalPrice}</span>
+                  <span>{formatCurrency(priceSummary.total, booking?.currency ?? 'MXN')}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Client Form Modal */}
           <ClientFormModal

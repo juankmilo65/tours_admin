@@ -1161,6 +1161,8 @@ export const es: Translation = {
     title: 'Verifica tu Correo Electrónico',
     description:
       'Hemos enviado un código de verificación de 6 dígitos a tu dirección de correo electrónico. Por favor, ingrésalo a continuación para verificar tu correo.',
+    tokenDescription:
+      'Estás verificando tu correo electrónico usando un enlace de verificación seguro.',
     otpLabel: 'Código de Verificación',
     otpRequired: 'Por favor ingresa el código de verificación',
     otpInvalidLength: 'El código debe tener 6 dígitos',

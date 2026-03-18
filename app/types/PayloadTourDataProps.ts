@@ -125,6 +125,7 @@ export interface Tour {
   daysCount?: number;
   maxCapacity: number;
   basePrice: string;
+  minimumPayment: number;
   currency: string;
   imageUrl: string;
   images: string[];

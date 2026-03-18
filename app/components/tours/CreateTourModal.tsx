@@ -71,6 +71,7 @@ interface TourFormData {
   duration: string;
   maxCapacity: number;
   basePrice: number;
+  minimumPayment: number;
   currency: string;
   imageUrl: string;
   images: File[];
@@ -136,6 +137,7 @@ export function CreateTourModal({
       duration: initialData?.duration ?? '1 hour',
       maxCapacity: initialData?.maxCapacity ?? 1,
       basePrice: initialData?.basePrice ?? 0,
+      minimumPayment: initialData?.minimumPayment ?? 0,
       currency: initialData?.currency ?? 'MXN',
       imageUrl: initialData?.imageUrl ?? '',
       images: initialData?.images ?? [],
@@ -462,6 +464,13 @@ export function CreateTourModal({
       newErrors.maxCapacity = t('tours.maxCapacityRequired') ?? 'Max capacity is required';
     if (formData.basePrice <= 0)
       newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
+    if (
+      formData.minimumPayment === undefined ||
+      formData.minimumPayment === null ||
+      formData.minimumPayment <= 0
+    )
+      newErrors.minimumPayment =
+        t('tours.minimumPaymentRequired') ?? 'El pago mínimo es obligatorio';
     // Validate that at least 1 day exists
     if (formData.days.length === 0) {
       newErrors.activities = t('tours.daysMinRequired') ?? 'Se requiere al menos un día';
@@ -529,6 +538,7 @@ export function CreateTourModal({
         shortDescriptionEn: formData.shortDescriptionEn,
         maxCapacity: formData.maxCapacity,
         basePrice: formData.basePrice,
+        minimumPayment: formData.minimumPayment,
         currency: formData.currency,
         difficulty: formData.difficulty,
         language: formData.language,
@@ -1447,6 +1457,43 @@ export function CreateTourModal({
                 {errors.basePrice !== undefined && (
                   <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
                     {errors.basePrice}
+                  </span>
+                )}
+              </div>
+
+              {/* Minimum Payment */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: 'var(--space-2)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    color: 'var(--color-neutral-700)',
+                  }}
+                >
+                  {t('tours.minimumPayment')} ({currencyCode}){' '}
+                  <span style={{ color: 'red' }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  name="minimumPayment"
+                  value={formData.minimumPayment}
+                  onChange={handleInputChange}
+                  min={0}
+                  step={0.01}
+                  style={{
+                    width: '100%',
+                    padding: 'var(--space-2)',
+                    border:
+                      errors.minimumPayment !== undefined
+                        ? '1px solid red'
+                        : '1px solid var(--color-neutral-300)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                />
+                {errors.minimumPayment !== undefined && (
+                  <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
+                    {errors.minimumPayment}
                   </span>
                 )}
               </div>

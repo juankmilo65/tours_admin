@@ -92,7 +92,8 @@ function AuthGuard({ children }: { children: ReactNode }): ReactNode {
     location.pathname === '/' ||
     location.pathname === '/register' ||
     location.pathname === '/newPassword' ||
-    location.pathname === '/forgot-password';
+    location.pathname === '/forgot-password' ||
+    location.pathname === '/verify-email';
 
   const needsRedirect = (!isAuthenticated || !isOtpVerified) && !isPublicRoute;
 
@@ -378,7 +379,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
   const pathname = url.pathname;
 
   // Rutas públicas que no requieren autenticación
-  const publicRoutes = ['/', '/register', '/newPassword', '/forgot-password'];
+  const publicRoutes = ['/', '/register', '/newPassword', '/forgot-password', '/verify-email'];
   const isPublicRoute = publicRoutes.includes(pathname);
 
   // Load session to check authentication
@@ -392,8 +393,14 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<{
   }
 
   // Si es una ruta pública (/ o /register) y el usuario SÍ está autenticado, redirigir al dashboard
-  // EXCEPTO para /newPassword y /forgot-password que permiten acceso aunque estés autenticado
-  if (isPublicRoute && hasToken && pathname !== '/newPassword' && pathname !== '/forgot-password') {
+  // EXCEPTO para /newPassword, /forgot-password y /verify-email que permiten acceso aunque estés autenticado
+  if (
+    isPublicRoute &&
+    hasToken &&
+    pathname !== '/newPassword' &&
+    pathname !== '/forgot-password' &&
+    pathname !== '/verify-email'
+  ) {
     throw redirect('/dashboard');
   }
   // Get selected country from session
@@ -573,12 +580,13 @@ export default function App(): React.JSX.Element {
     [cities, countries]
   );
 
-  // Check if current page is an auth page (login, register, newPassword, forgot-password)
+  // Check if current page is an auth page (login, register, newPassword, forgot-password, verify-email)
   const isAuthPage =
     location.pathname === '/' ||
     location.pathname === '/register' ||
     location.pathname === '/newPassword' ||
-    location.pathname === '/forgot-password';
+    location.pathname === '/forgot-password' ||
+    location.pathname === '/verify-email';
 
   return (
     <>
