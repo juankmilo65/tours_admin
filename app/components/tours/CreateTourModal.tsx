@@ -30,7 +30,7 @@ import type {
 // Type definitions
 interface UserDropdownOption {
   id: string;
-  name: string;
+  firstName: string;
   email: string;
 }
 
@@ -38,6 +38,11 @@ interface ActivityDropdownOption {
   id: string;
   activityEs: string;
   activityEn: string;
+}
+
+interface ToursInfo {
+  lastDateForThisTour: string; // ISO date string
+  toursRelated: number;
 }
 
 interface CreateTourModalProps {
@@ -49,6 +54,7 @@ interface CreateTourModalProps {
   mode?: 'create' | 'edit';
   tourId?: string;
   initialData?: Partial<TourFormData>;
+  toursInfo?: ToursInfo;
 }
 
 interface TourActivity {
@@ -103,6 +109,7 @@ export function CreateTourModal({
   mode = 'create',
   tourId,
   initialData,
+  toursInfo,
 }: CreateTourModalProps): JSX.Element | null {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -121,6 +128,24 @@ export function CreateTourModal({
 
   // Check if user is admin
   const isAdmin = currentUser?.role === 'admin';
+
+  // Calculate if tour has editing restrictions based on toursInfo
+  // Restrictions apply if: toursRelated > 0 AND lastDateForThisTour <= current date
+  const isTourRestricted = React.useMemo(() => {
+    if (!isEditMode || !toursInfo) return false;
+    const currentDate = new Date();
+    const lastDate = new Date(toursInfo.lastDateForThisTour);
+    return toursInfo.toursRelated > 0 && lastDate <= currentDate;
+  }, [isEditMode, toursInfo]);
+
+  // Store original max capacity for validation (in edit mode with restrictions)
+  const originalMaxCapacity = React.useMemo(
+    () =>
+      isEditMode && initialData?.maxCapacity !== undefined && initialData?.maxCapacity !== null
+        ? initialData.maxCapacity
+        : 0,
+    [isEditMode, initialData?.maxCapacity]
+  );
 
   // Default form data
   const getDefaultFormData = useCallback(
@@ -157,6 +182,7 @@ export function CreateTourModal({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [imageErrors, setImageErrors] = useState<string[]>([]);
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+  const [showLanguageWarningModal, setShowLanguageWarningModal] = useState(false);
   // Cover image tracking: store the image ID that should be cover
   const [selectedCoverId, setSelectedCoverId] = useState<string | null>(() => {
     const coverImage = initialData?.existingImages?.find((img: TourImage) => img.isCover);
@@ -431,6 +457,13 @@ export function CreateTourModal({
   // Activity handlers are now managed by ActivitiesByDay component
 
   const handleLanguageToggle = (lang: string): void => {
+    // Check if removing the last language
+    if (formData.language.includes(lang) && formData.language.length === 1) {
+      // Show warning modal instead of removing
+      setShowLanguageWarningModal(true);
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       language: prev.language.includes(lang)
@@ -460,8 +493,15 @@ export function CreateTourModal({
     if (!formData.shortDescriptionEn)
       newErrors.shortDescriptionEn =
         t('tours.shortDescriptionEnRequired') ?? 'Short description (EN) is required';
-    if (formData.maxCapacity <= 0)
+    if (formData.maxCapacity <= 0) {
       newErrors.maxCapacity = t('tours.maxCapacityRequired') ?? 'Max capacity is required';
+    }
+    // Validate max capacity >= original when tour is restricted
+    if (isTourRestricted && formData.maxCapacity < originalMaxCapacity) {
+      newErrors.maxCapacity =
+        t('tours.maxCapacityCannotBeReduced') ??
+        `La capacidad máxima no puede ser menor a ${originalMaxCapacity}`;
+    }
     if (formData.basePrice <= 0)
       newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
     if (
@@ -717,6 +757,87 @@ export function CreateTourModal({
     return null;
   }
 
+  // Language warning modal
+  if (showLanguageWarningModal) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10002,
+          padding: 'var(--space-4)',
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: 'white',
+            borderRadius: 'var(--radius-lg)',
+            maxWidth: '450px',
+            width: '100%',
+            padding: 'var(--space-6)',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              gap: 16,
+              alignItems: 'flex-start',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
+            <div style={{ fontSize: 34 }}>⚠️</div>
+            <div style={{ flex: 1 }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 'var(--text-lg)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  color: 'var(--color-neutral-900)',
+                }}
+              >
+                {t('common.warning') ?? 'Advertencia'}
+              </h3>
+              <p
+                style={{
+                  marginTop: 8,
+                  color: 'var(--color-neutral-600)',
+                  fontSize: 'var(--text-sm)',
+                  lineHeight: 1.5,
+                }}
+              >
+                {t('tours.minimumOneLanguageRequired') ??
+                  'No es posible dejar el tour sin un idioma seleccionado.'}
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={() => setShowLanguageWarningModal(false)}
+              style={{
+                padding: 'var(--space-2) var(--space-4)',
+                backgroundColor: 'var(--color-primary-500)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                fontWeight: 'var(--font-weight-medium)',
+                fontSize: 'var(--text-sm)',
+              }}
+            >
+              {t('common.accept') ?? 'Aceptar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Close confirmation modal
   if (showCloseConfirmation) {
     return (
@@ -915,7 +1036,7 @@ export function CreateTourModal({
                       { value: '', label: t('common.selectProvider') ?? 'Seleccionar proveedor' },
                       ...users.map((user) => ({
                         value: user.id,
-                        label: `${user.name} (${user.email})`,
+                        label: `${user.firstName} (${user.email})`,
                       })),
                     ]}
                     value={formData.userId}
@@ -1007,7 +1128,22 @@ export function CreateTourModal({
                 }}
                 placeholder={t('tours.selectCategory') ?? 'Seleccionar categoría'}
                 id="select-category"
+                disabled={isTourRestricted}
               />
+              {isTourRestricted && (
+                <span
+                  style={{
+                    color: 'var(--color-neutral-500)',
+                    fontSize: 'var(--text-xs)',
+                    marginTop: 'var(--space-1)',
+                    display: 'block',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {t('tours.fieldCannotBeChangedDueToBookings') ??
+                    'Este campo no se puede modificar porque el tour tiene reservas asociadas'}
+                </span>
+              )}
               {errors.categoryId !== undefined && (
                 <span
                   style={{
@@ -1051,7 +1187,22 @@ export function CreateTourModal({
                 }}
                 placeholder={t('common.selectCity') ?? 'Seleccionar ciudad'}
                 id="select-city-modal"
+                disabled={isTourRestricted}
               />
+              {isTourRestricted && (
+                <span
+                  style={{
+                    color: 'var(--color-neutral-500)',
+                    fontSize: 'var(--text-xs)',
+                    marginTop: 'var(--space-1)',
+                    display: 'block',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {t('tours.fieldCannotBeChangedDueToBookings') ??
+                    'Este campo no se puede modificar porque el tour tiene reservas asociadas'}
+                </span>
+              )}
               {errors.cityId !== undefined && (
                 <span
                   style={{
@@ -1163,6 +1314,7 @@ export function CreateTourModal({
                   name="titleEs"
                   value={formData.titleEs}
                   onChange={handleInputChange}
+                  disabled={isTourRestricted}
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1171,8 +1323,23 @@ export function CreateTourModal({
                         ? '1px solid red'
                         : '1px solid var(--color-neutral-300)',
                     borderRadius: 'var(--radius-md)',
+                    backgroundColor: isTourRestricted ? 'var(--color-neutral-100)' : 'white',
                   }}
                 />
+                {isTourRestricted && (
+                  <span
+                    style={{
+                      color: 'var(--color-neutral-500)',
+                      fontSize: 'var(--text-xs)',
+                      marginTop: 'var(--space-1)',
+                      display: 'block',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    {t('tours.fieldCannotBeChangedDueToBookings') ??
+                      'Este campo no se puede modificar porque el tour tiene reservas asociadas'}
+                  </span>
+                )}
                 {errors.titleEs !== undefined && (
                   <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>{errors.titleEs}</span>
                 )}
@@ -1195,6 +1362,7 @@ export function CreateTourModal({
                   name="titleEn"
                   value={formData.titleEn}
                   onChange={handleInputChange}
+                  disabled={isTourRestricted}
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1203,8 +1371,23 @@ export function CreateTourModal({
                         ? '1px solid red'
                         : '1px solid var(--color-neutral-300)',
                     borderRadius: 'var(--radius-md)',
+                    backgroundColor: isTourRestricted ? 'var(--color-neutral-100)' : 'white',
                   }}
                 />
+                {isTourRestricted && (
+                  <span
+                    style={{
+                      color: 'var(--color-neutral-500)',
+                      fontSize: 'var(--text-xs)',
+                      marginTop: 'var(--space-1)',
+                      display: 'block',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    {t('tours.fieldCannotBeChangedDueToBookings') ??
+                      'Este campo no se puede modificar porque el tour tiene reservas asociadas'}
+                  </span>
+                )}
                 {errors.titleEn !== undefined && (
                   <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>{errors.titleEn}</span>
                 )}
@@ -1227,6 +1410,7 @@ export function CreateTourModal({
                   name="shortDescriptionEs"
                   value={formData.shortDescriptionEs}
                   onChange={handleInputChange}
+                  disabled={isTourRestricted}
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1235,8 +1419,23 @@ export function CreateTourModal({
                         ? '1px solid red'
                         : '1px solid var(--color-neutral-300)',
                     borderRadius: 'var(--radius-md)',
+                    backgroundColor: isTourRestricted ? 'var(--color-neutral-100)' : 'white',
                   }}
                 />
+                {isTourRestricted && (
+                  <span
+                    style={{
+                      color: 'var(--color-neutral-500)',
+                      fontSize: 'var(--text-xs)',
+                      marginTop: 'var(--space-1)',
+                      display: 'block',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    {t('tours.fieldCannotBeChangedDueToBookings') ??
+                      'Este campo no se puede modificar porque el tour tiene reservas asociadas'}
+                  </span>
+                )}
                 {errors.shortDescriptionEs !== undefined && (
                   <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
                     {errors.shortDescriptionEs}
@@ -1261,6 +1460,7 @@ export function CreateTourModal({
                   name="shortDescriptionEn"
                   value={formData.shortDescriptionEn}
                   onChange={handleInputChange}
+                  disabled={isTourRestricted}
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1269,8 +1469,23 @@ export function CreateTourModal({
                         ? '1px solid red'
                         : '1px solid var(--color-neutral-300)',
                     borderRadius: 'var(--radius-md)',
+                    backgroundColor: isTourRestricted ? 'var(--color-neutral-100)' : 'white',
                   }}
                 />
+                {isTourRestricted && (
+                  <span
+                    style={{
+                      color: 'var(--color-neutral-500)',
+                      fontSize: 'var(--text-xs)',
+                      marginTop: 'var(--space-1)',
+                      display: 'block',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    {t('tours.fieldCannotBeChangedDueToBookings') ??
+                      'Este campo no se puede modificar porque el tour tiene reservas asociadas'}
+                  </span>
+                )}
                 {errors.shortDescriptionEn !== undefined && (
                   <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
                     {errors.shortDescriptionEn}
@@ -1295,6 +1510,7 @@ export function CreateTourModal({
                   value={formData.descriptionEs}
                   onChange={handleInputChange}
                   rows={4}
+                  disabled={isTourRestricted}
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1304,8 +1520,23 @@ export function CreateTourModal({
                         : '1px solid var(--color-neutral-300)',
                     borderRadius: 'var(--radius-md)',
                     resize: 'vertical',
+                    backgroundColor: isTourRestricted ? 'var(--color-neutral-100)' : 'white',
                   }}
                 />
+                {isTourRestricted && (
+                  <span
+                    style={{
+                      color: 'var(--color-neutral-500)',
+                      fontSize: 'var(--text-xs)',
+                      marginTop: 'var(--space-1)',
+                      display: 'block',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    {t('tours.fieldCannotBeChangedDueToBookings') ??
+                      'Este campo no se puede modificar porque el tour tiene reservas asociadas'}
+                  </span>
+                )}
                 {errors.descriptionEs !== undefined && (
                   <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
                     {errors.descriptionEs}
@@ -1330,6 +1561,7 @@ export function CreateTourModal({
                   value={formData.descriptionEn}
                   onChange={handleInputChange}
                   rows={4}
+                  disabled={isTourRestricted}
                   style={{
                     width: '100%',
                     padding: 'var(--space-2)',
@@ -1339,8 +1571,23 @@ export function CreateTourModal({
                         : '1px solid var(--color-neutral-300)',
                     borderRadius: 'var(--radius-md)',
                     resize: 'vertical',
+                    backgroundColor: isTourRestricted ? 'var(--color-neutral-100)' : 'white',
                   }}
                 />
+                {isTourRestricted && (
+                  <span
+                    style={{
+                      color: 'var(--color-neutral-500)',
+                      fontSize: 'var(--text-xs)',
+                      marginTop: 'var(--space-1)',
+                      display: 'block',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    {t('tours.fieldCannotBeChangedDueToBookings') ??
+                      'Este campo no se puede modificar porque el tour tiene reservas asociadas'}
+                  </span>
+                )}
                 {errors.descriptionEn !== undefined && (
                   <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
                     {errors.descriptionEn}

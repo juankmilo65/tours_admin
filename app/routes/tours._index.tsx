@@ -711,17 +711,29 @@ function ToursClient(): JSX.Element {
   // Edit tour data - computed from editingTour, rawTours, and fullTourData
   const editTourData = useMemo(() => {
     if (editingTour === null) {
-      return { isOpen: false, initialData: undefined, tourId: undefined, isLoading: false };
+      return {
+        isOpen: false,
+        initialData: undefined,
+        tourId: undefined,
+        isLoading: false,
+        toursInfo: undefined,
+      };
     }
 
     // If still loading full tour data, show loading state
     if (isLoadingFullTour) {
-      return { isOpen: true, initialData: undefined, tourId: editingTour.id, isLoading: true };
+      return {
+        isOpen: true,
+        initialData: undefined,
+        tourId: editingTour.id,
+        isLoading: true,
+        toursInfo: undefined,
+      };
     }
 
     console.warn('[tours._index] Computing editTourData for tour:', editingTour.id);
 
-    // Find the raw tour data with both languages
+    // Find's raw tour data with both languages
     const rawTourForEdit = rawTours.find((t) => t.id === editingTour.id);
     console.warn('[tours._index] rawTourForEdit found:', rawTourForEdit !== undefined);
     console.warn(
@@ -731,7 +743,13 @@ function ToursClient(): JSX.Element {
     console.warn('[tours._index] rawTourForEdit.images:', rawTourForEdit?.images);
 
     if (rawTourForEdit === undefined) {
-      return { isOpen: true, initialData: undefined, tourId: editingTour.id, isLoading: false };
+      return {
+        isOpen: true,
+        initialData: undefined,
+        tourId: editingTour.id,
+        isLoading: false,
+        toursInfo: undefined,
+      };
     }
 
     // Convert raw tour to initialData format
@@ -876,7 +894,30 @@ function ToursClient(): JSX.Element {
 
     console.warn('[tours._index] editInitialData computed:', initialData);
 
-    return { isOpen: true, initialData, tourId: editingTour.id, isLoading: false };
+    // Extract toursInfo from fullTourData for editing restrictions
+    // Type guard for toursInfo
+    const isToursInfo = (
+      data: unknown
+    ): data is { lastDateForThisTour: string; toursRelated: number } =>
+      typeof data === 'object' &&
+      data !== null &&
+      'lastDateForThisTour' in data &&
+      'toursRelated' in data &&
+      typeof (data as { lastDateForThisTour?: unknown }).lastDateForThisTour === 'string' &&
+      typeof (data as { toursRelated?: unknown }).toursRelated === 'number';
+
+    // Safely access toursInfo from fullData (which is Record<string, unknown>)
+    const toursInfoRaw = fullData.toursInfo;
+    const toursInfo = isToursInfo(toursInfoRaw)
+      ? {
+          lastDateForThisTour: toursInfoRaw.lastDateForThisTour,
+          toursRelated: toursInfoRaw.toursRelated,
+        }
+      : undefined;
+
+    console.warn('[tours._index] toursInfo extracted:', toursInfo);
+
+    return { isOpen: true, initialData, tourId: editingTour.id, isLoading: false, toursInfo };
   }, [editingTour, rawTours, fullTourData, isLoadingFullTour, currentLanguage]);
 
   // Clone tour handler - opens confirmation modal
@@ -2015,6 +2056,7 @@ function ToursClient(): JSX.Element {
             initialData={editTourData.initialData}
             users={loaderData.users}
             activities={loaderData.activities}
+            toursInfo={editTourData.toursInfo}
             onClose={() => {
               console.warn('[tours._index] Edit modal onClose called');
               setEditingTour(null);
