@@ -126,4 +126,5 @@ export const bookingEn = {
   basePricePerPerson: 'Base price per person',
   subtotal: 'Subtotal',
   minorDiscount: 'Minor discount (10%)',
+  minimumPayment: 'Minimum Payment',
 };

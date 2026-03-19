@@ -23,6 +23,7 @@ import uiReducer from '~/store/slices/uiSlice';
 import authReducer from '~/store/slices/authSlice';
 import cacheReducer from '~/store/slices/cacheSlice';
 import bookingsReducer from '~/store/slices/bookingsSlice';
+import toursReducer from '~/store/slices/toursSlice';
 
 // Redux Persist configuration
 const persistConfig = {
@@ -41,6 +42,7 @@ const rootReducer = combineReducers({
   auth: authReducer,
   cache: cacheReducer,
   bookings: bookingsReducer,
+  tours: toursReducer,
   /* offers: offersReducer, */
 });
 
