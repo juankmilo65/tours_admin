@@ -1,15 +1,15 @@
 import type { JSX } from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { useLoaderData, useNavigation, useSearchParams, useFetcher } from '@remix-run/react';
+import { useLoaderData, useFetcher } from '@remix-run/react';
 import { data, type LoaderFunctionArgs } from '@remix-run/node';
 import { requireAuth } from '~/utilities/auth.loader';
-import type { Tour, TranslatedTour, Language, TourImage } from '~/types/PayloadTourDataProps';
+import type { Tour, TranslatedTour, Language } from '~/types/PayloadTourDataProps';
 import { translateTours } from '~/types/PayloadTourDataProps';
 import { TourCard } from '~/components/tours/TourCard';
 import { CreateTourModal } from '~/components/tours/CreateTourModal';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
-import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
+import { selectCities, translateCities } from '~/store/slices/citiesSlice';
 import { selectSelectedCountry, selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import {
   selectCategories,
@@ -19,6 +19,21 @@ import {
 } from '~/store/slices/categoriesSlice';
 import { fetchCitiesSuccess } from '~/store/slices/citiesSlice';
 import { selectLanguage, setGlobalLoading, openModal } from '~/store/slices/uiSlice';
+import {
+  selectTours,
+  selectToursFilters,
+  selectToursPagination,
+  selectToursFiltersChanged,
+  selectToursHasSearched,
+  setTours,
+  setPagination,
+  setFilters,
+  setFiltersSilently,
+  clearFilters,
+  resetFiltersChanged,
+  setHasSearched,
+  setLoading as setToursLoading,
+} from '~/store/slices/toursSlice';
 import type { City } from '~/server/cities';
 import toursBL from '~/server/businessLogic/toursBusinessLogic';
 import { cloneTourBusiness, deleteTourBusiness } from '~/server/businessLogic/toursBusinessLogic';
@@ -32,12 +47,10 @@ import { useTranslation } from '~/lib/i18n/utils';
 import { getSession, commitSession } from '~/utilities/sessions';
 import Select from '~/components/ui/Select';
 
-// Loader function - runs on server
+// Loader function - runs on server, only loads initial data (categories, cities, users)
 export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeof data>> {
-  // Verificar autenticación
   await requireAuth(args);
 
-  // Load session to get selected countryId and user info
   const session = await getSession(args.request.headers.get('Cookie'));
   let selectedCountryId = session.get('selectedCountryId') as string | undefined;
   const authToken = session.get('authToken') as string | undefined;
@@ -45,72 +58,45 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     | { id: string; role: string; firstName?: string; lastName?: string; email?: string }
     | undefined;
 
-  // Si no hay countryId en sesión, obtener el default (México) de los países
-  // Esto sincroniza con la lógica del root.tsx loader
+  // Get default country if not in session
   if (selectedCountryId === undefined || selectedCountryId === null || selectedCountryId === '') {
-    // Fetch countries to get default (Mexico)
     const countriesFormData = new FormData();
     countriesFormData.append('action', 'getCountriesBusiness');
     countriesFormData.append('language', 'es');
     const countriesResult = await countriesBL(countriesFormData);
 
-    interface CountryData {
-      id: string;
-      code: string;
-      name_es?: string;
-      name_en?: string;
-    }
-
     const isCountriesResult = (
       result: unknown
-    ): result is { success: boolean; data: CountryData[] | null } =>
-      typeof result === 'object' && result !== null && 'success' in result && 'data' in result;
+    ): result is {
+      success: boolean;
+      data: { id: string; code: string; name_es?: string; name_en?: string }[] | null;
+    } => typeof result === 'object' && result !== null && 'success' in result && 'data' in result;
 
     if (isCountriesResult(countriesResult) && countriesResult.success && countriesResult.data) {
-      const countries = countriesResult.data;
-      // Buscar México como default
-      const mexicoCountry = countries.find(
-        (c: CountryData) =>
+      const mexicoCountry = countriesResult.data.find(
+        (c) =>
           c.code === 'MX' ||
           c.name_es?.toLowerCase() === 'méxico' ||
           c.name_en?.toLowerCase() === 'mexico'
       );
-      const defaultCountry = mexicoCountry ?? countries[0];
-
+      const defaultCountry = mexicoCountry ?? countriesResult.data[0];
       if (defaultCountry) {
         selectedCountryId = defaultCountry.id;
-        // Guardar en sesión para futuras requests
         session.set('selectedCountryId', defaultCountry.id);
         session.set('selectedCountryCode', defaultCountry.code);
       }
     }
   }
 
-  const url = new URL(args.request.url);
-  const userId = url.searchParams.get('userId') ?? null;
-  const countryId = selectedCountryId ?? null; // countryId is mandatory from session
-  const cityId = url.searchParams.get('cityId') ?? null; // cityId is optional filter
-  const page = url.searchParams.get('page') ?? '1';
-  const category = url.searchParams.get('category') ?? '';
-  const minPrice = url.searchParams.get('minPrice') ?? '';
-  const maxPrice = url.searchParams.get('maxPrice') ?? '';
-  const isActiveParam = url.searchParams.get('isActive'); // null if not set, 'true' or 'false' if set
-
   // Fetch categories
   const categoriesFormData = new FormData();
   categoriesFormData.append('action', 'getCategoriesBusiness');
   categoriesFormData.append('language', 'es');
   const categoriesResult = await categoriesBL(categoriesFormData);
-  // Type guard for categoriesResult
   const isCategoriesResult = (
     result: unknown
   ): result is { success: boolean; data: Category[] | null } =>
-    typeof result === 'object' &&
-    result !== null &&
-    'success' in result &&
-    typeof (result as { success?: boolean }).success === 'boolean' &&
-    'data' in result;
-
+    typeof result === 'object' && result !== null && 'success' in result && 'data' in result;
   const categories: Category[] =
     isCategoriesResult(categoriesResult) &&
     categoriesResult.success === true &&
@@ -118,9 +104,8 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
       ? categoriesResult.data
       : [];
 
-  // Fetch active cities - SOLO si tenemos un countryId válido
+  // Fetch active cities for selected country
   let activeCities: City[] = [];
-
   if (selectedCountryId !== undefined && selectedCountryId !== null && selectedCountryId !== '') {
     const citiesFormData = new FormData();
     citiesFormData.append('action', 'getCitiesBusiness');
@@ -130,62 +115,39 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
     );
     citiesFormData.append('language', 'es');
     const citiesResult = await citiesBL(citiesFormData);
-
     const isCitiesResult = (result: unknown): result is { success: boolean; data: City[] | null } =>
       typeof result === 'object' && result !== null && 'success' in result && 'data' in result;
-
     activeCities =
       isCitiesResult(citiesResult) && citiesResult.success === true && citiesResult.data !== null
         ? citiesResult.data
         : [];
   }
 
-  // Fetch users for dropdown - ALWAYS fetch for admin, and for non-admin fetch only current user
+  // Fetch users for dropdown
   let users: Array<{ id: string; firstName: string; email: string }> = [];
-  if (authToken !== undefined && authToken !== null && authToken !== '') {
+  if (authToken !== undefined) {
     if (authUser?.role === 'admin') {
       const usersResult = await getUsersDropdownBusiness(authToken, 'es');
-
       users =
         usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
-    } else if (authUser?.id !== undefined && authUser.id !== null && authUser.id !== '') {
-      // For non-admin, only set the current user
+    } else if (typeof authUser?.id === 'string' && authUser.id.trim() !== '') {
       const firstName = authUser.firstName ?? '';
       const lastName = authUser.lastName ?? '';
       const trimmedName = (firstName + ' ' + lastName).trim();
       const email = authUser.email ?? '';
       const fullName = trimmedName !== '' ? trimmedName : (email ?? 'Usuario');
-      users = [
-        {
-          id: authUser.id,
-          firstName: fullName,
-          email: email ?? 'usuario@ejemplo.com',
-        },
-      ];
+      users = [{ id: authUser.id, firstName: fullName, email: email ?? 'usuario@ejemplo.com' }];
     }
   }
-  // DEBUG: Log authUser and users for troubleshooting
-  // eslint-disable-next-line no-console
-  console.log('[tours._index][loader] authUser:', authUser);
-  // eslint-disable-next-line no-console
-  console.log('[tours._index][loader] users:', users);
 
   // Fetch activities for dropdown
   const activitiesResult = await getActivitiesDropdownBusiness('es');
-
-  // Type guard for activitiesResult
   const isActivitiesResult = (
     result: unknown
   ): result is {
     success: boolean;
     data?: Array<{ id: string; activityEs: string; activityEn: string }>;
-  } =>
-    typeof result === 'object' &&
-    result !== null &&
-    'success' in result &&
-    typeof (result as { success?: boolean }).success === 'boolean' &&
-    'data' in result;
-
+  } => typeof result === 'object' && result !== null && 'success' in result && 'data' in result;
   const activities =
     isActivitiesResult(activitiesResult) &&
     activitiesResult.success === true &&
@@ -193,154 +155,13 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
       ? activitiesResult.data
       : [];
 
-  // Fetch price range (based on current filters)
-  const priceRangeFormData = new FormData();
-  priceRangeFormData.append('action', 'getPriceRangeBusiness');
-  priceRangeFormData.append(
-    'filters',
-    JSON.stringify({
-      userId: userId ?? '',
-      countryId: countryId ?? '',
-      category: category ?? '',
-    })
-  );
-  priceRangeFormData.append('language', 'es');
-  priceRangeFormData.append('currency', 'MXN');
-  const priceRangeResult = await priceRangeBL(priceRangeFormData);
-  const priceRange = priceRangeResult.success === true ? priceRangeResult.data : null;
-
-  // If no userId or countryId, return empty state with categories and price range
-  if (userId === null || userId === undefined || countryId === null || countryId === undefined) {
-    return data(
-      {
-        userId: null,
-        countryId: countryId,
-        cityId: null,
-        categories,
-        activeCities,
-        users,
-        activities,
-        priceRange,
-        tours: {
-          data: [],
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 0,
-            totalPages: 1,
-          },
-        },
-      },
-      {
-        headers: {
-          'Set-Cookie': await commitSession(session),
-        },
-      }
-    );
-  }
-
-  // Build filters object - userId and countryId are mandatory
-  const filters: Record<string, string | number | boolean> = {
-    userId: userId ?? '',
-    countryId: countryId ?? '',
-    page: parseInt(page, 10),
-  };
-
-  // Add isActive filter if specified
-  if (isActiveParam !== null) {
-    filters.isActive = isActiveParam === 'true';
-  }
-
-  if (cityId !== null && cityId !== undefined && cityId !== '') {
-    filters.cityId = cityId;
-  }
-  if (category !== null && category !== undefined && category !== '') {
-    filters.category = category;
-  }
-  if (minPrice !== null && minPrice !== undefined && minPrice !== '') {
-    filters.minPrice = parseInt(minPrice, 10);
-  }
-  if (maxPrice !== null && maxPrice !== undefined && maxPrice !== '') {
-    filters.maxPrice = parseInt(maxPrice, 10);
-  }
-
-  // Call business logic to get tours
-  const formData = new FormData();
-  formData.append('action', 'getToursBusiness');
-  formData.append('filters', JSON.stringify(filters));
-  formData.append('language', 'es');
-
-  const result = await toursBL(formData);
-
-  // Type guard for tours result
-  const isToursResult = (
-    toursResult: unknown
-  ): toursResult is {
-    success: boolean;
-    data: Tour[] | null;
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    } | null;
-  } =>
-    typeof toursResult === 'object' &&
-    toursResult !== null &&
-    'success' in toursResult &&
-    typeof (toursResult as { success?: boolean }).success === 'boolean' &&
-    'data' in toursResult &&
-    'pagination' in toursResult;
-
-  if (isToursResult(result) && result.success === true) {
-    return data(
-      {
-        userId: userId,
-        countryId: countryId,
-        cityId: cityId,
-        categories,
-        activeCities,
-        users,
-        activities,
-        priceRange,
-        tours: {
-          data: result.data ?? [],
-          pagination: result.pagination ?? {
-            page: parseInt(page, 10),
-            limit: 10,
-            total: 0,
-            totalPages: 1,
-          },
-        },
-      },
-      {
-        headers: {
-          'Set-Cookie': await commitSession(session),
-        },
-      }
-    );
-  }
-
-  // Return empty on error
   return data(
     {
-      userId,
-      countryId,
-      cityId,
+      countryId: selectedCountryId,
       categories,
       activeCities,
       users,
       activities,
-      priceRange,
-      tours: {
-        data: [],
-        pagination: {
-          page: parseInt(page, 10),
-          limit: 10,
-          total: 0,
-          totalPages: 1,
-        },
-      },
     },
     {
       headers: {
@@ -350,7 +171,6 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   );
 }
 
-// Price range type
 interface PriceRange {
   minPrice: number;
   maxPrice: number;
@@ -358,60 +178,31 @@ interface PriceRange {
   count: number;
 }
 
-// Helper to extract data from loader response (data() wraps differently than json())
-function extractLoaderData(loaderData: unknown): {
-  userId: string | null;
-  countryId: string | null;
-  cityId: string | null;
-  categories: Category[];
-  activeCities: City[];
-  users: Array<{ id: string; firstName: string; email: string }>;
-  activities: Array<{ id: string; activityEs: string; activityEn: string }>;
-  priceRange: PriceRange | null;
-  tours: { data: Tour[]; pagination: unknown };
-} {
-  const innerData = (
-    typeof loaderData === 'object' &&
-    loaderData !== null &&
-    'type' in loaderData &&
-    (loaderData as { type?: string }).type === 'DataWithResponseInit'
-      ? (loaderData as { data?: typeof loaderData }).data
-      : loaderData
-  ) as
-    | {
-        userId?: string | null;
-        countryId?: string | null;
-        cityId?: string | null;
-        categories?: Category[];
-        activeCities?: City[];
-        users?: Array<{ id: string; firstName: string; email: string }>;
-        activities?: Array<{ id: string; activityEs: string; activityEn: string }>;
-        priceRange?: PriceRange | null;
-        tours?: { data: Tour[]; pagination: unknown };
-      }
-    | undefined;
-
-  return {
-    userId: innerData?.userId ?? null,
-    countryId: innerData?.countryId ?? null,
-    cityId: innerData?.cityId ?? null,
-    categories: innerData?.categories ?? [],
-    activeCities: innerData?.activeCities ?? [],
-    users: innerData?.users ?? [],
-    activities: innerData?.activities ?? [],
-    priceRange: innerData?.priceRange ?? null,
-    tours: innerData?.tours ?? {
-      data: [],
-      pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
-    },
-  };
-}
-
-// Internal reusable EmptyState component
 interface EmptyStateProps {
   icon: string;
   title: string;
   description: string;
+}
+
+interface TourActivity {
+  activityId?: string;
+  activity_en?: string;
+  activity_es?: string;
+  hora?: string;
+  sortOrder?: number;
+}
+
+interface TourDayGroup {
+  day: number;
+  activities: Array<{
+    id?: string;
+    activityId?: string;
+    activity_es?: string;
+    activity_en?: string;
+    activity?: string;
+    hora?: string;
+    sortOrder?: number;
+  }>;
 }
 
 function EmptyState({ icon, title, description }: EmptyStateProps): JSX.Element {
@@ -443,37 +234,39 @@ function EmptyState({ icon, title, description }: EmptyStateProps): JSX.Element 
   );
 }
 
-// Utility to convert 24h time (from API) to 12h format (for UI)
-// e.g., "09:00" -> "09:00 AM", "14:30" -> "02:00 PM"
-const convertTo12HourFormat = (time24: string): string => {
-  // If already in 12h format, return as-is
-  if (time24.includes('AM') || time24.includes('PM')) {
-    return time24;
-  }
+const convertTo12HourFormat = (time24: string | null | undefined): string => {
+  // Handle nullish/empty cases explicitly
+  if (time24 === null || time24 === undefined || time24.trim() === '') return '09:00 AM';
 
-  const match = time24.match(/^(\d{1,2}):(\d{2})$/);
-  if (match?.[1] === undefined) {
-    return '09:00 AM'; // Default fallback
-  }
+  // Now time24 is definitely a string
+  const timeStr: string = time24;
 
+  if (timeStr.includes('AM') || timeStr.includes('PM')) return timeStr;
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+  if (match?.[1] === undefined) return '09:00 AM';
   let hours = parseInt(match[1], 10);
   const period = hours >= 12 ? 'PM' : 'AM';
-
-  if (hours === 0) {
-    hours = 12;
-  } else if (hours > 12) {
-    hours = hours - 12;
-  }
-
+  if (hours === 0) hours = 12;
+  else if (hours > 12) hours = hours - 12;
   return `${hours.toString().padStart(2, '0')}:00 ${period}`;
 };
 
-// Client-only component that uses Redux
+// Client-only component that uses Redux for all state management
 function ToursClient(): JSX.Element {
-  const rawLoaderData = useLoaderData<typeof loader>();
-  const loaderData = extractLoaderData(rawLoaderData);
+  const loaderData = useLoaderData<typeof loader>() as {
+    data: {
+      users?: Array<{ id: string; firstName: string; email: string }>;
+      categories?: Category[];
+      activeCities?: City[];
+      activities?: Array<{ id: string; activityEs: string; activityEn: string }>;
+    };
+  };
   const dispatch = useAppDispatch();
   const rawCities = useAppSelector(selectCities);
+  const users = (loaderData.data?.users ?? []).map((u: { id: string; firstName: string }) => ({
+    value: u.id,
+    label: u.firstName,
+  }));
   const categories = useAppSelector(selectCategories);
   const currentLanguage = useAppSelector(selectLanguage) as Language;
   const authToken = useAppSelector(selectAuthToken);
@@ -481,153 +274,50 @@ function ToursClient(): JSX.Element {
   const { t } = useTranslation();
   const currencyCode = useAppSelector(selectSelectedCurrencyCode);
 
-  // Translated active cities from loader
-  const translatedCities = useMemo(() => {
-    return translateCities(loaderData.activeCities, currentLanguage);
-  }, [loaderData.activeCities, currentLanguage]);
+  // Tours state from Redux (no longer using URL params)
+  const rawTours = useAppSelector(selectTours);
+  const filters = useAppSelector(selectToursFilters);
+  const pagination = useAppSelector(selectToursPagination);
+  const filtersChanged = useAppSelector(selectToursFiltersChanged);
+  const hasSearched = useAppSelector(selectToursHasSearched);
 
-  // Translated categories - computed from categories based on language
-  const translatedCategories = useMemo(() => {
-    return translateCategories(categories, currentLanguage);
-  }, [categories, currentLanguage]);
-
-  const navigation = useNavigation();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // State for selected filters (only sent on "Filtrar" click)
-  const [selectedUserId, setSelectedUserId] = useState<string>(searchParams.get('userId') ?? '');
-  const [selectedCityId, setSelectedCityId] = useState<string>(searchParams.get('cityId') ?? '');
-  const [selectedCategory, setSelectedCategory] = useState<string>(
-    searchParams.get('category') ?? ''
+  const translatedCities = useMemo(
+    () => translateCities(loaderData.data?.activeCities ?? [], currentLanguage),
+    [loaderData.data?.activeCities, currentLanguage]
   );
-  // Active status filter - 'all' | 'active' | 'inactive'
-  const [activeStatusFilter, setActiveStatusFilter] = useState<string>(() => {
-    const isActiveParam = searchParams.get('isActive');
-    if (isActiveParam === 'false') return 'inactive';
-    if (isActiveParam === 'true') return 'active';
-    return 'all';
-  });
-
-  // Raw tours data (with both languages) - only updated on filter/pagination
-  const [rawTours, setRawTours] = useState<Tour[]>(loaderData.tours?.data ?? []);
-
-  // Translated tours - computed from rawTours based on language
-  const translatedTours = useMemo(() => {
-    return translateTours(rawTours, currentLanguage);
-  }, [rawTours, currentLanguage]);
-
-  const [pagination, setPagination] = useState<{
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  }>(
-    loaderData.tours?.pagination !== null && loaderData.tours?.pagination !== undefined
-      ? (loaderData.tours.pagination as {
-          page: number;
-          limit: number;
-          total: number;
-          totalPages: number;
-        })
-      : {
-          page: 1,
-          limit: 10,
-          total: 0,
-          totalPages: 1,
-        }
+  const translatedCategories = useMemo(
+    () => translateCategories(loaderData.data?.categories ?? [], currentLanguage),
+    [loaderData.data?.categories, currentLanguage]
   );
-  // Track if user has made a search (to show "no results" state)
-  const [hasSearched, setHasSearched] = useState(false);
+  const translatedTours = useMemo(
+    () => translateTours(rawTours, currentLanguage),
+    [rawTours, currentLanguage]
+  );
 
-  // Track if filters have been changed but not applied
-  const [filtersChanged, setFiltersChanged] = useState(false);
-
-  // Check if current user is admin
   const isAdmin = currentUser?.role === 'admin';
-
-  // Country ID from Redux (selected from Header)
   const selectedCountry = useAppSelector(selectSelectedCountry);
   const countryId = selectedCountry?.id ?? null;
 
-  // Auto-select current user as provider if not admin
-  useEffect(() => {
-    if (!isAdmin && currentUser !== undefined && currentUser !== null) {
-      setSelectedUserId(currentUser.id);
-    }
-  }, [isAdmin, currentUser]);
-
-  // Auto-load tours for non-admin users when userId and countryId are available
-  useEffect(() => {
-    // Only for non-admin users
-    if (isAdmin === false && selectedUserId !== '' && countryId !== null && countryId !== '') {
-      // Check if tours are already loaded from URL params
-      const urlUserId = searchParams.get('userId');
-      const urlCountryId = searchParams.get('countryId');
-
-      // If not already loaded via URL, automatically trigger filter
-      if (urlUserId !== selectedUserId || urlCountryId !== countryId) {
-        const params: Record<string, string> = {
-          userId: selectedUserId,
-          countryId: countryId,
-          page: '1',
-          category: selectedCategory,
-        };
-
-        // Include cityId if selected (optional filter)
-        if (selectedCityId !== '') {
-          params.cityId = selectedCityId;
-        }
-
-        // Include isActive filter based on dropdown selection
-        if (activeStatusFilter === 'active') {
-          params.isActive = 'true';
-        } else if (activeStatusFilter === 'inactive') {
-          params.isActive = 'false';
-        }
-
-        setSearchParams(params);
-      }
-    }
-  }, [
-    isAdmin,
-    selectedUserId,
-    countryId,
-    searchParams,
-    selectedCategory,
-    selectedCityId,
-    activeStatusFilter,
-    setSearchParams,
-  ]);
-
-  // Create tour modal state
+  // Local state for modals
   const [isCreateTourModalOpen, setIsCreateTourModalOpen] = useState(false);
-
-  // Edit tour modal state
   const [editingTour, setEditingTour] = useState<TranslatedTour | null>(null);
-
-  // Clone tour confirmation modal state
   const [tourToClone, setTourToClone] = useState<TranslatedTour | null>(null);
   const [cloneImagesOption, setCloneImagesOption] = useState(true);
-
-  // Delete tour confirmation modal state
   const [tourToDelete, setTourToDelete] = useState<TranslatedTour | null>(null);
+  const [priceRange, setPriceRange] = useState<PriceRange | null>(null);
 
-  // Fetcher for loading tour details via BL
+  // Fetcher for loading tour details
   const tourDetailsFetcher = useFetcher<{
     success: boolean;
     data?: Record<string, unknown>;
     error?: string;
   }>();
-
-  // Type guard for tour API result
   const isTourSuccessResult = (r: unknown): r is { success: true; data: Record<string, unknown> } =>
     typeof r === 'object' &&
     r !== null &&
     'success' in r &&
     (r as { success: unknown }).success === true &&
     'data' in r;
-
-  // Derive fullTourData from fetcher data using useMemo (no useEffect/setState needed)
   const fullTourData = useMemo(() => {
     if (
       editingTour !== null &&
@@ -635,42 +325,130 @@ function ToursClient(): JSX.Element {
       tourDetailsFetcher.data !== undefined &&
       isTourSuccessResult(tourDetailsFetcher.data)
     ) {
-      console.warn('[tours._index] Full tour data derived from fetcher');
       return tourDetailsFetcher.data.data;
     }
     return null;
   }, [editingTour, tourDetailsFetcher.state, tourDetailsFetcher.data]);
 
-  // Fetch full tour data when editingTour changes using useFetcher
+  // Cargar datos iniciales del loader en Redux
   useEffect(() => {
-    if (editingTour === null) {
-      return;
+    dispatch(setGlobalLoading({ isLoading: true, message: 'Cargando datos...' }));
+    if (loaderData.data?.categories && loaderData.data.categories.length > 0)
+      dispatch(fetchCategoriesSuccess(loaderData.data.categories));
+    if (loaderData.data?.activeCities && loaderData.data.activeCities.length > 0)
+      dispatch(fetchCitiesSuccess(loaderData.data.activeCities));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Ocultar spinner cuando los datos estén listos
+  useEffect(() => {
+    if (categories.length > 0 && rawCities.length > 0) {
+      dispatch(setGlobalLoading({ isLoading: false }));
     }
+  }, [categories, rawCities, dispatch]);
 
-    console.warn('[tours._index] Fetching full tour data for:', editingTour.id);
+  // Auto-select current user as provider for non-admin
+  useEffect(() => {
+    if (!isAdmin && currentUser?.id !== undefined && filters.userId !== currentUser.id) {
+      dispatch(setFilters({ userId: currentUser.id, countryId: countryId ?? '' }));
+    }
+  }, [isAdmin, currentUser, countryId, dispatch, filters.userId]);
 
-    // Show global loading while fetching tour details
+  // Fetch tours when filters are applied
+  const fetchTours = async () => {
+    if (
+      filters.userId === undefined ||
+      filters.userId === '' ||
+      filters.countryId === undefined ||
+      filters.countryId === ''
+    )
+      return;
+
+    dispatch(setGlobalLoading({ isLoading: true, message: 'Buscando tours...' }));
+    dispatch(setToursLoading(true));
+    dispatch(setHasSearched(true));
+
+    try {
+      const filtersObj: Record<string, string | number | boolean> = {
+        userId: filters.userId,
+        countryId: filters.countryId,
+        page: parseInt(filters.page ?? '1', 10),
+      };
+
+      if (filters.cityId !== undefined) filtersObj.cityId = filters.cityId;
+      if (filters.difficulty !== undefined) filtersObj.difficulty = filters.difficulty;
+      if (filters.minPrice !== undefined) filtersObj.minPrice = parseInt(filters.minPrice, 10);
+      if (filters.maxPrice !== undefined) filtersObj.maxPrice = parseInt(filters.maxPrice, 10);
+      if (filters.isActive !== undefined) filtersObj.isActive = filters.isActive;
+
+      const formData = new FormData();
+      formData.append('action', 'getToursBusiness');
+      formData.append('filters', JSON.stringify(filtersObj));
+      formData.append('language', 'es');
+
+      const result = await toursBL(formData);
+
+      const isToursResult = (
+        toursResult: unknown
+      ): toursResult is {
+        success: boolean;
+        data: Tour[] | null;
+        pagination: { page: number; limit: number; total: number; totalPages: number } | null;
+      } =>
+        typeof toursResult === 'object' &&
+        toursResult !== null &&
+        'success' in toursResult &&
+        typeof (toursResult as { success?: boolean }).success === 'boolean' &&
+        'data' in toursResult &&
+        'pagination' in toursResult;
+
+      if (isToursResult(result) && result.success === true) {
+        dispatch(setTours(result.data ?? []));
+        dispatch(
+          setPagination(
+            result.pagination ?? {
+              page: parseInt(filters.page ?? '1', 10),
+              limit: 10,
+              total: 0,
+              totalPages: 1,
+            }
+          )
+        );
+      } else {
+        dispatch(setTours([]));
+        dispatch(setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 }));
+      }
+    } catch (error) {
+      console.error('Error fetching tours:', error);
+      dispatch(setTours([]));
+      dispatch(setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 }));
+    } finally {
+      dispatch(setToursLoading(false));
+      dispatch(setGlobalLoading({ isLoading: false }));
+    }
+  };
+
+  // Fetch tour details for editing
+  useEffect(() => {
+    if (editingTour === null) return;
+
     dispatch(setGlobalLoading({ isLoading: true, message: 'Cargando datos del tour...' }));
-
-    // Use fetcher to call the API route which uses BL
     tourDetailsFetcher.load(
       `/api/tours/getById?tourId=${editingTour.id}&language=${currentLanguage ?? 'es'}&currency=MXN`
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingTour, currentLanguage, dispatch]);
 
-  // Hide global loading when fetcher completes
   useEffect(() => {
     if (tourDetailsFetcher.state === 'idle' && tourDetailsFetcher.data !== undefined) {
-      console.warn('[tours._index] Tour details fetcher completed, hiding loader');
       dispatch(setGlobalLoading({ isLoading: false }));
     }
   }, [tourDetailsFetcher.state, tourDetailsFetcher.data, dispatch]);
 
-  // Check for deferred success messages after page reload
+  // Check for success messages
   useEffect(() => {
     const successType = window.sessionStorage.getItem('tours_success_message');
-    if (successType !== null && successType !== '') {
+    if (successType !== null) {
       window.sessionStorage.removeItem('tours_success_message');
       let messageKey = '';
       switch (successType) {
@@ -695,21 +473,106 @@ function ToursClient(): JSX.Element {
           type: 'confirm',
           title: t('common.success'),
           isOpen: true,
-          data: {
-            message: t(messageKey),
-            icon: 'success',
-          },
+          data: { message: t(messageKey), icon: 'success' },
         })
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [t, dispatch]);
 
-  // Loading state from fetcher
+  // Load price range when filters change
+  useEffect(() => {
+    const loadPriceRange = async () => {
+      if (
+        filters.userId === null ||
+        filters.userId === undefined ||
+        filters.userId === '' ||
+        filters.countryId === null ||
+        filters.countryId === undefined ||
+        filters.countryId === ''
+      ) {
+        setPriceRange(null);
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('action', 'getPriceRangeBusiness');
+        formData.append(
+          'filters',
+          JSON.stringify({
+            userId: filters.userId,
+            countryId: filters.countryId,
+            category: filters.category ?? '',
+          })
+        );
+        formData.append('language', 'es');
+        formData.append('currency', 'MXN');
+        const result = await priceRangeBL(formData);
+        if (result.success === true && result.data) {
+          setPriceRange(result.data);
+          // Always update filters to match new price range if out of bounds or empty/invalid
+          const min = result.data.minPrice;
+          const max = result.data.maxPrice;
+          let newMin = filters.minPrice;
+          let newMax = filters.maxPrice;
+          const minNum = parseInt(newMin ?? '', 10);
+          const maxNum = parseInt(newMax ?? '', 10);
+          let update = false;
+          if (
+            newMin === undefined ||
+            newMin === null ||
+            newMin === '' ||
+            isNaN(minNum) ||
+            minNum < min ||
+            minNum > max
+          ) {
+            newMin = min.toString();
+            update = true;
+          }
+          if (
+            newMax === undefined ||
+            newMax === null ||
+            newMax === '' ||
+            isNaN(maxNum) ||
+            maxNum > max ||
+            maxNum < min
+          ) {
+            newMax = max.toString();
+            update = true;
+          }
+          if (update) {
+            dispatch(setFiltersSilently({ minPrice: newMin, maxPrice: newMax }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching price range:', error);
+        setPriceRange(null);
+      }
+    };
+
+    void loadPriceRange();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.userId, filters.countryId, filters.category, dispatch]);
+
+  // Auto-load tours for non-admin users
+  useEffect(() => {
+    if (
+      !isAdmin &&
+      filters.userId !== undefined &&
+      filters.countryId !== undefined &&
+      !hasSearched
+    ) {
+      void fetchTours();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, filters.userId, filters.countryId, hasSearched]);
+
   const isLoadingFullTour = tourDetailsFetcher.state === 'loading';
 
-  // Edit tour data - computed from editingTour, rawTours, and fullTourData
   const editTourData = useMemo(() => {
+    // LOG para depuración de estructura
+    // console.log('editTourData: loaderData', loaderData);
+    // console.log('editTourData: fullTourData', fullTourData);
     if (editingTour === null) {
       return {
         isOpen: false,
@@ -720,7 +583,6 @@ function ToursClient(): JSX.Element {
       };
     }
 
-    // If still loading full tour data, show loading state
     if (isLoadingFullTour) {
       return {
         isOpen: true,
@@ -731,18 +593,9 @@ function ToursClient(): JSX.Element {
       };
     }
 
-    console.warn('[tours._index] Computing editTourData for tour:', editingTour.id);
-
-    // Find's raw tour data with both languages
     const rawTourForEdit = rawTours.find((t) => t.id === editingTour.id);
-    console.warn('[tours._index] rawTourForEdit found:', rawTourForEdit !== undefined);
-    console.warn(
-      '[tours._index] rawTourForEdit KEYS:',
-      rawTourForEdit ? Object.keys(rawTourForEdit) : 'undefined'
-    );
-    console.warn('[tours._index] rawTourForEdit.images:', rawTourForEdit?.images);
-
-    if (rawTourForEdit === undefined) {
+    if (!rawTourForEdit) {
+      console.warn('rawTourForEdit is undefined for editingTour:', editingTour);
       return {
         isOpen: true,
         initialData: undefined,
@@ -752,36 +605,9 @@ function ToursClient(): JSX.Element {
       };
     }
 
-    // Convert raw tour to initialData format
-    // API uses snake_case field names: title_es, title_en, shortDescription_es, shortDescription_en
     const rawData = rawTourForEdit as unknown as Record<string, unknown>;
+    const fullData = fullTourData && typeof fullTourData === 'object' ? fullTourData : {};
 
-    // Get existing images from the raw tour data (API returns objects for /api/tours/:id)
-    const existingImages: TourImage[] = Array.isArray(rawTourForEdit.images)
-      ? (
-          rawTourForEdit.images as unknown as Array<{
-            id: string;
-            url: string;
-            isCover: boolean;
-            sortOrder: number;
-            storageKey?: string;
-          }>
-        ).map((img) => ({
-          id: img.id,
-          url: img.url,
-          isCover: img.isCover ?? false,
-          sortOrder: img.sortOrder ?? 0,
-          storageKey: img.storageKey,
-        }))
-      : [];
-
-    // Use fullTourData if available (has owners and long descriptions), fallback to rawData
-    const fullData = fullTourData ?? {};
-    console.warn('[tours._index] Using fullTourData:', fullTourData !== null);
-    console.warn('[tours._index] fullData owners:', fullData.owners);
-
-    // Helper to safely get owner ID from owners array
-    // API returns: owners: [{ id, firstName, email }]
     const getOwnerIdFromArray = (): string => {
       const owners = fullData.owners;
       if (Array.isArray(owners) && owners.length > 0) {
@@ -791,18 +617,21 @@ function ToursClient(): JSX.Element {
       return '';
     };
 
+    // Defensive: log if any property is undefined
+    if (!Array.isArray(fullData.images))
+      console.warn('fullData.images is not array', fullData.images);
+    if (!Array.isArray(fullData.activities))
+      console.warn('fullData.activities is not array', fullData.activities);
+    if (!Array.isArray(fullData.days)) console.warn('fullData.days is not array', fullData.days);
+
     const initialData = {
-      // userId comes from fullTourData.owners[0].id (not available in /tours/cards endpoint)
       userId: getOwnerIdFromArray(),
       categoryId: rawTourForEdit.categoryId ?? rawTourForEdit.category?.id ?? '',
       cityId: rawTourForEdit.cityId ?? rawTourForEdit.city?.id ?? '',
-      // API returns: title_es, title_en - prefer fullData if available
       titleEs: (fullData.title_es as string) ?? (rawData.title_es as string) ?? '',
       titleEn: (fullData.title_en as string) ?? (rawData.title_en as string) ?? '',
-      // Long descriptions come from fullTourData (not available in /tours/cards endpoint)
       descriptionEs: (fullData.description_es as string) ?? '',
       descriptionEn: (fullData.description_en as string) ?? '',
-      // API returns: shortDescription_es, shortDescription_en
       shortDescriptionEs:
         (fullData.shortDescription_es as string) ?? (rawData.shortDescription_es as string) ?? '',
       shortDescriptionEn:
@@ -816,11 +645,11 @@ function ToursClient(): JSX.Element {
       images: [] as File[],
       existingImages: Array.isArray(fullData.images)
         ? (
-            fullData.images as unknown as Array<{
-              id: string;
-              url: string;
-              isCover: boolean;
-              sortOrder: number;
+            fullData.images as Array<{
+              id?: string;
+              url?: string;
+              isCover?: boolean;
+              sortOrder?: number;
               storageKey?: string;
             }>
           ).map((img) => ({
@@ -830,23 +659,14 @@ function ToursClient(): JSX.Element {
             sortOrder: img.sortOrder ?? 0,
             storageKey: img.storageKey,
           }))
-        : existingImages,
+        : [],
       difficulty:
         ((fullData.difficulty ?? rawTourForEdit.difficulty) as 'easy' | 'medium' | 'hard') ??
         'easy',
       language: (fullData.language as string[]) ?? rawTourForEdit.language ?? ['es'],
       isActive: (fullData.isActive as boolean) ?? rawTourForEdit.isActive ?? true,
-      // Map activities from API format to CreateTourModal format
       activities: Array.isArray(fullData.activities)
-        ? (
-            fullData.activities as Array<{
-              activityId: string;
-              activity_es?: string;
-              activity_en?: string;
-              hora?: string;
-              sortOrder?: number;
-            }>
-          ).map((act, index) => ({
+        ? fullData.activities.map((act: TourActivity, index: number) => ({
             activityId: act.activityId ?? '',
             activityName:
               currentLanguage === 'en'
@@ -856,46 +676,29 @@ function ToursClient(): JSX.Element {
             sortOrder: act.sortOrder ?? index + 1,
           }))
         : [],
-      // Map days from API format (activities grouped by day)
       days: Array.isArray(fullData.days)
-        ? (
-            fullData.days as Array<{
-              day: number;
-              activities: Array<{
-                id?: string;
-                activityId?: string;
-                activity_es?: string;
-                activity_en?: string;
-                activity?: string;
-                hora?: string;
-                sortOrder?: number;
-                day?: number;
-              }>;
-            }>
-          ).map((dayGroup) => ({
+        ? fullData.days.map((dayGroup: TourDayGroup) => ({
             day: dayGroup.day,
-            activities: dayGroup.activities.map((act, index) => ({
-              id: act.id ?? act.activityId ?? '',
-              activityId: act.activityId ?? act.id ?? '',
-              activity_es: act.activity_es ?? '',
-              activity_en: act.activity_en ?? '',
-              activity:
-                currentLanguage === 'en'
-                  ? (act.activity_en ?? act.activity_es ?? act.activity ?? '')
-                  : (act.activity_es ?? act.activity_en ?? act.activity ?? ''),
-              hora: act.hora ?? '09:00 AM',
-              sortOrder: act.sortOrder ?? index + 1,
-              day: dayGroup.day,
-              category: 'activity',
-            })),
+            activities: Array.isArray(dayGroup.activities)
+              ? dayGroup.activities.map((act, index: number) => ({
+                  id: act.id ?? act.activityId ?? '',
+                  activityId: act.activityId ?? act.id ?? '',
+                  activity_es: act.activity_es ?? '',
+                  activity_en: act.activity_en ?? '',
+                  activity:
+                    currentLanguage === 'en'
+                      ? (act.activity_en ?? act.activity_es ?? act.activity ?? '')
+                      : (act.activity_es ?? act.activity_en ?? act.activity ?? ''),
+                  hora: act.hora ?? '09:00 AM',
+                  sortOrder: act.sortOrder ?? index + 1,
+                  day: dayGroup.day,
+                  category: 'activity',
+                }))
+              : [],
           }))
         : [],
     };
 
-    console.warn('[tours._index] editInitialData computed:', initialData);
-
-    // Extract toursInfo from fullTourData for editing restrictions
-    // Type guard for toursInfo
     const isToursInfo = (
       data: unknown
     ): data is { lastDateForThisTour: string; toursRelated: number } =>
@@ -906,7 +709,6 @@ function ToursClient(): JSX.Element {
       typeof (data as { lastDateForThisTour?: unknown }).lastDateForThisTour === 'string' &&
       typeof (data as { toursRelated?: unknown }).toursRelated === 'number';
 
-    // Safely access toursInfo from fullData (which is Record<string, unknown>)
     const toursInfoRaw = fullData.toursInfo;
     const toursInfo = isToursInfo(toursInfoRaw)
       ? {
@@ -915,38 +717,25 @@ function ToursClient(): JSX.Element {
         }
       : undefined;
 
-    console.warn('[tours._index] toursInfo extracted:', toursInfo);
-
     return { isOpen: true, initialData, tourId: editingTour.id, isLoading: false, toursInfo };
   }, [editingTour, rawTours, fullTourData, isLoadingFullTour, currentLanguage]);
 
-  // Clone tour handler - opens confirmation modal
   const handleCloneTour = (tour: TranslatedTour): void => {
     setTourToClone(tour);
-    setCloneImagesOption(true); // Reset to default when opening modal
+    setCloneImagesOption(true);
   };
 
-  // Execute clone tour - called when user confirms
   const executeCloneTour = async (): Promise<void> => {
     if (tourToClone === null) return;
-
     const tour = tourToClone;
     setTourToClone(null);
 
-    // Show global loading spinner
-    dispatch(
-      setGlobalLoading({
-        isLoading: true,
-        message: t('tours.cloningTour'),
-      })
-    );
+    dispatch(setGlobalLoading({ isLoading: true, message: t('tours.cloningTour') }));
 
     try {
-      // Get current date for custom title
       const today = new Date();
       const dateStr = `${today.getDate().toString().padStart(2, '0')}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getFullYear()}`;
 
-      // Find the raw tour to get both language titles
       const rawTour = rawTours.find((rt) => rt.id === tour.id);
 
       const result = await cloneTourBusiness(
@@ -968,16 +757,12 @@ function ToursClient(): JSX.Element {
             type: 'confirm',
             title: t('common.error'),
             isOpen: true,
-            data: {
-              message: t('tours.cloneTourError'),
-              icon: 'alert',
-            },
+            data: { message: t('tours.cloneTourError'), icon: 'alert' },
           })
         );
         return;
       }
 
-      // Success - save flag and reload, modal will show after page refreshes
       window.sessionStorage.setItem('tours_success_message', 'clone');
       window.location.reload();
     } catch (error) {
@@ -989,34 +774,22 @@ function ToursClient(): JSX.Element {
           type: 'confirm',
           title: t('common.error'),
           isOpen: true,
-          data: {
-            message: t('tours.cloneTourError'),
-            icon: 'alert',
-          },
+          data: { message: t('tours.cloneTourError'), icon: 'alert' },
         })
       );
     }
   };
 
-  // Delete tour handler - opens confirmation modal
   const handleDeleteTour = (tour: TranslatedTour): void => {
     setTourToDelete(tour);
   };
 
-  // Execute delete tour - called when user confirms
   const executeDeleteTour = async (): Promise<void> => {
     if (tourToDelete === null) return;
-
     const tour = tourToDelete;
     setTourToDelete(null);
 
-    // Show global loading spinner
-    dispatch(
-      setGlobalLoading({
-        isLoading: true,
-        message: t('tours.deletingTour'),
-      })
-    );
+    dispatch(setGlobalLoading({ isLoading: true, message: t('tours.deletingTour') }));
 
     try {
       const result = await deleteTourBusiness(tour.id, authToken ?? '');
@@ -1038,7 +811,6 @@ function ToursClient(): JSX.Element {
         return;
       }
 
-      // Success - save flag and reload, modal will show after page refreshes
       window.sessionStorage.setItem('tours_success_message', 'delete');
       window.location.reload();
     } catch (error) {
@@ -1050,198 +822,35 @@ function ToursClient(): JSX.Element {
           type: 'confirm',
           title: t('common.error'),
           isOpen: true,
-          data: {
-            message: t('tours.deleteTourError'),
-            icon: 'alert',
-          },
+          data: { message: t('tours.deleteTourError'), icon: 'alert' },
         })
       );
     }
   };
 
-  // Price range state
-  const [priceRange, setPriceRange] = useState<PriceRange | null>(loaderData.priceRange);
-  const [selectedMinPrice, setSelectedMinPrice] = useState<number>(
-    searchParams.get('minPrice') !== null && searchParams.get('minPrice') !== ''
-      ? parseInt(searchParams.get('minPrice') ?? '0', 10)
-      : (loaderData.priceRange?.minPrice ?? 0)
-  );
-  const [selectedMaxPrice, setSelectedMaxPrice] = useState<number>(
-    searchParams.get('maxPrice') !== null && searchParams.get('maxPrice') !== ''
-      ? parseInt(searchParams.get('maxPrice') ?? '10000', 10)
-      : (loaderData.priceRange?.maxPrice ?? 10000)
-  );
-
-  // City filter: enabled only if provider selected AND country exists
-  const isCityFilterEnabled = selectedUserId !== '' && countryId !== null && countryId !== '';
-
-  // Category filter: enabled only if provider selected AND country exists
-  const isCategoryFilterEnabled = selectedUserId !== '' && countryId !== null && countryId !== '';
-
-  // Price filter: enabled only if provider selected AND country exists AND price range exists
+  const isCityFilterEnabled =
+    filters.userId !== '' && countryId !== null && countryId !== undefined && countryId !== '';
+  const isCategoryFilterEnabled =
+    filters.userId !== '' && countryId !== null && countryId !== undefined && countryId !== '';
   const isPriceFilterEnabled =
-    selectedUserId !== '' &&
+    filters.userId !== '' &&
     countryId !== null &&
+    countryId !== undefined &&
     countryId !== '' &&
     priceRange !== null &&
     priceRange.count > 0;
 
-  // Activate global loading on component mount, deactivate when data is ready
-  useEffect(() => {
-    // Activate loading on mount
-    dispatch(setGlobalLoading({ isLoading: true, message: 'Cargando datos...' }));
+  // Defensive: always use valid min/max for price display and slider
+  const minPriceValue = priceRange
+    ? Math.max(priceRange.minPrice, parseInt(filters.minPrice ?? '', 10) || priceRange.minPrice)
+    : 0;
+  const maxPriceValue = priceRange
+    ? Math.min(priceRange.maxPrice, parseInt(filters.maxPrice ?? '', 10) || priceRange.maxPrice)
+    : 0;
 
-    // Deactivate loading when categories and cities are loaded
-    if (categories.length > 0 && rawCities.length > 0) {
-      dispatch(setGlobalLoading({ isLoading: false }));
-    }
-
-    // Cleanup: deactivate loading on unmount
-    return () => {
-      dispatch(setGlobalLoading({ isLoading: false }));
-    };
-  }, [categories, rawCities, dispatch]);
-
-  // Dispatch categories to Redux when loaded from server
-  useEffect(() => {
-    if (loaderData.categories !== undefined && loaderData.categories.length > 0) {
-      dispatch(fetchCategoriesSuccess(loaderData.categories));
-    }
-  }, [loaderData.categories, dispatch]);
-
-  // Dispatch cities to Redux when loaded from server
-  useEffect(() => {
-    if (loaderData.activeCities !== undefined && loaderData.activeCities.length > 0) {
-      dispatch(fetchCitiesSuccess(loaderData.activeCities));
-    }
-  }, [loaderData.activeCities, dispatch]);
-
-  // Update price range when loader data changes
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      if (loaderData.priceRange !== null) {
-        setPriceRange(loaderData.priceRange);
-        // Only reset price values if they haven't been set by URL params
-        const minPriceParam = searchParams.get('minPrice');
-        if (minPriceParam === null || minPriceParam === '') {
-          setSelectedMinPrice(loaderData.priceRange.minPrice);
-        }
-        const maxPriceParam = searchParams.get('maxPrice');
-        if (maxPriceParam === null || maxPriceParam === '') {
-          setSelectedMaxPrice(loaderData.priceRange.maxPrice);
-        }
-      }
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [loaderData.priceRange, searchParams]);
-
-  // Update tours and pagination when loader data changes (after navigation/filter)
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      // Only update tours if we have data and navigation was triggered (user clicked Filter or pagination)
-      const urlUserId = searchParams.get('userId');
-      if (urlUserId !== null && urlUserId !== undefined && urlUserId !== '') {
-        if (loaderData.tours?.data !== undefined && loaderData.tours.data !== null) {
-          setRawTours(loaderData.tours.data);
-        }
-        if (loaderData.tours?.pagination !== undefined && loaderData.tours.pagination !== null) {
-          setPagination(
-            loaderData.tours.pagination as {
-              page: number;
-              limit: number;
-              total: number;
-              totalPages: number;
-            }
-          );
-        }
-        setHasSearched(true);
-      }
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [loaderData.tours, searchParams]);
-
-  // Deactivate global loading when tours are loaded (either manually or automatically)
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const urlUserId = searchParams.get('userId');
-      const urlCountryId = searchParams.get('countryId');
-
-      // If we have userId and countryId in URL, deactivate loading
-      // loaderData.tours.data is always defined after loader runs (even if empty array)
-      if (
-        urlUserId !== null &&
-        urlUserId !== undefined &&
-        urlUserId !== '' &&
-        urlCountryId !== null &&
-        urlCountryId !== undefined &&
-        urlCountryId !== ''
-      ) {
-        dispatch(setGlobalLoading({ isLoading: false }));
-      }
-    }, 500); // Slight delay to ensure data is processed
-    return () => window.clearTimeout(timeoutId);
-  }, [searchParams, dispatch]);
-
-  // Handle city selection change - clear tours
-  const handleCityChange = (newCityId: string): void => {
-    setSelectedCityId(newCityId);
-    // Mark filters as changed
-    setFiltersChanged(true);
-    // Clear tours when city changes (before clicking Filter)
-    setRawTours([]);
-    setHasSearched(false);
-    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    });
-    // Reset price range when city changes
-    if (priceRange !== null) {
-      setSelectedMinPrice(priceRange.minPrice);
-      setSelectedMaxPrice(priceRange.maxPrice);
-    }
-  };
-
-  // Handle category selection change - clear tours
-  const handleCategoryChange = (newCategory: string): void => {
-    setSelectedCategory(newCategory);
-    // Mark filters as changed
-    setFiltersChanged(true);
-    // Clear tours when category changes (before clicking Filter)
-    setRawTours([]);
-    setHasSearched(false);
-    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    });
-  };
-
-  // Handle price range change - clear tours
-  const handlePriceChange = (minPrice: number, maxPrice: number): void => {
-    setSelectedMinPrice(minPrice);
-    setSelectedMaxPrice(maxPrice);
-    // Mark filters as changed
-    setFiltersChanged(true);
-    // Clear tours when price changes (before clicking Filter)
-    setRawTours([]);
-    setHasSearched(false);
-    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    });
-  };
-
-  // Check if navigation is loading
-  const isLoading = navigation.state === 'loading';
-
-  // Handle filter button click - update URL with all selected filters
-  const handleFilter = (): void => {
-    if (selectedUserId === '') {
+  // Filter handlers - update Redux state
+  const handleFilter = async (): Promise<void> => {
+    if (filters.userId === '') {
       dispatch(
         openModal({
           id: 'validation-select-provider',
@@ -1257,7 +866,6 @@ function ToursClient(): JSX.Element {
       return;
     }
 
-    // Validate that countryId is available from session
     if (countryId === null || countryId === undefined || countryId === '') {
       dispatch(
         openModal({
@@ -1265,89 +873,40 @@ function ToursClient(): JSX.Element {
           type: 'confirm',
           title: t('common.notice'),
           isOpen: true,
-          data: {
-            message: 'Por favor seleccionar un país primero',
-            icon: 'alert',
-          },
+          data: { message: 'Por favor seleccionar un país primero', icon: 'alert' },
         })
       );
       return;
     }
 
-    const params: Record<string, string> = {
-      userId: selectedUserId,
-      countryId: countryId,
-      page: '1',
-      category: selectedCategory,
-    };
-
-    // Include cityId if selected (optional filter)
-    if (selectedCityId !== '') {
-      params.cityId = selectedCityId;
-    }
-
-    // Only include price filters if they differ from default range
-    if (priceRange !== null) {
-      if (selectedMinPrice !== priceRange.minPrice) {
-        params.minPrice = selectedMinPrice.toString();
-      }
-      if (selectedMaxPrice !== priceRange.maxPrice) {
-        params.maxPrice = selectedMaxPrice.toString();
-      }
-    }
-
-    // Include isActive filter based on dropdown selection
-    if (activeStatusFilter === 'active') {
-      params.isActive = 'true';
-    } else if (activeStatusFilter === 'inactive') {
-      params.isActive = 'false';
-    }
-    // If 'all', don't send isActive param (show all tours)
-
-    // Reset filters changed flag
-    setFiltersChanged(false);
-    setSearchParams(params);
+    dispatch(resetFiltersChanged());
+    await fetchTours();
   };
 
-  // Handle page change - updates URL params
   const handlePageChange = (newPage: number): void => {
-    setSearchParams((prev) => ({
-      ...Object.fromEntries(prev.entries()),
-      page: newPage.toString(),
-    }));
+    dispatch(setFilters({ page: newPage.toString() }));
+    // FetchTours will be called by the effect that watches filters.page
   };
 
-  // Clear all filters
   const handleClearFilters = (): void => {
-    // For non-admin users, keep their own ID selected
+    dispatch(setTours([]));
+    dispatch(setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 }));
+    dispatch(setHasSearched(false));
+    setPriceRange(null);
+
     if (isAdmin) {
-      setSelectedUserId('');
+      dispatch(setFilters({ userId: '' }));
+    } else {
+      dispatch(clearFilters());
+      // Re-select current user for non-admin
+      if (currentUser?.id !== undefined) {
+        dispatch(setFiltersSilently({ userId: currentUser.id, countryId: countryId ?? '' }));
+      }
     }
-    setSelectedCityId('');
-    setSelectedCategory('');
-    setActiveStatusFilter('all'); // Reset to show all tours
-    // Reset filters changed flag
-    setFiltersChanged(false);
-    // Reset price to default range
-    if (priceRange !== null) {
-      setSelectedMinPrice(priceRange.minPrice);
-      setSelectedMaxPrice(priceRange.maxPrice);
-    }
-    // Clear results
-    setRawTours([]);
-    setHasSearched(false);
-    setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    });
   };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-neutral-50)' }}>
-      {/* Header and content will be rendered by Layout in root.tsx */}
-
       <main
         style={{
           paddingTop: 'var(--header-height)',
@@ -1422,87 +981,72 @@ function ToursClient(): JSX.Element {
               alignItems: 'center',
             }}
           >
-            {/* User Filter - ONLY shown to admins. Non-admin users are auto-selected */}
-            {(() => {
-              // Console log for loaded users in filters section
-              // eslint-disable-next-line no-console
-              console.log('[tours._index] Usuarios cargados para filtro:', loaderData.users);
-              if (isAdmin) {
-                return (
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 'var(--text-xs)',
-                        fontWeight: 'var(--font-weight-medium)',
-                        color: 'var(--color-neutral-700)',
-                        marginBottom: 'var(--space-1)',
-                      }}
-                    >
-                      {t('tours.provider')}
-                    </label>
-                    <Select
-                      options={[
-                        { value: '', label: t('common.selectProvider') || 'Seleccionar proveedor' },
-                      ].concat(loaderData.users.map((u) => ({ value: u.id, label: u.firstName })))}
-                      value={selectedUserId}
-                      onChange={(v: string) => {
-                        setSelectedUserId(v);
-                        // Clear search results when provider changes
-                        setRawTours([]);
-                        setHasSearched(false);
-                        setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 } as {
-                          page: number;
-                          limit: number;
-                          total: number;
-                          totalPages: number;
-                        });
-                        // Clear city, category and price filters when provider changes
-                        setSelectedCityId('');
-                        setSelectedCategory('');
-                        if (priceRange !== null) {
-                          setSelectedMinPrice(priceRange.minPrice);
-                          setSelectedMaxPrice(priceRange.maxPrice);
-                        }
-                      }}
-                      placeholder={t('common.selectProvider') || 'Seleccionar proveedor'}
-                      id="select-provider"
-                    />
-                  </div>
-                );
-              } else {
-                // Non-admin users see their firstName as selected provider
-                return (
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 'var(--text-xs)',
-                        fontWeight: 'var(--font-weight-medium)',
-                        color: 'var(--color-neutral-700)',
-                        marginBottom: 'var(--space-1)',
-                      }}
-                    >
-                      {t('tours.provider')}
-                    </label>
-                    <div
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: 'var(--color-neutral-100)',
-                        borderRadius: 'var(--radius-sm)',
-                        color: 'var(--color-neutral-700)',
-                        fontSize: 'var(--text-sm)',
-                        fontWeight: 'var(--font-weight-medium)',
-                      }}
-                    >
-                      {currentUser?.firstName} {currentUser?.lastName}
-                    </div>
-                  </div>
-                );
-              }
-            })()}
+            {/* User Filter */}
+            {isAdmin ? (
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    color: 'var(--color-neutral-700)',
+                    marginBottom: 'var(--space-1)',
+                  }}
+                >
+                  {t('tours.provider')}
+                </label>
+                <Select
+                  options={[
+                    { value: '', label: t('common.selectProvider') || 'Seleccionar proveedor' },
+                  ].concat(users)}
+                  value={filters.userId ?? ''}
+                  onChange={(v: string) => {
+                    dispatch(
+                      setFilters({
+                        userId: v,
+                        countryId: countryId ?? '',
+                        cityId: '',
+                        category: '',
+                        minPrice: '',
+                        maxPrice: '',
+                        isActive: undefined,
+                      })
+                    );
+                    setPriceRange(null);
+                  }}
+                  placeholder={t('common.selectProvider') || 'Seleccionar proveedor'}
+                  id="select-provider"
+                />
+              </div>
+            ) : (
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    color: 'var(--color-neutral-700)',
+                    marginBottom: 'var(--space-1)',
+                  }}
+                >
+                  {t('tours.provider')}
+                </label>
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--color-neutral-100)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--color-neutral-700)',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 'var(--font-weight-medium)',
+                  }}
+                >
+                  {currentUser?.firstName} {currentUser?.lastName}
+                </div>
+              </div>
+            )}
 
-            {/* City Filter - Optional, disabled until user is selected and filter is clicked */}
+            {/* City Filter */}
             <div>
               <label
                 style={{
@@ -1526,10 +1070,13 @@ function ToursClient(): JSX.Element {
               </label>
               <Select
                 options={[{ value: '', label: t('common.selectCity') }].concat(
-                  translatedCities.map((c: TranslatedCity) => ({ value: c.id, label: c.name }))
+                  (translatedCities ?? []).map((c) => ({ value: c.id, label: c.name }))
                 )}
-                value={selectedCityId ?? ''}
-                onChange={(v: string): void => handleCityChange(v)}
+                value={filters.cityId ?? ''}
+                onChange={(v: string) => {
+                  dispatch(setTours([]));
+                  dispatch(setFilters({ cityId: v }));
+                }}
                 placeholder={
                   isCityFilterEnabled
                     ? t('common.selectCity')
@@ -1540,7 +1087,7 @@ function ToursClient(): JSX.Element {
               />
             </div>
 
-            {/* Category Filter - Enabled only if provider selected AND country exists AND tours loaded */}
+            {/* Category Filter */}
             <div>
               <label
                 style={{
@@ -1566,8 +1113,11 @@ function ToursClient(): JSX.Element {
                 options={[{ value: '', label: t('common.allCategories') }].concat(
                   translatedCategories.map((c) => ({ value: c.id, label: c.name }))
                 )}
-                value={selectedCategory ?? ''}
-                onChange={(v: string) => handleCategoryChange(v)}
+                value={filters.category ?? ''}
+                onChange={(v: string) => {
+                  dispatch(setTours([]));
+                  dispatch(setFilters({ category: v }));
+                }}
                 placeholder={
                   isCategoryFilterEnabled
                     ? t('common.allCategories')
@@ -1600,7 +1150,6 @@ function ToursClient(): JSX.Element {
                   </span>
                 )}
               </label>
-              {/* Price display label */}
               <div
                 style={{
                   display: 'flex',
@@ -1613,19 +1162,17 @@ function ToursClient(): JSX.Element {
                   fontWeight: 'var(--font-weight-medium)',
                 }}
               >
-                <span>${selectedMinPrice.toLocaleString()}</span>
-                <span>${selectedMaxPrice.toLocaleString()}</span>
+                <span>${minPriceValue.toLocaleString()}</span>
+                <span>${maxPriceValue.toLocaleString()}</span>
               </div>
 
-              {/* Dual Range Slider Container - Smaller */}
               <div
                 style={{
                   position: 'relative',
                   height: '28px',
-                  opacity: isPriceFilterEnabled === true ? 1 : 0.5,
+                  opacity: isPriceFilterEnabled ? 1 : 0.5,
                 }}
               >
-                {/* Track background */}
                 <div
                   style={{
                     position: 'absolute',
@@ -1638,8 +1185,6 @@ function ToursClient(): JSX.Element {
                     transform: 'translateY(-50%)',
                   }}
                 />
-
-                {/* Active track (highlighted range) */}
                 <div
                   style={{
                     position: 'absolute',
@@ -1651,24 +1196,23 @@ function ToursClient(): JSX.Element {
                     borderRadius: '3px',
                     transform: 'translateY(-50%)',
                     left: priceRange
-                      ? `${((selectedMinPrice - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%`
+                      ? `${((minPriceValue - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%`
                       : '0%',
                     right: priceRange
-                      ? `${100 - ((selectedMaxPrice - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%`
+                      ? `${100 - ((maxPriceValue - priceRange.minPrice) / (priceRange.maxPrice - priceRange.minPrice)) * 100}%`
                       : '0%',
                   }}
                 />
-
-                {/* Min price slider */}
                 <input
                   type="range"
                   min={priceRange?.minPrice ?? 0}
                   max={priceRange?.maxPrice ?? 10000}
-                  value={selectedMinPrice}
+                  value={minPriceValue}
                   onChange={(e): void => {
                     const value = parseInt(e.target.value, 10);
-                    if (value < selectedMaxPrice && Number.isNaN(value) === false && value !== 0) {
-                      handlePriceChange(value, selectedMaxPrice);
+                    if (value < maxPriceValue && !Number.isNaN(value)) {
+                      dispatch(setTours([]));
+                      dispatch(setFilters({ minPrice: value.toString() }));
                     }
                   }}
                   disabled={!isPriceFilterEnabled}
@@ -1683,21 +1227,20 @@ function ToursClient(): JSX.Element {
                     WebkitAppearance: 'none',
                     background: 'transparent',
                     pointerEvents: 'auto',
-                    cursor: isPriceFilterEnabled === true ? 'pointer' : 'not-allowed',
+                    cursor: isPriceFilterEnabled ? 'pointer' : 'not-allowed',
                     zIndex: 2,
                   }}
                 />
-
-                {/* Max price slider */}
                 <input
                   type="range"
                   min={priceRange?.minPrice ?? 0}
                   max={priceRange?.maxPrice ?? 10000}
-                  value={selectedMaxPrice}
+                  value={maxPriceValue}
                   onChange={(e): void => {
                     const value = parseInt(e.target.value, 10);
-                    if (value > selectedMinPrice && Number.isNaN(value) === false && value !== 0) {
-                      handlePriceChange(selectedMinPrice, value);
+                    if (value > minPriceValue && !Number.isNaN(value)) {
+                      dispatch(setTours([]));
+                      dispatch(setFilters({ maxPrice: value.toString() }));
                     }
                   }}
                   disabled={!isPriceFilterEnabled}
@@ -1712,13 +1255,12 @@ function ToursClient(): JSX.Element {
                     WebkitAppearance: 'none',
                     background: 'transparent',
                     pointerEvents: 'auto',
-                    cursor: isPriceFilterEnabled === true ? 'pointer' : 'not-allowed',
+                    cursor: isPriceFilterEnabled ? 'pointer' : 'not-allowed',
                     zIndex: 3,
                   }}
                 />
               </div>
 
-              {/* Min/Max values display */}
               {priceRange && (
                 <div
                   style={{
@@ -1739,7 +1281,7 @@ function ToursClient(): JSX.Element {
               )}
             </div>
 
-            {/* Active Status Filter Dropdown */}
+            {/* Active Status Filter */}
             <div>
               <label
                 style={{
@@ -1758,21 +1300,30 @@ function ToursClient(): JSX.Element {
                   { value: 'active', label: t('common.active') },
                   { value: 'inactive', label: t('common.inactive') },
                 ]}
-                value={activeStatusFilter}
+                value={
+                  filters.isActive === true
+                    ? 'active'
+                    : filters.isActive === false
+                      ? 'inactive'
+                      : 'all'
+                }
                 onChange={(v: string) => {
-                  setActiveStatusFilter(v);
-                  setFiltersChanged(true);
+                  const isActive = v === 'active' ? true : v === 'inactive' ? false : undefined;
+                  dispatch(setTours([]));
+                  dispatch(setFilters({ isActive }));
                 }}
                 placeholder={t('common.all')}
                 id="select-active-status"
               />
             </div>
 
-            {/* Filter Button (primary) - Smaller */}
+            {/* Filter Button */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <button
-                onClick={handleFilter}
-                disabled={isLoading}
+                onClick={() => {
+                  void handleFilter();
+                }}
+                disabled={false}
                 style={{
                   width: 'auto',
                   minWidth: '80px',
@@ -1783,14 +1334,12 @@ function ToursClient(): JSX.Element {
                   border: 'none',
                   borderRadius: 'var(--radius-sm)',
                   fontWeight: 'var(--font-weight-medium)',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  cursor: 'pointer',
                   transition: 'background-color 0.2s ease',
                   fontSize: '13px',
                 }}
                 onMouseOver={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-primary-600)';
-                  }
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary-600)';
                 }}
                 onMouseOut={(e) => {
                   e.currentTarget.style.backgroundColor = 'var(--color-primary-500)';
@@ -1800,7 +1349,7 @@ function ToursClient(): JSX.Element {
               </button>
             </div>
 
-            {/* Clear Filters Button (secondary) - Smaller */}
+            {/* Clear Filters Button */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <button
                 onClick={handleClearFilters}
@@ -1831,8 +1380,8 @@ function ToursClient(): JSX.Element {
           </div>
         </div>
 
-        {/* Filters Changed Warning Message */}
-        {filtersChanged && selectedUserId !== '' && (
+        {/* Filters Changed Warning */}
+        {filtersChanged && filters.userId !== '' && (
           <div
             style={{
               display: 'flex',
@@ -1856,7 +1405,8 @@ function ToursClient(): JSX.Element {
         )}
 
         {/* Loading State */}
-        {isLoading && (
+        {false}
+        {/*
           <div
             style={{
               display: 'flex',
@@ -1879,7 +1429,7 @@ function ToursClient(): JSX.Element {
         )}
 
         {/* Tours Grid */}
-        {!isLoading && translatedTours.length > 0 && (
+        {translatedTours.length > 0 && (
           <div
             style={{
               display: 'grid',
@@ -1888,45 +1438,29 @@ function ToursClient(): JSX.Element {
               marginBottom: 'var(--space-6)',
             }}
           >
-            {translatedTours.map((tour: TranslatedTour) => (
+            {translatedTours.map((tour) => (
               <TourCard
                 key={tour.id}
                 tour={tour}
-                onEdit={() => {
-                  console.warn('[tours._index] onEdit called for tour:', tour.id, tour.title);
-                  console.warn('[tours._index] Setting editingTour to:', tour);
-                  setEditingTour(tour);
-                  console.warn('[tours._index] editingTour should now be set');
-                }}
-                onClone={() => {
-                  handleCloneTour(tour);
-                }}
-                onDelete={() => {
-                  handleDeleteTour(tour);
-                }}
+                onEdit={() => setEditingTour(tour)}
+                onClone={() => handleCloneTour(tour)}
+                onDelete={() => handleDeleteTour(tour)}
               />
             ))}
           </div>
         )}
 
-        {/* Empty State - No tours found after search */}
-        {!isLoading &&
-          translatedTours.length === 0 &&
-          selectedUserId !== '' &&
-          (hasSearched === true ||
-            (selectedCityId === '' &&
-              selectedCategory === '' &&
-              selectedMinPrice === priceRange?.minPrice &&
-              selectedMaxPrice === priceRange?.maxPrice)) && (
-            <EmptyState
-              icon="🏛️"
-              title={t('tours.noToursFound')}
-              description={t('tours.adjustFilters')}
-            />
-          )}
+        {/* Empty State - No tours found */}
+        {translatedTours.length === 0 && filters.userId !== '' && hasSearched && (
+          <EmptyState
+            icon="🏛️"
+            title={t('tours.noToursFound')}
+            description={t('tours.adjustFilters')}
+          />
+        )}
 
-        {/* Initial State - No provider selected or filters cleared */}
-        {!isLoading && translatedTours.length === 0 && selectedUserId === '' && (
+        {/* Initial State - No provider selected */}
+        {translatedTours.length === 0 && filters.userId === '' && (
           <EmptyState
             icon="👤"
             title={t('tours.selectProviderFirst')}
@@ -1935,7 +1469,7 @@ function ToursClient(): JSX.Element {
         )}
 
         {/* Pagination */}
-        {!isLoading && translatedTours.length > 0 && pagination.totalPages > 1 && (
+        {translatedTours.length > 0 && pagination.totalPages > 1 && (
           <div
             style={{
               display: 'flex',
@@ -1945,7 +1479,9 @@ function ToursClient(): JSX.Element {
             }}
           >
             <button
-              onClick={() => handlePageChange(pagination.page - 1)}
+              onClick={() => {
+                void handlePageChange(pagination.page - 1);
+              }}
               disabled={pagination.page === 1}
               style={{
                 padding: 'var(--space-2) var(--space-4)',
@@ -1959,9 +1495,8 @@ function ToursClient(): JSX.Element {
                 transition: 'background-color 0.2s ease',
               }}
               onMouseOver={(e) => {
-                if (pagination.page !== 1) {
+                if (pagination.page !== 1)
                   e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
-                }
               }}
               onMouseOut={(e) => {
                 e.currentTarget.style.backgroundColor =
@@ -1971,39 +1506,39 @@ function ToursClient(): JSX.Element {
               {t('pagination.previous')}
             </button>
 
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (page): JSX.Element => (
-                <button
-                  key={page}
-                  onClick={() => handlePageChange(page)}
-                  style={{
-                    padding: 'var(--space-2) var(--space-4)',
-                    backgroundColor:
-                      page === pagination.page ? 'var(--color-primary-500)' : 'white',
-                    color: page === pagination.page ? 'white' : 'var(--color-neutral-700)',
-                    border: '1px solid var(--color-neutral-300)',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                    fontWeight: 'var(--font-weight-medium)',
-                    transition: 'background-color 0.2s ease',
-                  }}
-                  onMouseOver={(e): void => {
-                    if (page !== pagination.page) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      page === pagination.page ? 'var(--color-primary-500)' : 'white';
-                  }}
-                >
-                  {page}
-                </button>
-              )
-            )}
+            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => {
+                  void handlePageChange(page);
+                }}
+                style={{
+                  padding: 'var(--space-2) var(--space-4)',
+                  backgroundColor: page === pagination.page ? 'var(--color-primary-500)' : 'white',
+                  color: page === pagination.page ? 'white' : 'var(--color-neutral-700)',
+                  border: '1px solid var(--color-neutral-300)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontWeight: 'var(--font-weight-medium)',
+                  transition: 'background-color 0.2s ease',
+                }}
+                onMouseOver={(e) => {
+                  if (page !== pagination.page)
+                    e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    page === pagination.page ? 'var(--color-primary-500)' : 'white';
+                }}
+              >
+                {page}
+              </button>
+            ))}
 
             <button
-              onClick={() => handlePageChange(pagination.page + 1)}
+              onClick={() => {
+                void handlePageChange(pagination.page + 1);
+              }}
               disabled={pagination.page === pagination.totalPages}
               style={{
                 padding: 'var(--space-2) var(--space-4)',
@@ -2020,9 +1555,8 @@ function ToursClient(): JSX.Element {
                 transition: 'background-color 0.2s ease',
               }}
               onMouseOver={(e) => {
-                if (pagination.page !== pagination.totalPages) {
+                if (pagination.page !== pagination.totalPages)
                   e.currentTarget.style.backgroundColor = 'var(--color-neutral-100)';
-                }
               }}
               onMouseOut={(e) => {
                 e.currentTarget.style.backgroundColor =
@@ -2037,11 +1571,10 @@ function ToursClient(): JSX.Element {
         {/* Create Tour Modal */}
         <CreateTourModal
           isOpen={isCreateTourModalOpen}
-          users={loaderData.users}
-          activities={loaderData.activities}
+          users={loaderData.data?.users ?? []}
+          activities={loaderData.data?.activities ?? []}
           onClose={() => setIsCreateTourModalOpen(false)}
           onSuccess={() => {
-            // Save flag and reload, modal will show after page refreshes
             window.sessionStorage.setItem('tours_success_message', 'create');
             window.location.reload();
           }}
@@ -2053,18 +1586,43 @@ function ToursClient(): JSX.Element {
             isOpen={true}
             mode="edit"
             tourId={editTourData.tourId}
-            initialData={editTourData.initialData}
-            users={loaderData.users}
-            activities={loaderData.activities}
+            initialData={
+              editTourData.initialData as Partial<{
+                userId: string;
+                categoryId: string;
+                cityId: string;
+                titleEs: string;
+                titleEn: string;
+                descriptionEs: string;
+                descriptionEn: string;
+                shortDescriptionEs: string;
+                shortDescriptionEn: string;
+                duration: string;
+                maxCapacity: number;
+                basePrice: number;
+                minimumPayment: number;
+                currency: string;
+                imageUrl: string;
+                images: File[];
+                existingImages: import('~/types/PayloadTourDataProps').TourImage[];
+                difficulty: 'easy' | 'medium' | 'hard';
+                language: string[];
+                activities: Array<{
+                  activityId: string;
+                  activityName: string;
+                  hora: string;
+                  sortOrder: number;
+                }>;
+                days: import('~/types/PayloadTourDataProps').TourDay[];
+                isActive: boolean;
+              }>
+            }
+            users={loaderData.data?.users ?? []}
+            activities={loaderData.data?.activities ?? []}
             toursInfo={editTourData.toursInfo}
-            onClose={() => {
-              console.warn('[tours._index] Edit modal onClose called');
-              setEditingTour(null);
-            }}
+            onClose={() => setEditingTour(null)}
             onSuccess={() => {
-              console.warn('[tours._index] Edit modal onSuccess called');
               setEditingTour(null);
-              // Save flag and reload, modal will show after page refreshes
               window.sessionStorage.setItem('tours_success_message', 'update');
               window.location.reload();
             }}
@@ -2099,9 +1657,7 @@ function ToursClient(): JSX.Element {
                 boxShadow: 'var(--shadow-lg)',
                 pointerEvents: 'auto',
               }}
-              onClick={(e): void => {
-                e.stopPropagation();
-              }}
+              onClick={(e): void => e.stopPropagation()}
             >
               <div
                 style={{
@@ -2180,13 +1736,7 @@ function ToursClient(): JSX.Element {
                   </label>
                 </div>
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 'var(--space-3)',
-                  justifyContent: 'flex-end',
-                }}
-              >
+              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setTourToClone(null)}
                   style={{
@@ -2252,9 +1802,7 @@ function ToursClient(): JSX.Element {
                 boxShadow: 'var(--shadow-lg)',
                 pointerEvents: 'auto',
               }}
-              onClick={(e): void => {
-                e.stopPropagation();
-              }}
+              onClick={(e): void => e.stopPropagation()}
             >
               <div
                 style={{
@@ -2313,13 +1861,7 @@ function ToursClient(): JSX.Element {
                   </p>
                 </div>
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 'var(--space-3)',
-                  justifyContent: 'flex-end',
-                }}
-              >
+              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setTourToDelete(null)}
                   style={{
@@ -2372,7 +1914,7 @@ function ClientOnlyTours(): JSX.Element {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
-  if (isClient === false) {
+  if (!isClient) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
