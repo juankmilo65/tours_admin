@@ -32,6 +32,7 @@ import { selectSelectedCountry } from '~/store/slices/countriesSlice';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { useTranslation } from '~/lib/i18n/utils';
 import { bookingEs, bookingEn } from '~/lib/i18n';
+import { selectCurrentUser } from '~/store/slices/authSlice';
 import { CreateBookingModal } from '~/components/bookings/CreateBookingModal';
 import { BookingClientsModal } from '~/components/bookings/BookingClientsModal';
 import { EditBookingModal } from '~/components/bookings/EditBookingModal';
@@ -208,8 +209,11 @@ export default function Bookings(): JSX.Element {
 
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken) ?? undefined;
+  const currentUser = useAppSelector(selectCurrentUser);
   const selectedCountry = useAppSelector(selectSelectedCountry);
   const countryId = selectedCountry?.id ?? loaderData.countryId ?? null;
+
+  const isAdmin = currentUser?.role === 'admin';
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState('');
@@ -366,6 +370,17 @@ export default function Bookings(): JSX.Element {
     };
     void fetchTours();
   }, [countryId, language, userFilter]);
+
+  // Auto-select current user as provider for non-admin
+  useEffect(() => {
+    if (!isAdmin && currentUser?.id !== undefined && userFilter !== currentUser.id) {
+      setUserFilter(currentUser.id);
+      setHasSearched(true);
+      setPage(1);
+      void refreshBookings();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, currentUser]);
 
   const handleViewBooking = (booking: Booking) => {
     navigate(`/bookings/${booking.id}`);
@@ -856,24 +871,39 @@ export default function Bookings(): JSX.Element {
               >
                 {bookingsT.allUsers}
               </label>
-              <Select
-                options={[
-                  { value: '', label: bookingsT.allUsers },
-                  ...loaderData.users.map((u) => ({
-                    value: u.id,
-                    label: u.name,
-                  })),
-                ]}
-                value={userFilter}
-                onChange={(v) => {
-                  setUserFilter(v);
-                  setCityIdFilter('');
-                  setTourIdFilter('');
-                  setFiltersChanged(true);
-                }}
-                placeholder={bookingsT.allUsers}
-                id="select-provider"
-              />
+              {isAdmin ? (
+                <Select
+                  options={[
+                    { value: '', label: bookingsT.allUsers },
+                    ...loaderData.users.map((u) => ({
+                      value: u.id,
+                      label: u.name,
+                    })),
+                  ]}
+                  value={userFilter}
+                  onChange={(v) => {
+                    setUserFilter(v);
+                    setCityIdFilter('');
+                    setTourIdFilter('');
+                    setFiltersChanged(true);
+                  }}
+                  placeholder={bookingsT.allUsers}
+                  id="select-provider"
+                />
+              ) : (
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--color-neutral-100)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--color-neutral-700)',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 'var(--font-weight-medium)',
+                  }}
+                >
+                  {currentUser?.firstName} {currentUser?.lastName}
+                </div>
+              )}
             </div>
 
             <div>
