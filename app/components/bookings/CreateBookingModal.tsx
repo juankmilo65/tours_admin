@@ -1478,6 +1478,7 @@ export function CreateBookingModal({
               language={language}
               initialData={getClientModalInitialData()}
               showPrimary={true}
+              isFirstClient={editingClientIndex === null && formData.clients.length === 0}
               onSave={handleClientModalSave}
               onClose={() => setClientModalOpen(false)}
               translations={{

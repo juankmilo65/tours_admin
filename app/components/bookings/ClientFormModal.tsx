@@ -26,10 +26,12 @@ export interface ClientFormData {
 interface ClientFormModalProps {
   isOpen: boolean;
   language: 'es' | 'en' | string;
-  /** When set, the modal is in edit mode and fields are pre-filled */
+  /** When set, modal is in edit mode and fields are pre-filled */
   initialData?: ClientFormData | null;
-  /** Whether the "isPrimary" radio is shown (Create modal has it, Edit doesn't) */
+  /** Whether "isPrimary" radio is shown (Create modal has it, Edit doesn't) */
   showPrimary?: boolean;
+  /** Whether this is the first client (first client is always primary) */
+  isFirstClient?: boolean;
   onSave: (data: ClientFormData) => void;
   onClose: () => void;
   translations: {
@@ -70,6 +72,7 @@ export function ClientFormModal({
   language,
   initialData,
   showPrimary = false,
+  isFirstClient = false,
   onSave,
   onClose,
   translations: tr,
@@ -227,6 +230,39 @@ export function ClientFormModal({
             gap: 'var(--space-4)',
           }}
         >
+          {/* isPrimary - Only show for first client in add mode */}
+          {showPrimary && isFirstClient && !isEdit && (
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: 'default',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 500,
+                color: 'var(--color-neutral-700)',
+                userSelect: 'none',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--color-primary-50, #eff6ff)',
+                border: '1px solid var(--color-primary-200, #bfdbfe)',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={true}
+                disabled={true}
+                style={{
+                  width: 16,
+                  height: 16,
+                  cursor: 'default',
+                  accentColor: 'var(--color-primary-500)',
+                }}
+              />
+              {tr.isPrimary}
+            </label>
+          )}
+
           {/* Client Name */}
           <div>
             <label style={labelStyle}>
@@ -359,8 +395,8 @@ export function ClientFormModal({
             />
           </div>
 
-          {/* isPrimary */}
-          {showPrimary && (
+          {/* isPrimary - Only show for non-first clients or in edit mode */}
+          {showPrimary && (!isFirstClient || isEdit) && (
             <label
               style={{
                 display: 'flex',
