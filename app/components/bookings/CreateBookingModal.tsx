@@ -17,6 +17,7 @@ import {
   getTourHourRangeBusiness,
   getTourByIdBusiness,
 } from '~/server/businessLogic/toursBusinessLogic';
+import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import { useDropdownCache } from '~/hooks/useDropdownCache';
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
@@ -79,6 +80,7 @@ export function CreateBookingModal({
   const [availabilityError, setAvailabilityError] = useState<string>('');
   const [tourBasePrice, setTourBasePrice] = useState<number | null>(null);
   const [tourMinimumPayment, setTourMinimumPayment] = useState<number | null>(null);
+  const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
 
   // Cache-first dropdown loaders
   const { loadNationalities } = useDropdownCache();
@@ -147,6 +149,32 @@ export function CreateBookingModal({
 
     void fetchTours();
   }, [language]);
+
+  // Fetch users with role 'user' when modal opens (only for admin)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchUsers = async () => {
+      if (currentUser?.role === 'admin' && token !== null && token !== '') {
+        try {
+          const usersResult = await getUsersDropdownBusiness(['user'], 'true', token, language);
+          if (usersResult.success === true && usersResult.data !== undefined) {
+            setUsers(
+              usersResult.data.map((u) => ({
+                id: u.id,
+                name: u.firstName,
+                email: u.email,
+              }))
+            );
+          }
+        } catch (error) {
+          console.error('Error fetching users:', error);
+        }
+      }
+    };
+
+    void fetchUsers();
+  }, [isOpen, currentUser?.role, token, language]);
 
   // Check tour availability when dates are selected
   useEffect(() => {
@@ -1479,6 +1507,7 @@ export function CreateBookingModal({
               initialData={getClientModalInitialData()}
               showPrimary={true}
               isFirstClient={editingClientIndex === null && formData.clients.length === 0}
+              users={users}
               onSave={handleClientModalSave}
               onClose={() => setClientModalOpen(false)}
               translations={{

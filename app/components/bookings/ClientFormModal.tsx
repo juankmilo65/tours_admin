@@ -32,6 +32,8 @@ interface ClientFormModalProps {
   showPrimary?: boolean;
   /** Whether this is the first client (first client is always primary) */
   isFirstClient?: boolean;
+  /** List of users with role 'user' to select from */
+  users?: Array<{ id: string; name: string; email: string }>;
   onSave: (data: ClientFormData) => void;
   onClose: () => void;
   translations: {
@@ -73,12 +75,14 @@ export function ClientFormModal({
   initialData,
   showPrimary = false,
   isFirstClient = false,
+  users = [],
   onSave,
   onClose,
   translations: tr,
 }: ClientFormModalProps): JSX.Element | null {
   const [form, setForm] = useState<ClientFormData>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
 
   const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
   const countries = useCachedNationalities(language);
@@ -261,6 +265,45 @@ export function ClientFormModal({
               />
               {tr.isPrimary}
             </label>
+          )}
+
+          {/* User Select - Only show for first client in add mode when there are users */}
+          {showPrimary && isFirstClient && !isEdit && users.length > 0 && (
+            <div>
+              <label style={labelStyle}>
+                {language === 'en' ? 'Select User' : 'Seleccionar Usuario'}
+              </label>
+              <Select
+                options={[
+                  { value: '', label: language === 'en' ? 'Manual Entry' : 'Ingreso Manual' },
+                  ...users.map((u) => ({
+                    value: u.id,
+                    label: u.name,
+                  })),
+                ]}
+                value={selectedUserId}
+                onChange={(value) => {
+                  setSelectedUserId(value);
+                  if (value) {
+                    const selectedUser = users.find((u) => u.id === value);
+                    if (selectedUser) {
+                      setForm((p) => ({ ...p, clientName: selectedUser.name }));
+                      if (errors.clientName !== undefined) {
+                        setErrors((p) => {
+                          const n = { ...p };
+                          delete n.clientName;
+                          return n;
+                        });
+                      }
+                    }
+                  } else {
+                    setForm((p) => ({ ...p, clientName: '' }));
+                  }
+                }}
+                placeholder={language === 'en' ? 'Select User' : 'Seleccionar Usuario'}
+                id="client-modal-user"
+              />
+            </div>
           )}
 
           {/* Client Name */}
