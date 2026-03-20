@@ -60,6 +60,8 @@ const toursSlice = createSlice({
       state.pagination = action.payload;
     },
     setFilters: (state, action: PayloadAction<Partial<TourFilters>>) => {
+      // Mark filters as changed when they are modified (not silent)
+      state.filtersChanged = true;
       state.filters = { ...state.filters, ...action.payload };
     },
     setFiltersSilently: (state, action: PayloadAction<Partial<TourFilters>>) => {
