@@ -345,16 +345,17 @@ export const deleteUserAvatar = async (
 };
 
 /**
- * Get users dropdown - for admin to select tour owner
+ * Get users dropdown - for admin to select tour owner or booking user
+ * Accepts an array of roles to filter multiple roles at once
  */
 export const getUsersDropdown = async (
-  role: string | null = null,
+  roles: string[] | null = null,
   isActive: string | null = null,
   token: string | undefined = undefined,
   language = 'es'
 ): Promise<unknown> => {
   console.warn('🎯 [GET USERS DROPDOWN] Starting with params:', {
-    role,
+    roles,
     isActive,
     language,
     BASE_URL,
@@ -371,13 +372,17 @@ export const getUsersDropdown = async (
     const fullUrl = `${BASE_URL}/${usersEndpoint}`;
     console.warn('🌐 [GET USERS DROPDOWN] Full URL to call:', fullUrl);
 
-    // Build query params
-    const params: Record<string, string> = {};
-    if (role !== null && role !== '') {
-      params.role = role;
+    // Build query params - use URLSearchParams for arrays
+    const queryParams = new URLSearchParams();
+    if (roles !== null && roles.length > 0) {
+      roles.forEach((role) => {
+        if (role !== '') {
+          queryParams.append('roles[]', role);
+        }
+      });
     }
     if (isActive !== null && isActive !== '') {
-      params.isActive = isActive;
+      queryParams.append('isActive', isActive);
     }
 
     const usersService = createServiceREST(
@@ -385,6 +390,13 @@ export const getUsersDropdown = async (
       usersEndpoint,
       token !== undefined && token !== '' ? token : ''
     );
+
+    // Convert URLSearchParams to object for axios
+    const params: Record<string, string> = {};
+    queryParams.forEach((value, key) => {
+      params[key] = value;
+    });
+
     console.warn('📡 [GET USERS DROPDOWN] Calling backend with headers:', {
       'X-Language': language,
       params,

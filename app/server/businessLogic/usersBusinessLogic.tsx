@@ -250,16 +250,22 @@ export const deleteUserAvatarBusiness = async (
 
 /**
  * Get users for dropdown (simplified format for filters)
+ * @param roles - Array of roles to filter users (e.g., ['admin', 'owner'] or ['user'])
+ * @param isActive - Optional active status filter
+ * @param token - Auth token
+ * @param language - Language preference
  */
 export const getUsersDropdownBusiness = async (
-  token: string | undefined,
+  roles: string[] | null = null,
+  isActive: string | null = null,
+  token: string | undefined = undefined,
   language = 'es'
 ): Promise<{
   success: boolean;
   data?: Array<{ id: string; firstName: string; email: string }>;
 }> => {
   try {
-    const result = (await getUsersDropdown(null, 'true', token, language)) as {
+    const result = (await getUsersDropdown(roles, isActive, token, language)) as {
       success?: boolean;
       data?: User[];
     };

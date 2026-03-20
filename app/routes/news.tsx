@@ -39,7 +39,7 @@ import { getSession } from '~/utilities/sessions';
 // User type for dropdown
 interface DropdownUser {
   id: string;
-  name: string;
+  firstName: string;
   email: string;
 }
 
@@ -52,8 +52,8 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
 
   console.warn('[news.tsx loader] authToken exists:', authToken !== undefined);
 
-  // Fetch users for dropdown
-  const usersResult = await getUsersDropdownBusiness(authToken, 'es');
+  // Fetch users for dropdown (admins and owners can create news)
+  const usersResult = await getUsersDropdownBusiness(['admin', 'owner'], 'true', authToken, 'es');
   console.warn('[news.tsx loader] usersResult:', usersResult);
 
   const users: DropdownUser[] =
@@ -1099,7 +1099,7 @@ export default function NewsRoute(): JSX.Element {
               options={
                 isAdmin
                   ? [{ value: '', label: t('common.select') }].concat(
-                      users.map((u) => ({ value: u.id, label: u.name }))
+                      users.map((u) => ({ value: u.id, label: u.firstName }))
                     )
                   : currentUser !== null
                     ? [

@@ -158,7 +158,7 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   let users: Array<{ id: string; name: string; email: string }> = [];
   if (authToken !== undefined) {
     if (authUser?.role === 'admin') {
-      const usersResult = await getUsersDropdownBusiness(authToken, 'es');
+      const usersResult = await getUsersDropdownBusiness(['user'], 'true', authToken, 'es');
       users =
         usersResult.success === true && usersResult.data !== undefined
           ? usersResult.data.map((u) => ({
