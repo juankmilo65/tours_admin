@@ -116,7 +116,7 @@ export interface MenusResponse {
 export interface GetMenusParams {
   page?: number;
   limit?: number;
-  role?: string;
+  app?: string;
   isActive?: boolean;
   language?: string;
   token?: string;

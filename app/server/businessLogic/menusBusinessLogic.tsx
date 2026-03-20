@@ -13,6 +13,7 @@ import {
   getParentMenus,
 } from '../menus';
 import type { ServiceResult } from '../_index';
+import type { GetMenusParams } from '~/types/MenuProps';
 import type {
   Menu,
   MenuResponse,
@@ -46,6 +47,7 @@ interface MenusPayload {
   isActive?: boolean;
   menuData?: CreateMenuDto | UpdateMenuDto;
   roleIds?: string[];
+  app?: string;
 }
 
 /**
@@ -90,14 +92,16 @@ const generatePayload = (formData: FormData, token = ''): MenusPayload => {
  * Business logic for getting all menus (internal)
  */
 const getMenusBusinessInternal = (data: MenusPayload): Promise<ServiceResult<unknown>> => {
-  return getMenus({
+  // Only pass properties that exist in GetMenusParams
+  const params: GetMenusParams = {
     language: data.language ?? 'es',
     page: data.page,
     limit: data.limit,
-    role: data.role,
     isActive: data.isActive,
     token: data.token,
-  }).catch((error: unknown) => {
+    app: data.app ?? 'admin',
+  };
+  return getMenus(params).catch((error: unknown) => {
     console.error('Error in getMenusBusiness:', error);
     return { error };
   });
@@ -239,6 +243,7 @@ export const getMenusBusiness = async (params: {
   role?: string;
   isActive?: boolean;
   language?: string;
+  app?: string;
 }): Promise<MenusResponse> => {
   try {
     const result = (await getMenus(params)) as MenusResponse;
@@ -351,10 +356,11 @@ export const associateRolesToMenuBusinessDirect = async (
 export const getUserMenuBusiness = async (
   token: string,
   language = 'es',
-  app = 'admin'
+  app = 'admin',
+  isActive?: boolean
 ): Promise<{ success: boolean; data?: NavItem[]; error?: { message?: string } }> => {
   try {
-    const result = (await getUserMenu(token, language, app)) as {
+    const result = (await getUserMenu(token, language, app, isActive)) as {
       success: boolean;
       data?: NavItem[];
     };

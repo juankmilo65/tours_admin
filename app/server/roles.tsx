@@ -48,11 +48,7 @@ export const getRoles = async (params: GetRolesParams = {}): Promise<unknown> =>
     }
 
     const rolesEndpoint = 'roles';
-    const rolesService = createServiceREST(
-      BASE_URL,
-      rolesEndpoint,
-      token !== undefined && token !== '' ? `Bearer ${token}` : 'Bearer'
-    );
+    const rolesService = createServiceREST(BASE_URL, rolesEndpoint, token ?? '');
 
     const result = await rolesService.get({
       params: queryParams,
@@ -96,7 +92,7 @@ export const getRoleById = async (id: string, token: string, language = 'es'): P
 
   try {
     const roleEndpoint = `roles/${id}`;
-    const roleService = createServiceREST(BASE_URL, roleEndpoint, `Bearer ${token}`);
+    const roleService = createServiceREST(BASE_URL, roleEndpoint, token);
 
     const result = await roleService.get({
       headers: {
@@ -124,7 +120,7 @@ export const createRole = async (
   }
 
   const rolesEndpoint = 'roles';
-  const rolesService = createServiceREST(BASE_URL, rolesEndpoint, `Bearer ${token}`);
+  const rolesService = createServiceREST(BASE_URL, rolesEndpoint, token);
 
   const result = await rolesService.create(data, {
     headers: {
@@ -148,7 +144,7 @@ export const updateRole = async (
   }
 
   const rolesEndpoint = `roles/${roleId}`;
-  const rolesService = createServiceREST(BASE_URL, 'roles', `Bearer ${token}`);
+  const rolesService = createServiceREST(BASE_URL, 'roles', token);
 
   const result = await rolesService.update(data, {
     headers: {
@@ -168,7 +164,7 @@ export const deleteRole = async (roleId: string, token: string): Promise<unknown
   }
 
   const rolesEndpoint = `roles/${roleId}`;
-  const roleService = createServiceREST(BASE_URL, rolesEndpoint, `Bearer ${token}`);
+  const roleService = createServiceREST(BASE_URL, rolesEndpoint, token);
 
   const result = await roleService.delete();
   return result;
@@ -188,7 +184,7 @@ export const associateMenusToRole = async (
   }
 
   const rolesEndpoint = `roles/${roleId}/menus`;
-  const rolesService = createServiceREST(BASE_URL, 'roles', `Bearer ${token}`);
+  const rolesService = createServiceREST(BASE_URL, 'roles', token);
 
   const result = await rolesService.create(data, {
     url: `/${rolesEndpoint}`,

@@ -32,7 +32,7 @@ export const getTourById = async (
 
   try {
     const tourEndpoint = `tours/${id}`;
-    const tourService = createServiceREST(BASE_URL, tourEndpoint, `Bearer ${token}`);
+    const tourService = createServiceREST(BASE_URL, tourEndpoint, token);
 
     const result = await tourService.get({
       headers: {
@@ -150,7 +150,7 @@ export const getTourHourRange = async (tourId: string, token: string): Promise<u
 
   try {
     const endpoint = `tours/${tourId}/hour-range`;
-    const service = createServiceREST(BASE_URL, endpoint, `Bearer ${token}`);
+    const service = createServiceREST(BASE_URL, endpoint, token);
     const result = await service.get({});
     return result;
   } catch (error) {
@@ -183,7 +183,7 @@ export const createTour = async (
 
   try {
     const toursEndpoint = 'tours';
-    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token}`);
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, token);
 
     const result = await toursService.create(payload);
 
@@ -230,7 +230,7 @@ export const updateTour = async (
 
   try {
     const toursEndpoint = `tours/${tourId}`;
-    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token}`);
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, token);
 
     const result = await toursService.update(payload);
 
@@ -477,7 +477,7 @@ export const setImageAsCover = async (
 
   try {
     const toursEndpoint = `tours/${tourId}/images/${imageId}/set-cover`;
-    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token}`);
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, token);
 
     const result = await toursService.update({});
 
@@ -510,7 +510,7 @@ export const deleteTourImage = async (
 
   try {
     const toursEndpoint = `tours/${tourId}/images/${imageId}`;
-    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token}`);
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, token ?? '');
 
     const result = await toursService.delete();
 

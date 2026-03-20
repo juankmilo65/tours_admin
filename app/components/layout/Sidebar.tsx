@@ -7,7 +7,7 @@ import { Link, useLocation, useNavigation } from '@remix-run/react';
 import { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { setGlobalLoading } from '~/store/slices/uiSlice';
-import { selectAuthToken } from '~/store/slices/authSlice';
+import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
 import type { NavItem } from '~/types/MenuProps';
 import { getUserMenuBusiness } from '~/server/businessLogic/menusBusinessLogic';
 
@@ -19,6 +19,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.Element {
   const token = useAppSelector(selectAuthToken);
+  const currentUser = useAppSelector(selectCurrentUser);
   const currentLanguage = useAppSelector((state) => state.ui.language);
   const location = useLocation();
   const navigation = useNavigation();
@@ -47,7 +48,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.El
           return;
         }
 
-        const result = await getUserMenuBusiness(token, language, 'admin');
+        const result = await getUserMenuBusiness(token, language, 'admin', true);
 
         if (result.success === true && result.data !== undefined && Array.isArray(result.data)) {
           setNavItems(result.data);
@@ -73,7 +74,7 @@ export function Sidebar({ isOpen, isCollapsed, onToggle }: SidebarProps): JSX.El
     return () => {
       window.removeEventListener('menu-updated', handleMenuUpdate);
     };
-  }, [token, currentLanguage]);
+  }, [token, currentLanguage, currentUser?.role]);
 
   // Check if screen is mobile
   useEffect(() => {

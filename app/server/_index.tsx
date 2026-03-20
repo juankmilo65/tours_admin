@@ -38,17 +38,21 @@ function createServiceREST<T = unknown>(url: string, endpoint: string, token: st
     _unusedToken: string,
     config?: AxiosRequestConfig
   ): ReturnType<typeof axios.create> {
-    const timeout =
-      typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SERVICE_API_TIMEOUT
-        ? Number(process.env.NEXT_PUBLIC_SERVICE_API_TIMEOUT)
-        : 10000;
+    let timeout = 10000;
+    if (
+      typeof process !== 'undefined' &&
+      typeof process.env.NEXT_PUBLIC_SERVICE_API_TIMEOUT === 'string' &&
+      process.env.NEXT_PUBLIC_SERVICE_API_TIMEOUT.trim() !== ''
+    ) {
+      timeout = Number(process.env.NEXT_PUBLIC_SERVICE_API_TIMEOUT);
+    }
     const defaultConfig = {
       baseURL: url + '/api/',
       timeout: timeout,
       headers:
         token !== ''
           ? {
-              Authorization: token,
+              Authorization: `Bearer ${token}`,
             }
           : {},
     };
