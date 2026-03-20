@@ -149,13 +149,32 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
         : [];
   }
 
-  // Fetch users for dropdown
-  const usersResult = await getUsersDropdownBusiness(
-    session.get('authToken') as string | undefined,
-    'es'
-  );
-  const users =
-    usersResult.success === true && usersResult.data !== undefined ? usersResult.data : [];
+  // Fetch users for dropdown (igual que tours)
+  const authToken = session.get('authToken') as string | undefined;
+  const authUser = session.get('authUser') as
+    | { id: string; role: string; firstName?: string; lastName?: string; email?: string }
+    | undefined;
+  let users: Array<{ id: string; name: string; email: string }> = [];
+  if (authToken !== undefined) {
+    if (authUser?.role === 'admin') {
+      const usersResult = await getUsersDropdownBusiness(authToken, 'es');
+      users =
+        usersResult.success === true && usersResult.data !== undefined
+          ? usersResult.data.map((u) => ({
+              id: u.id,
+              name: u.firstName,
+              email: u.email,
+            }))
+          : [];
+    } else if (typeof authUser?.id === 'string' && authUser.id.trim() !== '') {
+      const firstName = authUser.firstName ?? '';
+      const lastName = authUser.lastName ?? '';
+      const trimmedName = (firstName + ' ' + lastName).trim();
+      const email = authUser.email ?? '';
+      const fullName = trimmedName !== '' ? trimmedName : (email ?? 'Usuario');
+      users = [{ id: authUser.id, name: fullName, email: email ?? 'usuario@ejemplo.com' }];
+    }
+  }
 
   // Fetch booking statuses for dropdown
   const statusesResult: { success: boolean; data: Array<{ value: string; label: string }> | null } =
@@ -201,6 +220,9 @@ export default function Bookings(): JSX.Element {
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
   const [bookingDateFilter, setBookingDateFilter] = useState('');
+  // Filter state management - track when filters are changed but not yet applied
+  const [filtersChanged, setFiltersChanged] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -290,27 +312,21 @@ export default function Bookings(): JSX.Element {
     }
   };
 
-  // Fetch bookings on filter changes
+  // Fetch bookings on page change only (filters are applied manually via Apply button)
   useEffect(() => {
-    void refreshBookings();
+    if (hasSearched) {
+      void refreshBookings();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    page,
-    statusFilter,
-    userFilter,
-    tourIdFilter,
-    confirmationCodeFilter,
-    countryId,
-    cityIdFilter,
-    startDateFilter,
-    endDateFilter,
-    bookingDateFilter,
-    limit,
-    language,
-    dispatch,
-    t,
-    token,
-  ]);
+  }, [page, limit]);
+
+  // Auto-load bookings when country changes (not filters)
+  useEffect(() => {
+    if (countryId !== undefined && countryId !== null && countryId !== '') {
+      void refreshBookings();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countryId]);
 
   // Reload statuses when language changes
   useEffect(() => {
@@ -327,11 +343,21 @@ export default function Bookings(): JSX.Element {
   useEffect(() => {
     const fetchTours = async () => {
       try {
-        const result = (await getToursDropdownBusiness(countryId ?? null, language)) as {
-          success?: boolean;
-          data?: TourOption[];
-        };
-        if (result.success === true && result.data !== undefined) {
+        const result = await getToursDropdownBusiness(
+          countryId ?? null,
+          language,
+          userFilter ?? null
+        );
+        if (
+          typeof result === 'object' &&
+          result !== null &&
+          'success' in result &&
+          result.success === true &&
+          'data' in result &&
+          result.data !== undefined &&
+          result.data !== null &&
+          Array.isArray(result.data)
+        ) {
           setTours(result.data);
         }
       } catch (error) {
@@ -339,7 +365,7 @@ export default function Bookings(): JSX.Element {
       }
     };
     void fetchTours();
-  }, [countryId, language]);
+  }, [countryId, language, userFilter]);
 
   const handleViewBooking = (booking: Booking) => {
     navigate(`/bookings/${booking.id}`);
@@ -361,6 +387,50 @@ export default function Bookings(): JSX.Element {
     }
   };
 
+  // Handler to apply filters and search
+  const handleApplyFilters = async () => {
+    setHasSearched(true);
+    setFiltersChanged(false);
+    setPage(1);
+    await refreshBookings();
+  };
+
+  // Wrapper functions to mark filters as changed when modified
+  const handleStatusFilterChange = (v: string) => {
+    setStatusFilter(v);
+    setFiltersChanged(true);
+  };
+
+  const handleTourIdFilterChange = (v: string) => {
+    setTourIdFilter(v);
+    setFiltersChanged(true);
+  };
+
+  const handleConfirmationCodeFilterChange = (value: string) => {
+    setConfirmationCodeFilter(value);
+    setFiltersChanged(true);
+  };
+
+  const handleCityIdFilterChange = (v: string) => {
+    setCityIdFilter(v);
+    setFiltersChanged(true);
+  };
+
+  const handleStartDateFilterChange = (value: string) => {
+    setStartDateFilter(value);
+    setFiltersChanged(true);
+  };
+
+  const handleEndDateFilterChange = (value: string) => {
+    setEndDateFilter(value);
+    setFiltersChanged(true);
+  };
+
+  const handleBookingDateFilterChange = (value: string) => {
+    setBookingDateFilter(value);
+    setFiltersChanged(true);
+  };
+
   const handleClearFilters = () => {
     setStatusFilter('');
     setUserFilter('');
@@ -371,6 +441,8 @@ export default function Bookings(): JSX.Element {
     setEndDateFilter('');
     setBookingDateFilter('');
     setPage(1);
+    setFiltersChanged(false);
+    setHasSearched(false);
   };
 
   // Table columns
@@ -741,6 +813,29 @@ export default function Bookings(): JSX.Element {
             gap: 'var(--space-4)',
           }}
         >
+          {/* Filters Changed Warning */}
+          {filtersChanged && hasSearched && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                padding: 'var(--space-3) var(--space-4)',
+                backgroundColor: 'var(--color-warning-50)',
+                border: '1px solid var(--color-warning-200)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--color-warning-700)',
+                fontSize: 'var(--text-sm)',
+              }}
+            >
+              <span style={{ fontSize: '16px' }}>⚠️</span>
+              <span>
+                {t('tours.filtersChangedMessage') ||
+                  'Los filtros han cambiado. Presiona "Filtrar" para aplicar los nuevos criterios de búsqueda.'}
+              </span>
+            </div>
+          )}
+
           {/* Row 1: User, City, Status, Confirmation Code */}
           <div
             style={{
@@ -759,21 +854,25 @@ export default function Bookings(): JSX.Element {
                   marginBottom: 'var(--space-1)',
                 }}
               >
-                {t('users.user')}
+                {bookingsT.allUsers}
               </label>
               <Select
-                options={[{ value: '', label: bookingsT.allUsers }].concat(
-                  loaderData.users.map((u) => ({
+                options={[
+                  { value: '', label: bookingsT.allUsers },
+                  ...loaderData.users.map((u) => ({
                     value: u.id,
                     label: u.name,
-                  }))
-                )}
+                  })),
+                ]}
                 value={userFilter}
-                onChange={(v: string) => {
+                onChange={(v) => {
                   setUserFilter(v);
-                  setPage(1);
+                  setCityIdFilter('');
+                  setTourIdFilter('');
+                  setFiltersChanged(true);
                 }}
                 placeholder={bookingsT.allUsers}
+                id="select-provider"
               />
             </div>
 
@@ -797,10 +896,7 @@ export default function Bookings(): JSX.Element {
                   }))
                 )}
                 value={cityIdFilter}
-                onChange={(v: string) => {
-                  setCityIdFilter(v);
-                  setPage(1);
-                }}
+                onChange={handleCityIdFilterChange}
                 placeholder={bookingsT.allCities}
               />
             </div>
@@ -820,10 +916,7 @@ export default function Bookings(): JSX.Element {
               <Select
                 options={[{ value: '', label: bookingsT.allStatus }].concat(statuses)}
                 value={statusFilter}
-                onChange={(v: string) => {
-                  setStatusFilter(v);
-                  setPage(1);
-                }}
+                onChange={handleStatusFilterChange}
                 placeholder={bookingsT.allStatus}
               />
             </div>
@@ -844,10 +937,7 @@ export default function Bookings(): JSX.Element {
                 type="text"
                 placeholder={bookingsT.confirmationCode}
                 value={confirmationCodeFilter}
-                onChange={(e) => {
-                  setConfirmationCodeFilter(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => handleConfirmationCodeFilterChange(e.target.value)}
                 style={{ height: '40px' }}
               />
             </div>
@@ -876,10 +966,7 @@ export default function Bookings(): JSX.Element {
               <input
                 type="date"
                 value={startDateFilter}
-                onChange={(e) => {
-                  setStartDateFilter(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => handleStartDateFilterChange(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -908,10 +995,7 @@ export default function Bookings(): JSX.Element {
               <input
                 type="date"
                 value={endDateFilter}
-                onChange={(e) => {
-                  setEndDateFilter(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => handleEndDateFilterChange(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -940,10 +1024,7 @@ export default function Bookings(): JSX.Element {
               <input
                 type="date"
                 value={bookingDateFilter}
-                onChange={(e) => {
-                  setBookingDateFilter(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => handleBookingDateFilterChange(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -978,10 +1059,7 @@ export default function Bookings(): JSX.Element {
                   })),
                 ]}
                 value={tourIdFilter}
-                onChange={(v: string) => {
-                  setTourIdFilter(v);
-                  setPage(1);
-                }}
+                onChange={handleTourIdFilterChange}
                 placeholder={language === 'en' ? 'All Tours' : 'Todos los Tours'}
               />
             </div>
@@ -997,6 +1075,14 @@ export default function Bookings(): JSX.Element {
           >
             <Button variant="secondary" onClick={handleClearFilters}>
               {t('common.clearFilters') ?? 'Limpiar Filtros'}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                void handleApplyFilters();
+              }}
+            >
+              {t('common.filter') ?? 'Filtrar'}
             </Button>
             <Button
               variant="primary"

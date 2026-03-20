@@ -21,6 +21,9 @@ interface BookingsState {
     total: number;
     totalPages: number;
   };
+  // Filter state management
+  filtersChanged: boolean;
+  hasSearched: boolean;
 }
 
 const initialState: BookingsState = {
@@ -37,6 +40,8 @@ const initialState: BookingsState = {
     total: 0,
     totalPages: 0,
   },
+  filtersChanged: false,
+  hasSearched: false,
 };
 
 const bookingsSlice = createSlice({
@@ -182,10 +187,18 @@ const bookingsSlice = createSlice({
       state.selectedBooking = null;
     },
     updateFilters: (state, action: PayloadAction<Partial<BookingFilters>>) => {
+      // Mark filters as changed when they are modified (not silent)
+      state.filtersChanged = true;
       state.filters = { ...state.filters, ...action.payload };
     },
     clearError: (state) => {
       state.error = null;
+    },
+    resetFiltersChanged: (state) => {
+      state.filtersChanged = false;
+    },
+    setHasSearched: (state, action: PayloadAction<boolean>) => {
+      state.hasSearched = action.payload;
     },
   },
 });
@@ -219,6 +232,36 @@ export const {
   clearSelectedBooking,
   updateFilters,
   clearError,
+  resetFiltersChanged,
+  setHasSearched,
 } = bookingsSlice.actions;
+
+// Selectors
+export const selectBookings = (state: { bookings: BookingsState }): Booking[] =>
+  state.bookings.bookings;
+export const selectSelectedBooking = (state: { bookings: BookingsState }): Booking | null =>
+  state.bookings.selectedBooking;
+export const selectPayments = (state: { bookings: BookingsState }): Payment[] =>
+  state.bookings.payments;
+export const selectBookingStats = (state: { bookings: BookingsState }): BookingStats | null =>
+  state.bookings.stats;
+export const selectBookingsIsLoading = (state: { bookings: BookingsState }): boolean =>
+  state.bookings.isLoading;
+export const selectBookingsError = (state: { bookings: BookingsState }): string | null =>
+  state.bookings.error;
+export const selectBookingsFilters = (state: { bookings: BookingsState }): BookingFilters =>
+  state.bookings.filters;
+export const selectBookingsPagination = (state: {
+  bookings: BookingsState;
+}): {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+} => state.bookings.pagination;
+export const selectBookingsFiltersChanged = (state: { bookings: BookingsState }): boolean =>
+  state.bookings.filtersChanged;
+export const selectBookingsHasSearched = (state: { bookings: BookingsState }): boolean =>
+  state.bookings.hasSearched;
 
 export default bookingsSlice.reducer;

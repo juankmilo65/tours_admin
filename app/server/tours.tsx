@@ -69,11 +69,13 @@ export const getTourById = async (
  */
 export const getToursDropdown = async (
   countryId: string | null = null,
-  language = 'es'
+  language = 'es',
+  userId: string | null = null
 ): Promise<unknown> => {
   console.warn('🎯 [GET TOURS DROPDOWN] Starting with params:', {
     countryId,
     language,
+    userId,
     BASE_URL,
   });
 
@@ -92,6 +94,9 @@ export const getToursDropdown = async (
     const params: Record<string, string> = {};
     if (countryId !== null && countryId !== '') {
       params.countryId = countryId;
+    }
+    if (userId !== null && userId !== '') {
+      params.userId = userId;
     }
 
     // No token needed - public endpoint

@@ -91,10 +91,11 @@ const getToursBusiness = async (data: ToursPayload): Promise<ServiceResult<unkno
  */
 const getToursDropdownBusiness = async (
   countryId: string | null = null,
-  language = 'es'
+  language = 'es',
+  userId: string | null = null
 ): Promise<ServiceResult<unknown>> => {
   try {
-    const result = await getToursDropdown(countryId, language);
+    const result = await getToursDropdown(countryId, language, userId);
     return result;
   } catch (error) {
     console.error('Error in getToursDropdownBusiness:', error);
