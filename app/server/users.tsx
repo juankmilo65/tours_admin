@@ -135,7 +135,7 @@ export const getAllUsers = async (params: GetUsersParams = {}): Promise<unknown>
     const usersService = createServiceREST(
       BASE_URL,
       usersEndpoint,
-      token !== undefined && token !== '' ? `Bearer ${token}` : 'Bearer'
+      token !== undefined && token !== '' ? token : ''
     );
 
     const result = await usersService.get({
@@ -176,7 +176,7 @@ export const getUserById = async (
     const userService = createServiceREST(
       BASE_URL,
       userEndpoint,
-      token !== undefined && token !== '' ? `Bearer ${token}` : 'Bearer'
+      token !== undefined && token !== '' ? token : ''
     );
 
     const result = await userService.get({
@@ -208,7 +208,7 @@ export const createUser = async (
   const usersService = createServiceREST(
     BASE_URL,
     usersEndpoint,
-    token !== undefined && token !== '' ? `Bearer ${token}` : 'Bearer'
+    token !== undefined && token !== '' ? token : ''
   );
 
   const result = await usersService.create(userData, {
@@ -236,7 +236,7 @@ export const updateUser = async (
   const usersService = createServiceREST(
     BASE_URL,
     'users',
-    token !== undefined && token !== '' ? `Bearer ${token}` : 'Bearer'
+    token !== undefined && token !== '' ? token : ''
   );
 
   const result = await usersService.update(userData, {
@@ -265,7 +265,7 @@ export const toggleUserStatus = async (
   const usersService = createServiceREST(
     BASE_URL,
     'users',
-    token !== undefined && token !== '' ? `Bearer ${token}` : 'Bearer'
+    token !== undefined && token !== '' ? token : ''
   );
 
   const result = await usersService.update(
@@ -301,7 +301,7 @@ export const uploadUserAvatar = async (
   try {
     const response = await axios.post(`${BASE_URL}/api/users/${userId}/avatar`, formData, {
       headers: {
-        Authorization: token !== undefined && token !== '' ? `Bearer ${token}` : 'Bearer',
+        Authorization: token !== undefined && token !== '' ? token : '',
         'Content-Type': 'multipart/form-data',
         'X-Language': language,
       },
@@ -331,7 +331,7 @@ export const deleteUserAvatar = async (
   try {
     const response = await axios.delete(`${BASE_URL}/api/users/${userId}/avatar`, {
       headers: {
-        Authorization: token !== undefined && token !== '' ? `Bearer ${token}` : 'Bearer',
+        Authorization: token !== undefined && token !== '' ? token : '',
         'X-Language': language,
       },
     });
@@ -383,7 +383,7 @@ export const getUsersDropdown = async (
     const usersService = createServiceREST(
       BASE_URL,
       usersEndpoint,
-      token !== undefined && token !== '' ? `Bearer ${token}` : ''
+      token !== undefined && token !== '' ? token : ''
     );
     console.warn('📡 [GET USERS DROPDOWN] Calling backend with headers:', {
       'X-Language': language,

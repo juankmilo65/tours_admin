@@ -91,7 +91,7 @@ export const getCategories = async (params: GetCategoriesParams = {}): Promise<u
     }
 
     const categoriesEndpoint = 'categories';
-    const categoriesService = createServiceREST(BASE_URL, categoriesEndpoint, 'Bearer');
+    const categoriesService = createServiceREST(BASE_URL, categoriesEndpoint, '');
 
     const result = await categoriesService.get({
       params: queryParams,
@@ -135,7 +135,7 @@ export const getCategoryById = async (id: string, language = 'es'): Promise<unkn
 
   try {
     const categoryEndpoint = `categories/${id}`;
-    const categoryService = createServiceREST(BASE_URL, categoryEndpoint, 'Bearer');
+    const categoryService = createServiceREST(BASE_URL, categoryEndpoint, '');
 
     const result = await categoryService.get({
       headers: {
@@ -306,7 +306,7 @@ export const getCategoriesDropdown = async (
     }
 
     const categoriesDropdownEndpoint = 'categories/dropdown';
-    const categoriesService = createServiceREST(BASE_URL, categoriesDropdownEndpoint, 'Bearer');
+    const categoriesService = createServiceREST(BASE_URL, categoriesDropdownEndpoint, '');
 
     const result = await categoriesService.get({
       params: queryParams,

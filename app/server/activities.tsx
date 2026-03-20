@@ -105,7 +105,7 @@ export const getActivities = async (params: GetActivitiesParams = {}): Promise<u
     }
 
     const activitiesEndpoint = 'activities';
-    const activitiesService = createServiceREST(BASE_URL, activitiesEndpoint, 'Bearer');
+    const activitiesService = createServiceREST(BASE_URL, activitiesEndpoint, '');
 
     const result = await activitiesService.get({
       params: queryParams,
@@ -120,7 +120,7 @@ export const getActivities = async (params: GetActivitiesParams = {}): Promise<u
       console.error('Error in getActivities service:', error.message);
       if (error.message.includes('ECONNREFUSED')) {
         console.warn(
-          'Backend API is not available. Please ensure the backend server is running at:',
+          'Backend API is not available. Please ensure that backend server is running at:',
           BASE_URL
         );
       }
@@ -147,7 +147,7 @@ export const getActivityById = async (id: string, language = 'es'): Promise<unkn
 
   try {
     const activityEndpoint = `activities/${id}`;
-    const activityService = createServiceREST(BASE_URL, activityEndpoint, 'Bearer');
+    const activityService = createServiceREST(BASE_URL, activityEndpoint, '');
 
     const result = await activityService.get({
       headers: {
@@ -161,7 +161,7 @@ export const getActivityById = async (id: string, language = 'es'): Promise<unkn
       console.error('Error in getActivityById service:', error.message);
       if (error.message.includes('ECONNREFUSED')) {
         console.warn(
-          'Backend API is not available. Please ensure the backend server is running at:',
+          'Backend API is not available. Please ensure that backend server is running at:',
           BASE_URL
         );
       }
@@ -185,7 +185,7 @@ export const createActivity = async (
   }
 
   const activitiesEndpoint = 'activities';
-  const activitiesService = createServiceREST(BASE_URL, activitiesEndpoint, `Bearer ${token}`);
+  const activitiesService = createServiceREST(BASE_URL, activitiesEndpoint, token);
 
   const result = await activitiesService.create(data, {
     headers: {

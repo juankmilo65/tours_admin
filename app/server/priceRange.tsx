@@ -105,7 +105,7 @@ export async function getPriceRange(
     }
 
     const priceRangeEndpoint = 'tours/price-range';
-    const priceRangeService = createServiceREST(BASE_URL, priceRangeEndpoint, 'Bearer');
+    const priceRangeService = createServiceREST(BASE_URL, priceRangeEndpoint, '');
 
     const result = await priceRangeService.get({
       params,

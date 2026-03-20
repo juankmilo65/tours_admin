@@ -39,7 +39,7 @@ export const getLanguagesDropdown = async (language = 'es'): Promise<LanguagesDr
 
   try {
     const languagesDropdownEndpoint = 'languages/dropdown';
-    const languagesService = createServiceREST(BASE_URL, languagesDropdownEndpoint, 'Bearer');
+    const languagesService = createServiceREST(BASE_URL, languagesDropdownEndpoint, '');
 
     const result = await languagesService.get({
       headers: {

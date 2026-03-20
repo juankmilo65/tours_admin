@@ -71,7 +71,7 @@ export const getAllBookings = async (params: {
     };
 
     const bookingsEndpoint = 'bookings';
-    const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, `Bearer ${token ?? ''}`);
+    const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, token ?? '');
 
     const headers: Record<string, string> = {};
     if (language !== undefined) {
@@ -135,7 +135,7 @@ export const getBookingById = async (
     const fullUrl = `${BASE_URL}/${bookingEndpoint}`;
     console.warn('🌐 [GET BOOKING BY ID] Full URL to call:', fullUrl);
 
-    const bookingService = createServiceREST(BASE_URL, bookingEndpoint, `Bearer ${token}`);
+    const bookingService = createServiceREST(BASE_URL, bookingEndpoint, token);
 
     const result = await bookingService.get({
       headers: {
@@ -185,7 +185,7 @@ export const createBooking = async (
 
   try {
     const bookingsEndpoint = 'bookings';
-    const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, `Bearer ${token}`);
+    const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, token);
 
     const result = await bookingsService.create(payload, {
       headers: {
@@ -196,7 +196,7 @@ export const createBooking = async (
       timeout: 30000,
     });
 
-    // Check if the result contains an error (from createServiceREST catch)
+    // Check if result contains an error (from createServiceREST catch)
     if (result !== null && typeof result === 'object' && 'error' in result) {
       console.error('❌ [CREATE BOOKING] Error in result:', result.error);
       return { success: false, error: result.error };
@@ -246,7 +246,7 @@ export const updateBooking = async (
 
   try {
     const bookingsEndpoint = `bookings/${id}`;
-    const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, `Bearer ${token}`);
+    const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, token);
 
     const result = await bookingsService.update(payload, {
       headers: {
@@ -297,7 +297,7 @@ export const deleteBooking = async (
 
   try {
     const bookingsEndpoint = `bookings/${id}`;
-    const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, `Bearer ${token}`);
+    const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, token);
 
     const result = await bookingsService.update(
       {
@@ -347,7 +347,7 @@ export const getBookingStats = async (token: string, language = 'es'): Promise<u
 
   try {
     const statsEndpoint = 'bookings/stats';
-    const statsService = createServiceREST(BASE_URL, statsEndpoint, `Bearer ${token}`);
+    const statsService = createServiceREST(BASE_URL, statsEndpoint, token);
 
     const result = await statsService.get({
       headers: {
@@ -396,7 +396,7 @@ export const getBookingPayments = async (
 
   try {
     const paymentsEndpoint = `payments/booking/${bookingId}`;
-    const paymentsService = createServiceREST(BASE_URL, paymentsEndpoint, `Bearer ${token}`);
+    const paymentsService = createServiceREST(BASE_URL, paymentsEndpoint, token);
 
     const result = await paymentsService.get({
       headers: {
@@ -445,7 +445,7 @@ export const createPayment = async (
 
   try {
     const paymentsEndpoint = 'payments';
-    const paymentsService = createServiceREST(BASE_URL, paymentsEndpoint, `Bearer ${token}`);
+    const paymentsService = createServiceREST(BASE_URL, paymentsEndpoint, token);
 
     const result = await paymentsService.create(payload, {
       headers: {
@@ -485,7 +485,7 @@ export const getBookingStatusHistory = async (
   }
   try {
     const endpoint = `bookings/${bookingId}/status-history`;
-    const service = createServiceREST(BASE_URL, endpoint, `Bearer ${token ?? ''}`);
+    const service = createServiceREST(BASE_URL, endpoint, token ?? '');
     return await service.get({ headers: { 'X-Language': language } });
   } catch (error) {
     console.error('❌ [GET BOOKING STATUS HISTORY] Error:', error);

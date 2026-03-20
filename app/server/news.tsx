@@ -90,7 +90,7 @@ export const getNews = async (params: GetNewsParams = {}): Promise<unknown> => {
     }
 
     const newsEndpoint = 'news';
-    const newsService = createServiceREST(BASE_URL, newsEndpoint, 'Bearer');
+    const newsService = createServiceREST(BASE_URL, newsEndpoint, '');
 
     const result = await newsService.get({
       params: queryParams,
@@ -133,7 +133,7 @@ export const getNewsById = async (id: string, language = 'es'): Promise<unknown>
 
   try {
     const newsEndpoint = `news/${id}`;
-    const newsService = createServiceREST(BASE_URL, newsEndpoint, 'Bearer');
+    const newsService = createServiceREST(BASE_URL, newsEndpoint, '');
 
     const result = await newsService.get({
       headers: {

@@ -118,7 +118,7 @@ export const getOffers = async (params: {
     }
 
     const offersEndpoint = 'offers';
-    const offersService = createServiceREST(BASE_URL, offersEndpoint, 'Bearer');
+    const offersService = createServiceREST(BASE_URL, offersEndpoint, '');
 
     const result = await offersService.get({
       params: queryParams,
@@ -151,7 +151,7 @@ export const getOfferById = async (id: string, language = 'es'): Promise<unknown
 
   try {
     const offerEndpoint = `offers/${id}`;
-    const offerService = createServiceREST(BASE_URL, offerEndpoint, 'Bearer');
+    const offerService = createServiceREST(BASE_URL, offerEndpoint, '');
 
     const result = await offerService.get({
       headers: {

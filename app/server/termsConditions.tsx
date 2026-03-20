@@ -43,7 +43,7 @@ export const getTermsConditionsByType = async (
 
   try {
     const termsEndpoint = `terms-conditions/type/${type}`;
-    const termsService = createServiceREST(BASE_URL, termsEndpoint, 'Bearer');
+    const termsService = createServiceREST(BASE_URL, termsEndpoint, '');
 
     const result = await termsService.get({
       headers: {

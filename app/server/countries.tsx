@@ -24,7 +24,7 @@ export const getCountries = async (language = 'es'): Promise<unknown> => {
 
   try {
     const countriesEndpoint = 'countries';
-    const countriesService = createServiceREST(BASE_URL, countriesEndpoint, 'Bearer');
+    const countriesService = createServiceREST(BASE_URL, countriesEndpoint, '');
 
     const result = await countriesService.get({
       headers: {
@@ -62,7 +62,7 @@ export const getCountryById = async (id: string, language = 'es'): Promise<unkno
 
   try {
     const countryEndpoint = `countries/${id}`;
-    const countryService = createServiceREST(BASE_URL, countryEndpoint, 'Bearer');
+    const countryService = createServiceREST(BASE_URL, countryEndpoint, '');
 
     const result = await countryService.get({
       headers: {

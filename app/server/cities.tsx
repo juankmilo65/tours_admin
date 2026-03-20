@@ -110,7 +110,7 @@ export const getCities = async (params: GetCitiesParams = {}): Promise<unknown> 
     }
 
     const citiesEndpoint = 'cities';
-    const citiesService = createServiceREST(BASE_URL, citiesEndpoint, 'Bearer');
+    const citiesService = createServiceREST(BASE_URL, citiesEndpoint, '');
 
     const result = await citiesService.get({
       params: queryParams,

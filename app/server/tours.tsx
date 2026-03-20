@@ -607,7 +607,7 @@ export const getTours = async (payload: ServicePayload): Promise<unknown> => {
     }
 
     const toursEndpoint = 'tours/cards';
-    const toursService = createServiceREST(BASE_URL, toursEndpoint, `Bearer ${token ?? ''}`);
+    const toursService = createServiceREST(BASE_URL, toursEndpoint, token ?? '');
 
     const result = await toursService.get({
       params,
