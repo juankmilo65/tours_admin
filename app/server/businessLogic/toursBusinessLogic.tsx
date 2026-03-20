@@ -166,6 +166,7 @@ export const getTourHourRangeBusiness = async (
     daysCount: number;
     basePrice?: number;
     currency?: string;
+    minimumPayment: number;
   };
   message?: string;
 }> => {

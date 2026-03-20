@@ -91,7 +91,7 @@ export function CreateBookingModal({
     startDate: '',
     endDate: '',
     currency: 'MXN',
-    clients: [{ clientName: '', clientAge: 0, identificationTypeId: '', clientId: '' }],
+    clients: [],
   });
 
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
@@ -108,7 +108,7 @@ export function CreateBookingModal({
       startDate: '',
       endDate: '',
       currency: 'MXN',
-      clients: [{ clientName: '', clientAge: 0, identificationTypeId: '', clientId: '' }],
+      clients: [],
     });
     setErrors({});
     setIsSubmitting(false);
@@ -1103,42 +1103,72 @@ export function CreateBookingModal({
 
             {/* Clients */}
             <div style={{ marginTop: 'var(--space-2)' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: 'var(--space-3)',
-                }}
-              >
-                <h3
+              {formData.clients.length > 0 && (
+                <div
                   style={{
-                    fontSize: 'var(--text-lg)',
-                    fontWeight: 'var(--font-weight-semibold)',
-                    color: 'var(--color-neutral-900)',
-                    margin: 0,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 'var(--space-3)',
                   }}
                 >
-                  {t('bookings.clients') ?? 'Clients'}
-                </h3>
-                <button
-                  type="button"
-                  onClick={handleOpenAddClient}
-                  className="modal-btn-add-client"
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
+                  <h3
+                    style={{
+                      fontSize: 'var(--text-lg)',
+                      fontWeight: 'var(--font-weight-semibold)',
+                      color: 'var(--color-neutral-900)',
+                      margin: 0,
+                    }}
                   >
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  {t('bookings.addClient') ?? 'Add Client'}
-                </button>
-              </div>
+                    {t('bookings.clients') ?? 'Clients'}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddClient}
+                    className="modal-btn-add-client"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    {t('bookings.addClient') ?? 'Add Client'}
+                  </button>
+                </div>
+              )}
+
+              {formData.clients.length === 0 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    padding: 'var(--space-4)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleOpenAddClient}
+                    className="modal-btn-add-client"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    {t('bookings.addClient') ?? 'Add Client'}
+                  </button>
+                </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {formData.clients.map((client, index) => (
@@ -1193,8 +1223,7 @@ export function CreateBookingModal({
                           )}
                         </div>
                         <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                          {client.clientAge}{' '}
-                          {t('bookings.yearsOld') ?? (language === 'en' ? 'years old' : 'años')}
+                          {client.clientAge} {bookingsT.yearsOld}
                         </span>
                       </div>
                     </div>
