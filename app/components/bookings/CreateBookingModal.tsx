@@ -1024,79 +1024,82 @@ export function CreateBookingModal({
             </div>
 
             {/* Is this booking for me? */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-3)',
-                padding: 'var(--space-3) var(--space-4)',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: isBookingForMe
-                  ? 'var(--color-primary-50, #eff6ff)'
-                  : 'var(--color-neutral-50)',
-                border: `1px solid ${isBookingForMe ? 'var(--color-primary-200, #bfdbfe)' : 'var(--color-neutral-200)'}`,
-                cursor: 'pointer',
-                userSelect: 'none',
-              }}
-              onClick={() => {
-                const next = !isBookingForMe;
-                setIsBookingForMe(next);
-                if (next && currentUser !== null) {
-                  const fullName = `${currentUser.firstName} ${currentUser.lastName}`.trim();
-                  setFormData((prev) => ({
-                    ...prev,
-                    clients: prev.clients.map((c, i) =>
-                      i === 0
-                        ? { ...c, clientName: fullName, isPrimary: true }
-                        : { ...c, isPrimary: false }
-                    ),
-                  }));
-                } else {
-                  setFormData((prev) => ({
-                    ...prev,
-                    clients: prev.clients.map((c, i) =>
-                      i === 0 ? { ...c, clientName: '', isPrimary: false } : c
-                    ),
-                  }));
-                }
-                if (errors.primaryClient !== undefined) {
-                  setErrors((prev) => ({ ...prev, primaryClient: undefined }));
-                }
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={isBookingForMe}
-                onChange={() => undefined}
+            {/* Is this booking for me? - Only show for user role */}
+            {currentUser !== null && currentUser.role === 'user' && (
+              <div
                 style={{
-                  width: 18,
-                  height: 18,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-3)',
+                  padding: 'var(--space-3) var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: isBookingForMe
+                    ? 'var(--color-primary-50, #eff6ff)'
+                    : 'var(--color-neutral-50)',
+                  border: `1px solid ${isBookingForMe ? 'var(--color-primary-200, #bfdbfe)' : 'var(--color-neutral-200)'}`,
                   cursor: 'pointer',
-                  accentColor: 'var(--color-primary-500)',
+                  userSelect: 'none',
                 }}
-              />
-              <span
-                style={{
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--font-weight-medium)',
-                  color: 'var(--color-neutral-800)',
+                onClick={() => {
+                  const next = !isBookingForMe;
+                  setIsBookingForMe(next);
+                  if (next && currentUser !== null) {
+                    const fullName = `${currentUser.firstName} ${currentUser.lastName}`.trim();
+                    setFormData((prev) => ({
+                      ...prev,
+                      clients: prev.clients.map((c, i) =>
+                        i === 0
+                          ? { ...c, clientName: fullName, isPrimary: true }
+                          : { ...c, isPrimary: false }
+                      ),
+                    }));
+                  } else {
+                    setFormData((prev) => ({
+                      ...prev,
+                      clients: prev.clients.map((c, i) =>
+                        i === 0 ? { ...c, clientName: '', isPrimary: false } : c
+                      ),
+                    }));
+                  }
+                  if (errors.primaryClient !== undefined) {
+                    setErrors((prev) => ({ ...prev, primaryClient: undefined }));
+                  }
                 }}
               >
-                {t('bookings.bookingForMe') ?? '¿Esta reserva es para ti?'}
-              </span>
-              {isBookingForMe && currentUser !== null && (
+                <input
+                  type="checkbox"
+                  checked={isBookingForMe}
+                  onChange={() => undefined}
+                  style={{
+                    width: 18,
+                    height: 18,
+                    cursor: 'pointer',
+                    accentColor: 'var(--color-primary-500)',
+                  }}
+                />
                 <span
                   style={{
-                    marginLeft: 'auto',
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-primary-600, #2563eb)',
-                    fontWeight: 500,
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    color: 'var(--color-neutral-800)',
                   }}
                 >
-                  {`${currentUser.firstName} ${currentUser.lastName}`.trim()}
+                  {t('bookings.bookingForMe') ?? '¿Esta reserva es para ti?'}
                 </span>
-              )}
-            </div>
+                {isBookingForMe && currentUser !== null && (
+                  <span
+                    style={{
+                      marginLeft: 'auto',
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-primary-600, #2563eb)',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {`${currentUser.firstName} ${currentUser.lastName}`.trim()}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Clients */}
             <div style={{ marginTop: 'var(--space-2)' }}>
