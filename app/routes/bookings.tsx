@@ -5,7 +5,7 @@
 
 import type { JSX } from 'react';
 import { useState, useEffect } from 'react';
-import { useNavigate, useLoaderData } from '@remix-run/react';
+import { useLoaderData } from '@remix-run/react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { data } from '@remix-run/node';
 import { requireAuth } from '~/utilities/auth.loader';
@@ -202,7 +202,6 @@ export default function Bookings(): JSX.Element {
   const rawLoaderData = useLoaderData<typeof loader>();
   const loaderData = extractLoaderData(rawLoaderData);
   const { t, language } = useTranslation();
-  const navigate = useNavigate();
 
   // Use component-specific translations
   const bookingsT = language === 'en' ? bookingEn : bookingEs;
@@ -396,10 +395,6 @@ export default function Bookings(): JSX.Element {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, currentUser]);
-
-  const handleViewBooking = (booking: Booking) => {
-    navigate(`/bookings/${booking.id}`);
-  };
 
   const handleEditBooking = async (bookingId: string) => {
     dispatch(setGlobalLoading({ isLoading: true, message: t('common.loading') ?? 'Cargando...' }));
@@ -701,135 +696,142 @@ export default function Bookings(): JSX.Element {
     {
       key: 'actions',
       label: t('common.actions') ?? 'Acciones',
-      render: (_value: unknown, row: Booking) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* View details */}
-          <button
-            type="button"
-            onClick={() => handleViewBooking(row)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 38,
-              height: 38,
-              borderRadius: 'var(--radius-lg, 10px)',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: 'var(--color-primary-50, #eff6ff)',
-              color: 'var(--color-primary-500, #3b82f6)',
-              transition: 'all .18s ease',
-              lineHeight: 1,
-            }}
-            title={bookingsT.viewDetails}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-primary-100, #dbeafe)';
-              e.currentTarget.style.color = 'var(--color-primary-600, #2563eb)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-primary-50, #eff6ff)';
-              e.currentTarget.style.color = 'var(--color-primary-500, #3b82f6)';
-            }}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+      render: (_value: unknown, row: Booking) => {
+        // Si es rol user, solo mostrar botón cancelar
+        if (currentUser?.role === 'user') {
+          return (
+            <button
+              type="button"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--radius-lg, 10px)',
+                border: '1px solid #fca5a5',
+                background: '#fff1f2',
+                color: '#dc2626',
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all .18s ease',
+                lineHeight: 1,
+              }}
+              title={bookingsT.cancelBooking}
+              onClick={() => {
+                showError({
+                  messageKey: 'common.error',
+                  fallback:
+                    language === 'en' ? 'Cancel booking (user)' : 'Cancelar reserva (usuario)',
+                });
+              }}
             >
-              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          </button>
-          {/* Edit booking */}
-          <button
-            type="button"
-            onClick={() => void handleEditBooking(row.id)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 38,
-              height: 38,
-              borderRadius: 'var(--radius-lg, 10px)',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: 'var(--color-neutral-100, #f3f4f6)',
-              color: 'var(--color-neutral-600, #4b5563)',
-              transition: 'all .18s ease',
-              lineHeight: 1,
-            }}
-            title={language === 'en' ? 'Edit' : 'Editar'}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-neutral-200, #e5e7eb)';
-              e.currentTarget.style.color = 'var(--color-neutral-800, #1f2937)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-neutral-100, #f3f4f6)';
-              e.currentTarget.style.color = 'var(--color-neutral-600, #4b5563)';
-            }}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          );
+        }
+        // Si es admin, mostrar editar y modal de estados
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Edit booking */}
+            <button
+              type="button"
+              onClick={() => void handleEditBooking(row.id)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--radius-lg, 10px)',
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: 'var(--color-neutral-100, #f3f4f6)',
+                color: 'var(--color-neutral-600, #4b5563)',
+                transition: 'all .18s ease',
+                lineHeight: 1,
+              }}
+              title={language === 'en' ? 'Edit' : 'Editar'}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-neutral-200, #e5e7eb)';
+                e.currentTarget.style.color = 'var(--color-neutral-800, #1f2937)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-neutral-100, #f3f4f6)';
+                e.currentTarget.style.color = 'var(--color-neutral-600, #4b5563)';
+              }}
             >
-              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-              <path d="m15 5 4 4" />
-            </svg>
-          </button>
-          {/* Status history */}
-          <button
-            type="button"
-            onClick={() => setStatusModal({ isOpen: true, booking: row })}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 38,
-              height: 38,
-              borderRadius: 'var(--radius-lg, 10px)',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: 'var(--color-success-50, #f0fdf4)',
-              color: 'var(--color-success-500, #22c55e)',
-              transition: 'all .18s ease',
-              lineHeight: 1,
-            }}
-            title={language === 'en' ? 'Status' : 'Estado'}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-success-100, #dcfce7)';
-              e.currentTarget.style.color = 'var(--color-success-600, #16a34a)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-success-50, #f0fdf4)';
-              e.currentTarget.style.color = 'var(--color-success-500, #22c55e)';
-            }}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                <path d="m15 5 4 4" />
+              </svg>
+            </button>
+            {/* Status history */}
+            <button
+              type="button"
+              onClick={() => setStatusModal({ isOpen: true, booking: row })}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--radius-lg, 10px)',
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: 'var(--color-success-50, #f0fdf4)',
+                color: 'var(--color-success-500, #22c55e)',
+                transition: 'all .18s ease',
+                lineHeight: 1,
+              }}
+              title={language === 'en' ? 'Status' : 'Estado'}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-success-100, #dcfce7)';
+                e.currentTarget.style.color = 'var(--color-success-600, #16a34a)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-success-50, #f0fdf4)';
+                e.currentTarget.style.color = 'var(--color-success-500, #22c55e)';
+              }}
             >
-              <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-            </svg>
-          </button>
-        </div>
-      ),
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+              </svg>
+            </button>
+          </div>
+        );
+      },
     },
   ];
 

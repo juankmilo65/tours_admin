@@ -301,7 +301,7 @@ export const uploadUserAvatar = async (
   try {
     const response = await axios.post(`${BASE_URL}/api/users/${userId}/avatar`, formData, {
       headers: {
-        Authorization: token !== undefined && token !== '' ? token : '',
+        Authorization: token !== undefined && token !== '' ? `Bearer ${token}` : '',
         'Content-Type': 'multipart/form-data',
         'X-Language': language,
       },
