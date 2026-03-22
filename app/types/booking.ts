@@ -99,7 +99,7 @@ export interface BookingClient {
   identificationTypeId?: string;
   clientId?: string | null;
   email?: string | null; // NEW - client email
-  userId?: string; // NEW - linked for primary client
+  userId?: string | null; // NEW - linked for primary client
   isPrimary?: boolean;
   user?: User; // User object if linked
 }
@@ -212,6 +212,7 @@ export interface Client {
   clientId?: string | null;
   countryCode?: string | null;
   email?: string | null; // renamed from clientEmail to match API
+  userId?: string | null; // NEW - for admin users or linking to user account
   isPrimary: boolean; // required, exactly one must be true
 }
 

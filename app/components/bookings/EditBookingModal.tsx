@@ -162,6 +162,7 @@ export function EditBookingModal({
       identificationTypeId: data.identificationTypeId,
       clientId: data.clientId,
       email: data.clientEmail,
+      userId: data.userId ?? null,
     };
 
     if (editingClientIndex !== null) {
@@ -239,6 +240,7 @@ export function EditBookingModal({
       countryCode: clientNationalities[editingClientIndex] ?? c.countryCode ?? '',
       identificationTypeId: c.identificationTypeId ?? '',
       clientId: c.clientId ?? '',
+      userId: c.userId ?? null,
     };
   };
 
@@ -1124,6 +1126,18 @@ export function EditBookingModal({
               clientNameMaxLength: bookingsT.clientNameMaxLength,
               clientAgeMin: bookingsT.clientAgeMin,
               clientAgeMax: bookingsT.clientAgeMax,
+              select: bookingsT.select,
+              selectUser: bookingsT.selectUser,
+              clientIdLabel: bookingsT.clientIdLabel,
+              enterEmail: bookingsT.enterEmail,
+              emailLabel: bookingsT.emailLabel,
+              nationalityLabel: bookingsT.nationalityLabel,
+              idTypeLabel: bookingsT.idTypeLabel,
+              editClient: bookingsT.editClient,
+              addClient: bookingsT.addClient,
+              cancel: bookingsT.cancel,
+              save: bookingsT.save,
+              add: bookingsT.add,
             }}
           />
 

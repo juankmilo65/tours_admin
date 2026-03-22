@@ -330,6 +330,7 @@ export function CreateBookingModal({
       countryCode: data.countryCode,
       identificationTypeId: data.identificationTypeId,
       clientId: data.clientId,
+      userId: data.userId ?? null,
       isPrimary: data.isPrimary ?? false,
     };
 
@@ -409,6 +410,7 @@ export function CreateBookingModal({
       countryCode: clientNationalities[editingClientIndex] ?? c.countryCode ?? '',
       identificationTypeId: c.identificationTypeId ?? '',
       clientId: c.clientId ?? '',
+      userId: c.userId ?? null,
       isPrimary: c.isPrimary ?? false,
     };
   };
@@ -1527,6 +1529,18 @@ export function CreateBookingModal({
                   t('bookings.clientNameMaxLength') ?? 'El nombre no puede exceder 100 caracteres',
                 clientAgeMin: t('bookings.clientAgeMin') ?? 'La edad no puede ser negativa',
                 clientAgeMax: t('bookings.clientAgeMax') ?? 'La edad no puede ser mayor a 120 años',
+                select: bookingsT.select,
+                selectUser: bookingsT.selectUser,
+                clientIdLabel: bookingsT.clientIdLabel,
+                enterEmail: bookingsT.enterEmail,
+                emailLabel: bookingsT.emailLabel,
+                nationalityLabel: bookingsT.nationalityLabel,
+                idTypeLabel: bookingsT.idTypeLabel,
+                editClient: bookingsT.editClient,
+                addClient: bookingsT.addClient,
+                cancel: bookingsT.cancel,
+                save: bookingsT.save,
+                add: bookingsT.add,
               }}
             />
 

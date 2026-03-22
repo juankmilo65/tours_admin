@@ -21,6 +21,7 @@ export interface ClientFormData {
   countryCode: string;
   identificationTypeId: string;
   clientId: string;
+  userId?: string | null;
   isPrimary?: boolean;
 }
 
@@ -50,6 +51,18 @@ interface ClientFormModalProps {
     clientNameMaxLength: string;
     clientAgeMin: string;
     clientAgeMax: string;
+    select: string;
+    selectUser: string;
+    clientIdLabel: string;
+    enterEmail: string;
+    emailLabel: string;
+    nationalityLabel: string;
+    idTypeLabel: string;
+    editClient: string;
+    addClient: string;
+    cancel: string;
+    save: string;
+    add: string;
   };
 }
 
@@ -119,7 +132,7 @@ export function ClientFormModal({
     const errs: Partial<Record<string, string>> = {};
 
     if (!form.clientName.trim()) {
-      errs.clientName = `${tr.clientName}: ${language === 'en' ? 'Required' : 'Requerido'}`;
+      errs.clientName = `${tr.clientName}`;
     } else if (form.clientName.trim().length < 3) {
       errs.clientName = tr.clientNameMinLength;
     } else if (form.clientName.trim().length > 100) {
@@ -146,7 +159,9 @@ export function ClientFormModal({
 
   const handleSave = (): void => {
     if (!validate()) return;
-    onSave(form);
+    // Include selectedUserId if it's set (admin selecting a user)
+    const dataToSave = { ...form, userId: selectedUserId || form.userId };
+    onSave(dataToSave);
   };
 
   const handleNationalityChange = (code: string): void => {
@@ -162,6 +177,10 @@ export function ClientFormModal({
   if (!isOpen) return null;
 
   const isEdit = initialData !== null && initialData !== undefined;
+
+  // Determine if fields should be disabled (first client, not edit, and "Seleccione" is selected)
+  const shouldDisableFields =
+    showPrimary && isFirstClient && !isEdit && users.length > 0 && !selectedUserId;
 
   return (
     <div
@@ -201,13 +220,7 @@ export function ClientFormModal({
           }}
         >
           <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>
-            {isEdit
-              ? language === 'en'
-                ? 'Edit Client'
-                : 'Editar Cliente'
-              : language === 'en'
-                ? 'Add Client'
-                : 'Agregar Cliente'}
+            {isEdit ? tr.editClient : tr.addClient}
           </h3>
           <button
             type="button"
@@ -308,12 +321,10 @@ export function ClientFormModal({
           {/* User Select - Only show for first client in add mode when there are users */}
           {showPrimary && isFirstClient && !isEdit && users.length > 0 && (
             <div>
-              <label style={labelStyle}>
-                {language === 'en' ? 'Select User' : 'Seleccionar Usuario'}
-              </label>
+              <label style={labelStyle}>{tr.selectUser}</label>
               <Select
                 options={[
-                  { value: '', label: language === 'en' ? 'Manual Entry' : 'Ingreso Manual' },
+                  { value: '', label: tr.select },
                   ...users.map((u) => ({
                     value: u.id,
                     label: u.name,
@@ -342,7 +353,7 @@ export function ClientFormModal({
                     setForm((p) => ({ ...p, clientName: '', clientEmail: '' }));
                   }
                 }}
-                placeholder={language === 'en' ? 'Select User' : 'Seleccionar Usuario'}
+                placeholder={tr.selectUser}
                 id="client-modal-user"
               />
             </div>
@@ -375,19 +386,21 @@ export function ClientFormModal({
                 }}
                 placeholder={tr.clientNamePlaceholder}
                 error={errors.clientName}
+                disabled={shouldDisableFields}
               />
             </div>
 
             {/* Client Email */}
             <div>
-              <label style={labelStyle}>{language === 'en' ? 'Email' : 'Correo Electrónico'}</label>
+              <label style={labelStyle}>{tr.emailLabel}</label>
               <Input
                 type="email"
                 value={form.clientEmail ?? ''}
                 onChange={(e) => {
                   setForm((p) => ({ ...p, clientEmail: e.target.value }));
                 }}
-                placeholder={language === 'en' ? 'Enter email' : 'Ingresar correo'}
+                placeholder={tr.enterEmail}
+                disabled={shouldDisableFields}
               />
             </div>
 
@@ -412,14 +425,14 @@ export function ClientFormModal({
                 min={0}
                 max={120}
                 error={errors.clientAge}
+                disabled={shouldDisableFields}
               />
             </div>
 
             {/* Nationality */}
             <div>
               <label style={labelStyle}>
-                {language === 'en' ? 'Nationality' : 'Nacionalidad'}{' '}
-                <span style={{ color: 'red' }}>*</span>
+                {tr.nationalityLabel} <span style={{ color: 'red' }}>*</span>
               </label>
               <Select
                 options={[
@@ -436,6 +449,7 @@ export function ClientFormModal({
                 onChange={handleNationalityChange}
                 placeholder={tr.selectNationality}
                 id="client-modal-nationality"
+                disabled={shouldDisableFields}
               />
               {errors.countryCode !== undefined && (
                 <p
@@ -453,8 +467,7 @@ export function ClientFormModal({
             {/* ID Type */}
             <div>
               <label style={labelStyle}>
-                {language === 'en' ? 'ID Type' : 'Tipo de ID'}{' '}
-                <span style={{ color: 'red' }}>*</span>
+                {tr.idTypeLabel} <span style={{ color: 'red' }}>*</span>
               </label>
               <Select
                 options={[
@@ -476,7 +489,7 @@ export function ClientFormModal({
                 }}
                 placeholder={tr.selectIdType}
                 id="client-modal-idtype"
-                disabled={form.countryCode === ''}
+                disabled={form.countryCode === '' || shouldDisableFields}
               />
               {errors.identificationTypeId !== undefined && (
                 <p
@@ -493,12 +506,13 @@ export function ClientFormModal({
 
             {/* Client ID */}
             <div>
-              <label style={labelStyle}>{language === 'en' ? 'Client ID' : 'ID Cliente'}</label>
+              <label style={labelStyle}>{tr.clientIdLabel}</label>
               <Input
                 type="text"
                 value={form.clientId}
                 onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))}
                 placeholder={tr.enterClientId}
+                disabled={shouldDisableFields}
               />
             </div>
           </div>
@@ -515,16 +529,15 @@ export function ClientFormModal({
           }}
         >
           <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
-            {language === 'en' ? 'Cancel' : 'Cancelar'}
+            {tr.cancel}
           </button>
-          <button type="button" onClick={handleSave} className="modal-btn modal-btn-primary">
-            {isEdit
-              ? language === 'en'
-                ? 'Save'
-                : 'Guardar'
-              : language === 'en'
-                ? 'Add'
-                : 'Agregar'}
+          <button
+            type="button"
+            onClick={handleSave}
+            className="modal-btn modal-btn-primary"
+            disabled={shouldDisableFields}
+          >
+            {isEdit ? tr.save : tr.add}
           </button>
         </div>
       </div>
