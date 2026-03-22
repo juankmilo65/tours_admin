@@ -90,8 +90,10 @@ export function BookingStatusModal({
     setLoadingData(true);
 
     const currentCode = booking.status;
+
+    // Solo consultar el próximo estado si no es 'cancelled' o 'confirmed' (sí consultar para 'paid')
     const needsNextStatus =
-      Boolean(currentCode) && currentCode !== 'cancelled' && currentCode !== 'paid';
+      Boolean(currentCode) && currentCode !== 'cancelled' && currentCode !== 'confirmed';
 
     const fetchNextStatus = needsNextStatus
       ? getNextBookingStatusBusiness(currentCode, token ?? undefined, language)
@@ -405,8 +407,8 @@ export function BookingStatusModal({
             </button>
           )}
 
-          {/* Mensajes de error, fuera de flujo o estado final */}
-          {!loadingData && nextStatusError && (
+          {/* Mensajes de error, fuera de flujo o estado final, pero NO mostrar si es 'confirmed' y no se consultó siguiente estado */}
+          {!loadingData && nextStatusError && booking.status !== 'confirmed' && (
             <div
               style={{
                 flex: 1,
@@ -425,7 +427,11 @@ export function BookingStatusModal({
             </div>
           )}
           {/* Next status button solo si hay siguiente estado y no hay error */}
-          {!loadingData && nextStatus && !nextStatusError && isActiveStatus ? (
+          {!loadingData &&
+          nextStatus &&
+          !nextStatusError &&
+          isActiveStatus &&
+          nextStatus.nextStatusName ? (
             <button
               type="button"
               disabled={isTransitioning}
@@ -443,8 +449,8 @@ export function BookingStatusModal({
               }}
             >
               {language === 'en'
-                ? `→ ${nextStatus.nextStatusName.en}`
-                : `→ ${nextStatus.nextStatusName.es}`}
+                ? `→ ${nextStatus.nextStatusName?.en ?? ''}`
+                : `→ ${nextStatus.nextStatusName?.es ?? ''}`}
             </button>
           ) : null}
         </div>
