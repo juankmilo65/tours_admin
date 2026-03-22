@@ -1,7 +1,7 @@
 /**
  * BookingStatusModal
  * Shows the status history of a booking and allows transitioning to the next status
- * or cancelling the booking.
+ * or cancelling of booking.
  */
 
 import type { JSX } from 'react';
@@ -25,6 +25,14 @@ interface BookingStatusModalProps {
   booking: Booking | null;
   onClose: () => void;
   onSuccess: () => void;
+}
+
+// Extended type for next status API response
+interface NextStatusApiResponse {
+  success: boolean;
+  data: NextBookingStatus | null;
+  isOutOfFlow?: boolean;
+  message?: string;
 }
 
 // Map status codes -> colour pair [bg, text]
@@ -55,6 +63,7 @@ function formatDate(iso: string, locale: string): string {
   }
 }
 
+/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 export function BookingStatusModal({
   isOpen,
   booking,
@@ -67,6 +76,7 @@ export function BookingStatusModal({
   const token = useAppSelector(selectAuthToken);
 
   const [nextStatus, setNextStatus] = useState<NextBookingStatus | null>(null);
+  const [nextStatusError, setNextStatusError] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [history, setHistory] = useState<BookingStatusHistoryEntry[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -75,6 +85,7 @@ export function BookingStatusModal({
   useEffect(() => {
     if (!isOpen || !booking) return;
     setNextStatus(null);
+    setNextStatusError(null);
     setHistory([]);
     setLoadingData(true);
 
@@ -84,17 +95,44 @@ export function BookingStatusModal({
 
     const fetchNextStatus = needsNextStatus
       ? getNextBookingStatusBusiness(currentCode, token ?? undefined, language)
-      : Promise.resolve({ data: null });
+      : Promise.resolve({ success: false, data: null });
 
     const fetchHistory = getBookingStatusHistoryBusiness(booking.id, token ?? undefined, language);
 
     void Promise.all([fetchNextStatus, fetchHistory])
-      .then(([nextRes, historyRes]) => {
-        setNextStatus(nextRes.data);
-        if (historyRes.success && historyRes.data) {
-          setHistory(historyRes.data.history);
+      .then(
+        ([nextRes, historyRes]: [
+          NextStatusApiResponse,
+          { success: boolean; data: { history: BookingStatusHistoryEntry[] } | null },
+        ]) => {
+          if (nextRes.success && nextRes.data) {
+            setNextStatus(nextRes.data);
+          } else if (nextRes.isOutOfFlow === true) {
+            setNextStatusError(
+              nextRes.message ??
+                (language === 'en'
+                  ? 'This status is outside of main flow.'
+                  : 'Este estado está fuera del flujo principal.')
+            );
+          } else if (nextRes.data === null && nextRes.success) {
+            setNextStatusError(
+              language === 'en'
+                ? 'This booking is already at the final status.'
+                : 'La reserva ya está en el estado final del flujo.'
+            );
+          } else if (!nextRes.success) {
+            setNextStatusError(
+              nextRes.message ??
+                (language === 'en'
+                  ? 'Error fetching next status.'
+                  : 'Error obteniendo el siguiente estado.')
+            );
+          }
+          if (historyRes.success && historyRes.data !== null) {
+            setHistory(historyRes.data.history);
+          }
         }
-      })
+      )
       .finally(() => {
         setLoadingData(false);
       });
@@ -159,6 +197,8 @@ export function BookingStatusModal({
   };
 
   if (!isOpen || !booking) return null;
+
+  const isActiveStatus: boolean = booking.status !== null && booking.status !== 'cancelled';
 
   return (
     <div
@@ -344,7 +384,7 @@ export function BookingStatusModal({
           }}
         >
           {/* Cancel button – always shown unless already cancelled */}
-          {!loadingData && booking.status !== 'cancelled' && (
+          {!loadingData && isActiveStatus && (
             <button
               type="button"
               disabled={isTransitioning}
@@ -365,8 +405,27 @@ export function BookingStatusModal({
             </button>
           )}
 
-          {/* Next status button */}
-          {!loadingData && nextStatus !== null && booking.status !== 'cancelled' ? (
+          {/* Mensajes de error, fuera de flujo o estado final */}
+          {!loadingData && nextStatusError && (
+            <div
+              style={{
+                flex: 1,
+                color: '#b91c1c',
+                background: '#fee2e2',
+                borderRadius: 8,
+                padding: '10px 16px',
+                fontSize: '0.92rem',
+                marginRight: 'auto',
+                marginTop: 4,
+                marginBottom: 4,
+                maxWidth: '100%',
+              }}
+            >
+              {nextStatusError}
+            </div>
+          )}
+          {/* Next status button solo si hay siguiente estado y no hay error */}
+          {!loadingData && nextStatus && !nextStatusError && isActiveStatus ? (
             <button
               type="button"
               disabled={isTransitioning}
