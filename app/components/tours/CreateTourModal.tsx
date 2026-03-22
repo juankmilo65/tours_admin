@@ -942,11 +942,6 @@ export function CreateTourModal({
         zIndex: 10000,
         padding: 'var(--space-4)',
       }}
-      onClick={(e) => {
-        if (e.currentTarget === e.target) {
-          handleRequestClose();
-        }
-      }}
     >
       <div
         style={{

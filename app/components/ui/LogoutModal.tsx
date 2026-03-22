@@ -121,7 +121,6 @@ export function LogoutModal(): JSX.Element | null {
         zIndex: 9999,
         backdropFilter: 'blur(4px)',
       }}
-      onClick={handleClose}
     >
       <div
         style={{

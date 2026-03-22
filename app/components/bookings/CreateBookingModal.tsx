@@ -693,11 +693,6 @@ export function CreateBookingModal({
         zIndex: 10000,
         padding: 'var(--space-4)',
       }}
-      onClick={(e) => {
-        if (e.currentTarget === e.target && onClose !== undefined) {
-          onClose();
-        }
-      }}
     >
       <div
         style={{

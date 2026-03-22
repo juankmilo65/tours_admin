@@ -38,9 +38,6 @@ export function BookingClientsModal({
         justifyContent: 'center',
         zIndex: 10000,
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
     >
       <div
         role="dialog"

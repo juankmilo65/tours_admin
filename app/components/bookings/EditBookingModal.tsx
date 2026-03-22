@@ -441,9 +441,6 @@ export function EditBookingModal({
         zIndex: 10000,
         padding: 'var(--space-4)',
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
     >
       <div
         style={{

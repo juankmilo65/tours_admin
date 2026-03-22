@@ -195,9 +195,6 @@ export function ClientFormModal({
         zIndex: 10001,
         padding: 'var(--space-4)',
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
     >
       <div
         style={{
