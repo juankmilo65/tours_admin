@@ -121,7 +121,8 @@ export function ClientFormModal({
         void loadIdentificationTypes(initialData.countryCode, language);
       }
     } else {
-      setForm({ ...emptyForm });
+      // Si es el primer cliente, setear isPrimary en true por defecto
+      setForm({ ...emptyForm, isPrimary: showPrimary && isFirstClient ? true : false });
     }
     setErrors({});
     void loadNationalities(language);
@@ -286,7 +287,7 @@ export function ClientFormModal({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                cursor: 'pointer',
+                cursor: 'default',
                 fontSize: 'var(--text-sm)',
                 fontWeight: 500,
                 color: 'var(--color-neutral-700)',
@@ -303,11 +304,11 @@ export function ClientFormModal({
               <input
                 type="checkbox"
                 checked={form.isPrimary === true}
-                onChange={(e) => setForm((p) => ({ ...p, isPrimary: e.target.checked }))}
+                disabled={true}
                 style={{
                   width: 16,
                   height: 16,
-                  cursor: 'pointer',
+                  cursor: 'default',
                   accentColor: 'var(--color-primary-500)',
                 }}
               />

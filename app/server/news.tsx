@@ -194,7 +194,7 @@ export const createNews = async (
   }
 
   const newsEndpoint = 'news';
-  const newsService = createServiceREST(BASE_URL, newsEndpoint, `Bearer ${token}`);
+  const newsService = createServiceREST(BASE_URL, newsEndpoint, token);
 
   const result = await newsService.create(data, {
     headers: {

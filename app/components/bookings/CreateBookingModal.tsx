@@ -323,6 +323,8 @@ export function CreateBookingModal({
   };
 
   const handleClientModalSave = (data: ClientFormData): void => {
+    // Si es el primer cliente, forzar isPrimary a true
+    const isFirstClient = formData.clients.length === 0 && editingClientIndex === null;
     const client: Client = {
       clientName: data.clientName,
       clientAge: Number(data.clientAge),
@@ -331,7 +333,7 @@ export function CreateBookingModal({
       identificationTypeId: data.identificationTypeId,
       clientId: data.clientId,
       userId: data.userId ?? null,
-      isPrimary: data.isPrimary ?? false,
+      isPrimary: isFirstClient ? true : (data.isPrimary ?? false),
     };
 
     if (editingClientIndex !== null) {
@@ -1244,8 +1246,7 @@ export function CreateBookingModal({
                                 color: '#1d4ed8',
                               }}
                             >
-                              {t('bookings.primaryLabel') ??
-                                (language === 'en' ? 'Primary' : 'Principal')}
+                              {bookingsT.primaryLabel}
                             </span>
                           )}
                         </div>

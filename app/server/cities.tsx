@@ -203,7 +203,7 @@ export const createCity = async (
 
   const citiesEndpoint = 'cities';
   // createServiceREST takes (url, endpoint, token). The token argument is used as the Authorization header value.
-  const citiesService = createServiceREST(BASE_URL, citiesEndpoint, `Bearer ${token}`);
+  const citiesService = createServiceREST(BASE_URL, citiesEndpoint, token);
 
   const result = await citiesService.create(data, {
     headers: {
@@ -264,7 +264,7 @@ export const updateCity = async (
   }
 
   const citiesEndpoint = `cities/${cityId}`;
-  const citiesService = createServiceREST(BASE_URL, 'cities', `Bearer ${token}`);
+  const citiesService = createServiceREST(BASE_URL, 'cities', token);
 
   const result = await citiesService.update(data, {
     headers: {

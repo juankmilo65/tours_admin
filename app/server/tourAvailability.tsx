@@ -42,7 +42,7 @@ export async function getTourAvailability(
 
   try {
     const endpoint = `tours/${tourId}/availability`;
-    const service = createServiceREST(BASE_URL, endpoint, `Bearer ${token}`);
+    const service = createServiceREST(BASE_URL, endpoint, token);
 
     console.warn('🌐 [GET TOUR AVAILABILITY] Calling backend with query params:', {
       startDate,

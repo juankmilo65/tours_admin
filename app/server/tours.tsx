@@ -291,7 +291,7 @@ export const cloneTour = async (
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
         },
         timeout: 30000, // 30s timeout for clone (images may take time)
       }
@@ -343,7 +343,7 @@ export const deleteTourPhysical = async (
     const response = await axios.delete<{ success: boolean; message?: string }>(fullUrl, {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
       },
       timeout: 15000, // 15s timeout
     });

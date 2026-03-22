@@ -187,7 +187,7 @@ export const createCategory = async (
   }
 
   const categoriesEndpoint = 'categories';
-  const categoriesService = createServiceREST(BASE_URL, categoriesEndpoint, `Bearer ${token}`);
+  const categoriesService = createServiceREST(BASE_URL, categoriesEndpoint, token);
 
   const result = await categoriesService.create(data, {
     headers: {
@@ -248,7 +248,7 @@ export const updateCategory = async (
   }
 
   const categoriesEndpoint = `categories/${categoryId}`;
-  const categoriesService = createServiceREST(BASE_URL, 'categories', `Bearer ${token}`);
+  const categoriesService = createServiceREST(BASE_URL, 'categories', token);
 
   const result = await categoriesService.update(data, {
     headers: {
@@ -272,7 +272,7 @@ export const toggleCategoryStatus = async (
   }
 
   const categoriesEndpoint = `categories/${categoryId}/toggle-status`;
-  const categoriesService = createServiceREST(BASE_URL, 'categories', `Bearer ${token}`);
+  const categoriesService = createServiceREST(BASE_URL, 'categories', token);
 
   const result = await categoriesService.update(
     {},

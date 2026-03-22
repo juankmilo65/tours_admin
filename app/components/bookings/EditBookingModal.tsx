@@ -163,19 +163,38 @@ export function EditBookingModal({
       clientId: data.clientId,
       email: data.clientEmail,
       userId: data.userId ?? null,
+      isPrimary: data.isPrimary ?? false,
     };
 
     if (editingClientIndex !== null) {
-      // Update existing
-      setFormData((p) => ({
-        ...p,
-        clients: p.clients.map((c, i) => (i === editingClientIndex ? updatedClient : c)),
-      }));
+      // Update existing client
+      setFormData((p) => {
+        const newClients = p.clients.map((c, i) => (i === editingClientIndex ? updatedClient : c));
+        // If this client was marked primary, unmark all others
+        if (updatedClient.isPrimary === true) {
+          return {
+            ...p,
+            clients: newClients.map((c, i) =>
+              i === editingClientIndex ? c : { ...c, isPrimary: false }
+            ),
+          };
+        }
+        return { ...p, clients: newClients };
+      });
       setClientNationalities((p) => ({ ...p, [editingClientIndex]: data.countryCode }));
     } else {
-      // Add new
+      // Add new client
       const newIndex = formData.clients.length;
-      setFormData((p) => ({ ...p, clients: [...p.clients, updatedClient] }));
+      setFormData((p) => {
+        // If new client is marked primary, unmark all existing clients
+        if (updatedClient.isPrimary === true) {
+          return {
+            ...p,
+            clients: [...p.clients.map((c) => ({ ...c, isPrimary: false })), updatedClient],
+          };
+        }
+        return { ...p, clients: [...p.clients, updatedClient] };
+      });
       setClientNationalities((p) => ({ ...p, [newIndex]: data.countryCode }));
     }
 
@@ -241,6 +260,7 @@ export function EditBookingModal({
       identificationTypeId: c.identificationTypeId ?? '',
       clientId: c.clientId ?? '',
       userId: c.userId ?? null,
+      isPrimary: c.isPrimary ?? false,
     };
   };
 
@@ -1107,6 +1127,8 @@ export function EditBookingModal({
             isOpen={clientModalOpen}
             language={language}
             initialData={getClientModalInitialData()}
+            showPrimary={true}
+            isFirstClient={false}
             onSave={handleClientModalSave}
             onClose={() => setClientModalOpen(false)}
             translations={{

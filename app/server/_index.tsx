@@ -52,7 +52,7 @@ function createServiceREST<T = unknown>(url: string, endpoint: string, token: st
       headers:
         token !== ''
           ? {
-              Authorization: `Bearer ${token}`,
+              Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
             }
           : {},
     };

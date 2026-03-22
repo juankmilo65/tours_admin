@@ -324,13 +324,28 @@ export default function Bookings(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit]);
 
+  // Auto-select current user as provider for non-admin
+  useEffect(() => {
+    if (!isAdmin && currentUser?.id !== undefined && userFilter !== currentUser.id) {
+      setUserFilter(currentUser.id);
+      setHasSearched(true);
+      setPage(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, currentUser]);
+
   // Auto-load bookings when country changes (not filters)
   useEffect(() => {
+    // Skip if non-admin user hasn't been auto-selected yet
+    if (!isAdmin && (currentUser?.id === undefined || userFilter !== currentUser.id)) {
+      return;
+    }
+
     if (countryId !== undefined && countryId !== null && countryId !== '') {
       void refreshBookings();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countryId]);
+  }, [countryId, isAdmin, currentUser, userFilter]);
 
   // Reload statuses when language changes
   useEffect(() => {

@@ -34,6 +34,8 @@ export interface UserDropdownOption {
 export const NATIONALITIES_TTL = 24 * 60 * 60 * 1000;
 /** TTL for identification types per country — 24 h */
 export const ID_TYPES_TTL = 24 * 60 * 60 * 1000;
+/** TTL for users dropdown — 5 minutes to respect rate limiting */
+export const USERS_TTL = 5 * 60 * 1000;
 
 interface CacheState {
   // Dropdown data by language code

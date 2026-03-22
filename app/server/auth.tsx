@@ -187,14 +187,14 @@ export const requestEmailVerification = async (payload: {
 };
 
 /**
- * Verify email
+ * Verify email with token
  */
 export const verifyEmail = async (
   payload: { otp: string; email: string },
   token: string
 ): Promise<VerifyEmailResponse> => {
   try {
-    const authService = createServiceREST(BASE_URL, 'users/verify-email', `Bearer ${token}`);
+    const authService = createServiceREST(BASE_URL, 'users/verify-email', token);
 
     const result = await authService.create(payload);
 

@@ -179,7 +179,7 @@ export const createOffer = async (
   }
 
   const offersEndpoint = 'offers';
-  const offersService = createServiceREST(BASE_URL, offersEndpoint, `Bearer ${token}`);
+  const offersService = createServiceREST(BASE_URL, offersEndpoint, token);
 
   const result = await offersService.create(offerData, {
     headers: {
@@ -203,7 +203,7 @@ export const updateOffer = async (
   }
 
   const offersEndpoint = `offers/${id}`;
-  const offersService = createServiceREST(BASE_URL, 'offers', `Bearer ${token}`);
+  const offersService = createServiceREST(BASE_URL, 'offers', token);
 
   const result = await offersService.update(offerData, {
     headers: {
@@ -223,7 +223,7 @@ export const deleteOffer = async (id: string, token: string): Promise<unknown> =
   }
 
   const offersEndpoint = `offers/${id}`;
-  const offersService = createServiceREST(BASE_URL, offersEndpoint, `Bearer ${token}`);
+  const offersService = createServiceREST(BASE_URL, offersEndpoint, token);
 
   const result = await offersService.delete();
   return result;
@@ -250,7 +250,7 @@ export const uploadOfferImage = async (
   try {
     const response = await axios.post(`${BASE_URL}/api/offers/${offerId}/image`, formData, {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: token,
         'Content-Type': 'multipart/form-data',
         'X-Language': language,
       },
@@ -282,7 +282,7 @@ export const deleteOfferImage = async (
   try {
     const response = await axios.delete(`${BASE_URL}/api/offers/${offerId}/image`, {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: token,
         'X-Language': language,
       },
     });
@@ -309,7 +309,7 @@ export const toggleOfferStatus = async (
   }
 
   const offersEndpoint = `offers/${offerId}/toggle-status`;
-  const offersService = createServiceREST(BASE_URL, 'offers', `Bearer ${token}`);
+  const offersService = createServiceREST(BASE_URL, 'offers', token);
 
   const result = await offersService.update(
     {},

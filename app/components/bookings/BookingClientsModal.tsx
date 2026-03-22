@@ -131,8 +131,36 @@ export function BookingClientsModal({
 
                   {/* Client info */}
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#111827' }}>
-                      {client.clientName}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#111827' }}>
+                        {client.clientName}
+                      </div>
+                      {client.isPrimary === true && (
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 600,
+                            padding: '2px 8px',
+                            borderRadius: 9999,
+                            background: '#dbeafe',
+                            color: '#1d4ed8',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <svg
+                            width="10"
+                            height="10"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            color="#1d4ed8"
+                          >
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                          </svg>
+                          {language === 'en' ? 'Primary' : 'Principal'}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 2 }}>
                       {bookingsT.clientAge}: {client.clientAge}{' '}

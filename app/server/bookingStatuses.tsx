@@ -32,7 +32,7 @@ export const getNextBookingStatusService = async (
 
   try {
     const endpoint = `booking-statuses/${currentStatusCode}/next`;
-    const service = createServiceREST(BASE_URL, endpoint, `Bearer ${token ?? ''}`);
+    const service = createServiceREST(BASE_URL, endpoint, token ?? '');
     const result = (await service.get({
       headers: { 'X-Language': language },
     })) as { success?: boolean; data?: NextBookingStatus | null };
@@ -65,7 +65,7 @@ export const getBookingStatusesService = async (
 
   try {
     const statusesEndpoint = 'booking-statuses';
-    const statusesService = createServiceREST(BASE_URL, statusesEndpoint, `Bearer ${token ?? ''}`);
+    const statusesService = createServiceREST(BASE_URL, statusesEndpoint, token ?? '');
 
     const result = await statusesService.get({
       headers: {

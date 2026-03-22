@@ -21,14 +21,18 @@ import type { RootState } from '~/store/index';
 import {
   setNationalities,
   setIdentificationTypesByNationality,
+  setUsers,
   isCacheValid,
   NATIONALITIES_TTL,
   ID_TYPES_TTL,
+  USERS_TTL,
 } from '~/store/slices/cacheSlice';
 import { getCountriesDropdownBusiness } from '~/server/businessLogic/countriesBusinessLogic';
 import { getIdentificationTypesDropdownBusiness } from '~/server/businessLogic/identificationTypesBusinessLogic';
+import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import type { CountryDropdown } from '~/types/country';
 import type { IdentificationTypeDropdown } from '~/types/identificationType';
+import type { UserDropdownOption } from '~/store/slices/cacheSlice';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,6 +51,17 @@ export interface UseDropdownCacheReturn {
     countryCode: string,
     language: string
   ) => Promise<IdentificationTypeDropdown[]>;
+
+  /**
+   * Load (or reuse from cache) users dropdown for admin filters.
+   * Dispatches to Redux on a cache miss; returns the list once ready.
+   */
+  loadUsers: (
+    roles: string[] | null,
+    isActive: string | null,
+    token: string | undefined,
+    language: string
+  ) => Promise<UserDropdownOption[]>;
 }
 
 /**
@@ -65,6 +80,8 @@ export function useDropdownCache(): UseDropdownCacheReturn {
   const natTsRef = useRef<Record<string, number>>({});
   const idRef = useRef<Record<string, IdentificationTypeDropdown[]>>({});
   const idTsRef = useRef<Record<string, number>>({});
+  const usersRef = useRef<Record<string, UserDropdownOption[]>>({});
+  const usersTsRef = useRef<Record<string, number>>({});
 
   // Keep refs in sync after each render — safe, no side effects during render
   const natState = useAppSelector((state: RootState) => state.cache.nationalities);
@@ -75,6 +92,8 @@ export function useDropdownCache(): UseDropdownCacheReturn {
   const idTsState = useAppSelector(
     (state: RootState) => state.cache.identificationTypesByNationalityTimestamp
   );
+  const usersState = useAppSelector((state: RootState) => state.cache.users);
+  const usersTsState = useAppSelector((state: RootState) => state.cache.usersTimestamp);
 
   useEffect(() => {
     natRef.current = natState;
@@ -88,6 +107,12 @@ export function useDropdownCache(): UseDropdownCacheReturn {
   useEffect(() => {
     idTsRef.current = idTsState;
   }, [idTsState]);
+  useEffect(() => {
+    usersRef.current = usersState;
+  }, [usersState]);
+  useEffect(() => {
+    usersTsRef.current = usersTsState;
+  }, [usersTsState]);
 
   // ── Load nationalities ─────────────────────────────────────────────────────
 
@@ -143,7 +168,47 @@ export function useDropdownCache(): UseDropdownCacheReturn {
     [dispatch]
   );
 
-  return { loadNationalities, loadIdentificationTypes };
+  // ── Load users ─────────────────────────────────────────────────────────────
+
+  const loadUsers = useCallback(
+    async (
+      roles: string[] | null,
+      isActive: string | null,
+      token: string | undefined,
+      language: string
+    ): Promise<UserDropdownOption[]> => {
+      if (token === undefined || token === '') return [];
+
+      // Create cache key from token
+      const cacheKey = token;
+
+      const cached = usersRef.current[cacheKey];
+      const ts = usersTsRef.current[cacheKey];
+
+      if (cached !== undefined && isCacheValid(ts, USERS_TTL)) {
+        return cached;
+      }
+
+      const res = await getUsersDropdownBusiness(roles, isActive, token, language);
+
+      if (res.success === true && res.data !== undefined) {
+        // Transform the data to match UserDropdownOption interface
+        const transformedData: UserDropdownOption[] = res.data.map((user) => ({
+          id: user.id,
+          name: user.firstName,
+          email: user.email,
+        }));
+
+        dispatch(setUsers({ token: cacheKey, data: transformedData }));
+        return transformedData;
+      }
+
+      return cached ?? [];
+    },
+    [dispatch]
+  );
+
+  return { loadNationalities, loadIdentificationTypes, loadUsers };
 }
 
 // ── Selector hooks (reactive reads inside components) ────────────────────────

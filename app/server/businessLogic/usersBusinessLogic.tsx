@@ -16,6 +16,10 @@ import {
 
 export type { User, CreateUserDto, UpdateUserDto, UsersResponse, GetUsersParams };
 
+// In-memory cache for users dropdown to avoid rate limiting
+const usersDropdownCache = new Map<string, { data: User[]; timestamp: number }>();
+const USERS_DROPDOWN_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Get all users with filters and pagination
  */
@@ -265,13 +269,51 @@ export const getUsersDropdownBusiness = async (
   data?: Array<{ id: string; firstName: string; email: string }>;
 }> => {
   try {
+    // Create cache key from parameters
+    const cacheKey = JSON.stringify({
+      roles: roles?.sort(),
+      isActive,
+      language,
+    });
+
+    // Check cache first
+    const cached = usersDropdownCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < USERS_DROPDOWN_TTL) {
+      console.log('📦 [USERS CACHE] Using cached data');
+      const users = cached.data.map((user) => ({
+        id: user.id,
+        firstName: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+      }));
+      return { success: true, data: users };
+    }
+
+    // Fetch from API if cache miss or expired
     const result = (await getUsersDropdown(roles, isActive, token, language)) as {
       success?: boolean;
       data?: User[];
     };
 
     if (result.success === true && result.data !== undefined) {
+      // Store in cache
+      usersDropdownCache.set(cacheKey, {
+        data: result.data,
+        timestamp: Date.now(),
+      });
+      console.log('💾 [USERS CACHE] Data cached');
+
       const users = result.data.map((user) => ({
+        id: user.id,
+        firstName: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+      }));
+      return { success: true, data: users };
+    }
+
+    // If API call fails but we have cached data, return it even if expired
+    if (cached && cached.data.length > 0) {
+      console.log('🔄 [USERS CACHE] API failed, returning stale cached data');
+      const users = cached.data.map((user) => ({
         id: user.id,
         firstName: `${user.firstName} ${user.lastName}`,
         email: user.email,
@@ -281,7 +323,32 @@ export const getUsersDropdownBusiness = async (
 
     return { success: false };
   } catch (error) {
-    console.error('Error in getUsersDropdownBusiness:', error);
+    console.error('❌ [USERS CACHE] Error in getUsersDropdownBusiness:', error);
+
+    // If there's a 429 error, try to return stale cached data
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ERR_BAD_REQUEST'
+    ) {
+      const cacheKey = JSON.stringify({
+        roles: roles?.sort(),
+        isActive,
+        language,
+      });
+      const cached = usersDropdownCache.get(cacheKey);
+      if (cached && cached.data.length > 0) {
+        console.log('🔄 [USERS CACHE] Rate limited, returning stale cached data');
+        const users = cached.data.map((user) => ({
+          id: user.id,
+          firstName: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+        }));
+        return { success: true, data: users };
+      }
+    }
+
     return { success: false };
   }
 };
