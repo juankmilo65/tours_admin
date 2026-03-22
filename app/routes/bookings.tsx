@@ -494,6 +494,7 @@ export default function Bookings(): JSX.Element {
           confirmed: { bg: '#e0e7ff', text: '#4338ca', dot: '#6366f1' },
           pending_payment: { bg: '#fef9c3', text: '#a16207', dot: '#eab308' },
           partially_paid: { bg: '#ffedd5', text: '#c2410c', dot: '#f97316' },
+          pending_confirmation: { bg: '#fef9c3', text: '#a16207', dot: '#eab308' },
         };
         const statusLabels: Record<string, string> = {
           pending: bookingsT.pending,
@@ -505,6 +506,7 @@ export default function Bookings(): JSX.Element {
           confirmed: bookingsT.confirmed,
           pending_payment: bookingsT.pendingPayment,
           partially_paid: bookingsT.partiallyPaid,
+          pending_confirmation: bookingsT.pending_confirmation,
         };
         const colors = statusColors[statusValue] ?? {
           bg: '#f3f4f6',
