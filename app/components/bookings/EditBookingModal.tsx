@@ -161,6 +161,7 @@ export function EditBookingModal({
       countryCode: data.countryCode,
       identificationTypeId: data.identificationTypeId,
       clientId: data.clientId,
+      email: data.clientEmail,
     };
 
     if (editingClientIndex !== null) {
@@ -234,6 +235,7 @@ export function EditBookingModal({
     return {
       clientName: c.clientName,
       clientAge: c.clientAge,
+      clientEmail: c.email ?? '',
       countryCode: clientNationalities[editingClientIndex] ?? c.countryCode ?? '',
       identificationTypeId: c.identificationTypeId ?? '',
       clientId: c.clientId ?? '',

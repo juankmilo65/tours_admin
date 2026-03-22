@@ -326,6 +326,7 @@ export function CreateBookingModal({
     const client: Client = {
       clientName: data.clientName,
       clientAge: Number(data.clientAge),
+      email: data.clientEmail,
       countryCode: data.countryCode,
       identificationTypeId: data.identificationTypeId,
       clientId: data.clientId,
@@ -404,6 +405,7 @@ export function CreateBookingModal({
     return {
       clientName: c.clientName,
       clientAge: c.clientAge,
+      clientEmail: c.email ?? '',
       countryCode: clientNationalities[editingClientIndex] ?? c.countryCode ?? '',
       identificationTypeId: c.identificationTypeId ?? '',
       clientId: c.clientId ?? '',

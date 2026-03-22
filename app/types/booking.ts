@@ -5,7 +5,7 @@
 
 export interface Booking {
   id: string;
-  userId: string;
+  userId?: string; // No longer at booking level - now in clients
   tourId: string;
   offerId?: string;
   tourTitle?: string;
@@ -97,8 +97,11 @@ export interface BookingClient {
   countryId?: string;
   countryCode?: string;
   identificationTypeId?: string;
-  clientId?: string;
+  clientId?: string | null;
+  email?: string | null; // NEW - client email
+  userId?: string; // NEW - linked for primary client
   isPrimary?: boolean;
+  user?: User; // User object if linked
 }
 
 export interface Country {
@@ -193,27 +196,31 @@ export interface BookingStatsResponse {
 
 export interface CreateBookingDto {
   tourId: string;
+  offerId?: string | null;
   startDate: string;
   endDate: string;
   clients: Client[];
-  currency: string;
+  specialRequests?: string | null;
+  totalPrice?: number | null;
+  minimumPayment?: number | null;
 }
 
 export interface Client {
   clientName: string;
   clientAge: number;
-  countryId?: string;
-  countryCode?: string;
-  identificationTypeId?: string;
-  clientId?: string;
-  isPrimary?: boolean;
+  identificationTypeId: string; // required
+  clientId?: string | null;
+  countryCode?: string | null;
+  email?: string | null; // renamed from clientEmail to match API
+  isPrimary: boolean; // required, exactly one must be true
 }
 
 export interface UpdateBookingDto {
-  startDate?: string;
-  endDate?: string;
+  startDate?: string | null;
+  endDate?: string | null;
   numberOfPeople?: number;
   status?: string;
+  statusCode?: string | null; // e.g., "paid", "cancelled"
   firstName1?: string;
   firstName2?: string;
   lastName1?: string;
@@ -221,6 +228,9 @@ export interface UpdateBookingDto {
   email?: string;
   phone?: string;
   countryId?: string;
+  specialRequests?: string | null;
+  clients?: Client[];
+  totalPrice?: number | null;
 }
 
 export interface CreatePaymentDto {
