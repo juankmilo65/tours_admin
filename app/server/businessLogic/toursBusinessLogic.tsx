@@ -179,31 +179,64 @@ export const getTourHourRangeBusiness = async (
   }
 
   try {
+    console.warn('🔍 getTourHourRangeBusiness - tourId:', tourId);
+
     const result = (await getTourHourRange(tourId, token)) as {
       success?: boolean;
       data?: {
         tourId?: string;
-        startHour?: string;
-        endHour?: string;
+        startHour?: string | null;
+        endHour?: string | null;
         daysCount?: number;
-        basePrice?: number;
+        basePrice?: string;
+        minimumPayment?: string | null;
         currency?: string;
       };
       message?: string;
     };
 
+    console.warn('🔍 getTourHourRange API response:', JSON.stringify(result, null, 2));
+
     if (result.success !== true || result.data === undefined) {
+      console.warn('❌ getTourHourRange failed:', result.message);
       return { success: false, message: result.message ?? 'Hour range not found' };
     }
 
-    const { startHour, endHour, daysCount, basePrice, currency } = result.data;
+    const { startHour, endHour, daysCount, basePrice, minimumPayment, currency } = result.data;
     const start = startHour ?? '';
     const end = endHour ?? '';
 
+    console.warn('🔍 Parsed values:', {
+      start,
+      end,
+      daysCount,
+      basePrice,
+      minimumPayment,
+      currency,
+    });
+
+    // Convert string prices to numbers, handling null/undefined
+    const basePriceNum =
+      basePrice !== null && basePrice !== undefined && basePrice !== ''
+        ? Number(basePrice)
+        : undefined;
+    const minimumPaymentNum =
+      minimumPayment !== null && minimumPayment !== undefined && minimumPayment !== ''
+        ? Number(minimumPayment)
+        : 0;
+
     if (start === '' && end === '') {
+      console.warn('ℹ️ No start/end hours, returning null hourRange');
       return {
         success: true,
-        data: { tourId, hourRange: null, daysCount: daysCount ?? 1, basePrice, currency },
+        data: {
+          tourId,
+          hourRange: null,
+          daysCount: daysCount ?? 1,
+          basePrice: basePriceNum,
+          minimumPayment: minimumPaymentNum,
+          currency,
+        },
       };
     }
 
@@ -216,12 +249,21 @@ export const getTourHourRangeBusiness = async (
             ? end
             : null;
 
+    console.warn('✅ Constructed hourRange:', hourRange);
+
     return {
       success: true,
-      data: { tourId, hourRange, daysCount: daysCount ?? 1, basePrice, currency },
+      data: {
+        tourId,
+        hourRange,
+        daysCount: daysCount ?? 1,
+        basePrice: basePriceNum,
+        minimumPayment: minimumPaymentNum,
+        currency,
+      },
     };
   } catch (error) {
-    console.error('Error in getTourHourRangeBusiness:', error);
+    console.error('💥 Error in getTourHourRangeBusiness:', error);
     return { success: false, message: 'Error fetching tour hour range' };
   }
 };

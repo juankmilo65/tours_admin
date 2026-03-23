@@ -180,8 +180,10 @@ export default function Select({
           borderRadius: '8px',
           border: '1px solid #d1d5db',
           fontSize: '14px',
-          color: '#111827',
-          backgroundColor: 'white',
+          color: disabled === true ? '#9ca3af' : '#111827',
+          backgroundColor: disabled === true ? '#f3f4f6' : 'white',
+          cursor: disabled === true ? 'not-allowed' : 'pointer',
+          opacity: disabled === true ? 0.6 : 1,
         }}
       >
         <span

@@ -468,8 +468,11 @@ select:focus {
 }
 
 .custom-select .custom-select-button[disabled] {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  background-color: var(--color-neutral-100);
+  color: var(--color-neutral-400);
+  border-color: var(--color-neutral-300);
 }
 
 .custom-select ul {
@@ -797,8 +800,15 @@ input[type='range']::-moz-range-track {
   transition: background-color 0.2s;
 }
 
-.modal-btn-add-client:hover {
+.modal-btn-add-client:hover:not(:disabled) {
   background-color: var(--color-primary-600);
+}
+
+.modal-btn-add-client:disabled {
+  background-color: var(--color-neutral-300);
+  color: var(--color-neutral-500);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 .login-link {
   margin-top: var(--space-6);

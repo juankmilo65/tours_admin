@@ -12,6 +12,7 @@ import { createBookingBusiness } from '~/server/businessLogic/bookingsBusinessLo
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken, selectAuth } from '~/store/slices/authSlice';
 import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
+import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import {
   getToursDropdownBusiness,
   getTourHourRangeBusiness,
@@ -32,6 +33,7 @@ import {
 import { getTourAvailabilityBusiness } from '~/server/businessLogic/tourAvailabilityBusinessLogic';
 import { TourAvailabilityDisplay } from '~/components/bookings/TourAvailabilityDisplay';
 import type { TourAvailabilityData } from '~/types/tourAvailability';
+import type { BookingTourActivity } from '~/types/booking';
 
 // The dropdown endpoint returns minimal tour info (same as offers)
 interface TourOption {
@@ -65,6 +67,7 @@ export function CreateBookingModal({
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectAuth).user;
+  const selectedCountryCurrency = useAppSelector(selectSelectedCurrencyCode);
 
   const [isBookingForMe, setIsBookingForMe] = useState(false);
 
@@ -81,6 +84,7 @@ export function CreateBookingModal({
   const [tourBasePrice, setTourBasePrice] = useState<number | null>(null);
   const [tourMinimumPayment, setTourMinimumPayment] = useState<number | null>(null);
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [tourActivities, setTourActivities] = useState<BookingTourActivity[]>([]);
 
   // Cache-first dropdown loaders
   const { loadNationalities } = useDropdownCache();
@@ -105,11 +109,12 @@ export function CreateBookingModal({
   // Reset all form state when the modal opens
   useEffect(() => {
     if (!isOpen) return;
+    const initialCurrency = selectedCountryCurrency;
     setFormData({
       tourId: '',
       startDate: '',
       endDate: '',
-      currency: 'MXN',
+      currency: initialCurrency,
       clients: [],
     });
     setErrors({});
@@ -125,6 +130,8 @@ export function CreateBookingModal({
     setTourAvailability(null);
     setAvailabilityError('');
     setTourBasePrice(null);
+    setTourActivities([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Load nationality dropdown into cache when modal opens or language changes
@@ -222,43 +229,95 @@ export function CreateBookingModal({
       setHourRange(null);
       setMinBookingDate('');
       setTourDaysCount(null);
+      setTourActivities([]);
       return;
     }
     const fetchTourDetails = async () => {
       setIsLoadingHourRange(true);
       try {
+        console.warn('🔄 Fetching tour details for:', formData.tourId);
+        console.warn('🔑 Token available:', token !== null && token !== '');
+
         // Fetch hour range
         const hourRangeResult = await getTourHourRangeBusiness(formData.tourId, token, language);
-        const newHourRange = hourRangeResult.success
-          ? (hourRangeResult.data?.hourRange ?? null)
-          : null;
-        setHourRange(newHourRange);
-        setTourDaysCount(
-          hourRangeResult.success ? (hourRangeResult.data?.daysCount ?? null) : null
-        );
-        setTourBasePrice(
-          hourRangeResult.success && hourRangeResult.data?.basePrice !== undefined
-            ? Number(hourRangeResult.data.basePrice)
-            : null
-        );
-        setTourMinimumPayment(
-          hourRangeResult.success && hourRangeResult.data?.minimumPayment !== undefined
-            ? Number(hourRangeResult.data.minimumPayment)
-            : null
-        );
 
-        // Fetch tour details to get country code
+        console.warn('📦 Hour Range Result:', JSON.stringify(hourRangeResult, null, 2));
+
+        // ✅ Validate response structure
+        if (!hourRangeResult?.success || !hourRangeResult.data) {
+          console.warn('Failed to fetch hour range:', hourRangeResult?.message);
+          setHourRange(null);
+          setTourDaysCount(null);
+          setTourBasePrice(null);
+          setTourMinimumPayment(null);
+        } else {
+          // ✅ Use optional chaining and nullish coalescing
+          const data = hourRangeResult.data;
+
+          console.warn('✅ Setting hour range data:', {
+            hourRange: data.hourRange,
+            daysCount: data.daysCount,
+            basePrice: data.basePrice,
+            minimumPayment: data.minimumPayment,
+          });
+
+          setHourRange(data.hourRange ?? null);
+          setTourDaysCount(data.daysCount ?? null);
+          setTourBasePrice(data.basePrice !== undefined ? Number(data.basePrice) : null);
+          setTourMinimumPayment(
+            data.minimumPayment !== undefined ? Number(data.minimumPayment) : null
+          );
+        }
+
+        // Fetch tour details to get country code and activities
         const tourResult = (await getTourByIdBusiness(formData.tourId, language, 'MXN', token)) as {
           success?: boolean;
-          data?: { city?: { countryId?: string } };
+          data?: {
+            city?: { countryId?: string };
+            days?: Array<{
+              day: number;
+              activities: BookingTourActivity[];
+            }>;
+          };
         };
-        if (tourResult.success === true && tourResult.data?.city?.countryId !== undefined) {
-          const countryCode = tourResult.data.city.countryId;
+        console.warn('🔍 Tour Result Full:', JSON.stringify(tourResult, null, 2));
+        console.warn('🔍 tourResult.success:', tourResult.success);
+        console.warn('🔍 tourResult.data:', tourResult.data);
+        console.warn('🔍 tourResult.data?.days:', tourResult.data?.days);
+
+        // ✅ Validate tour result
+        if (tourResult.success === true && tourResult.data !== undefined) {
+          const countryCode = tourResult.data.city?.countryId ?? '';
           setTourCountryCode(countryCode);
 
+          // Extract activities from days array
+          const days = tourResult.data.days ?? [];
+          const allActivities: BookingTourActivity[] = [];
+
+          days.forEach((dayItem) => {
+            const dayActivities = dayItem.activities ?? [];
+            allActivities.push(...dayActivities);
+          });
+
+          console.warn(
+            '✅ Setting activities from days:',
+            allActivities.length,
+            'activities:',
+            allActivities
+          );
+          setTourActivities(allActivities);
+
           // Calculate minimum booking date if we have tour start time
-          if (newHourRange !== null) {
-            const startTime = newHourRange.split(' - ')[0] ?? '';
+          const currentHourRange =
+            hourRangeResult.success &&
+            hourRangeResult.data?.hourRange !== null &&
+            hourRangeResult.data?.hourRange !== undefined &&
+            hourRangeResult.data.hourRange !== ''
+              ? hourRangeResult.data.hourRange
+              : null;
+
+          if (currentHourRange !== null) {
+            const startTime = currentHourRange.split(' - ')[0] ?? '';
             const minDate = getMinimumBookingDate(startTime, countryCode);
             setMinBookingDate(minDate);
           } else {
@@ -267,13 +326,20 @@ export function CreateBookingModal({
         } else {
           setTourCountryCode('');
           setMinBookingDate('');
+          setTourActivities([]);
         }
-      } catch {
+      } catch (error) {
+        console.error('💥 Error fetching tour details:', error);
+        console.error('💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+        console.error('💥 Error message:', error instanceof Error ? error.message : String(error));
+
         setHourRange(null);
         setMinBookingDate('');
         setTourCountryCode('');
         setTourDaysCount(null);
         setTourBasePrice(null);
+        setTourMinimumPayment(null);
+        setTourActivities([]);
       } finally {
         setIsLoadingHourRange(false);
       }
@@ -389,6 +455,46 @@ export function CreateBookingModal({
     const total = subtotal - minorDiscount;
     return { basePrice, validClients, minors, subtotal, minorDiscount, total };
   }, [tourBasePrice, formData.clients]);
+
+  // Determine when each section should be enabled
+  const canEnableDates = useMemo(() => {
+    return formData.tourId !== '' && !isLoadingHourRange;
+  }, [formData.tourId, isLoadingHourRange]);
+
+  const canAddClients = useMemo(() => {
+    // Clients can be added after dates are selected and availability is checked
+    const datesSet = formData.startDate !== '' && formData.endDate !== '';
+    const hasAvailability = tourAvailability !== null && (tourAvailability.availableSlots ?? 0) > 0;
+    return datesSet && hasAvailability && !isLoadingAvailability;
+  }, [formData.startDate, formData.endDate, tourAvailability, isLoadingAvailability]);
+
+  const canAddSpecialRequests = useMemo(() => {
+    return formData.clients.length > 0;
+  }, [formData.clients.length]);
+
+  const canSubmit = useMemo(() => {
+    // All components must have data
+    const hasTour = formData.tourId !== '';
+    const hasDates = formData.startDate !== '' && formData.endDate !== '';
+    const hasCurrency = formData.currency !== '';
+    const hasClients = formData.clients.length > 0;
+    const hasAvailability = tourAvailability !== null && (tourAvailability.availableSlots ?? 0) > 0;
+
+    return hasTour && hasDates && hasCurrency && hasClients && hasAvailability && !isSubmitting;
+  }, [
+    formData.tourId,
+    formData.startDate,
+    formData.endDate,
+    formData.currency,
+    formData.clients.length,
+    tourAvailability,
+    isSubmitting,
+  ]);
+
+  // 🛡️ Don't render if modal is not open (after all hooks for React rules)
+  if (!isOpen) {
+    return null;
+  }
 
   const formatCurrency = (amount: number, currency: string): string => {
     try {
@@ -679,10 +785,6 @@ export function CreateBookingModal({
     }
   };
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
     <div
       style={{
@@ -846,6 +948,136 @@ export function CreateBookingModal({
               </div>
             )}
 
+            {/* Tour Activities / Itinerary */}
+            {(() => {
+              console.warn('🎨 tourActivities.length:', tourActivities.length);
+              if (tourActivities.length === 0) return null;
+
+              // Group by day
+              const dayMap = new Map<number, BookingTourActivity[]>();
+              tourActivities.forEach((act) => {
+                const d = act.day ?? 1;
+                if (!dayMap.has(d)) dayMap.set(d, []);
+                const group = dayMap.get(d);
+                if (group) group.push(act);
+              });
+              const sortedDays = [...dayMap.entries()].sort(([a], [b]) => a - b);
+              sortedDays.forEach(([, acts]) => acts.sort((a, b) => a.sortOrder - b.sortOrder));
+
+              return (
+                <div>
+                  <h3
+                    style={{
+                      margin: '0 0 var(--space-3) 0',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      color: '#111827',
+                    }}
+                  >
+                    {language === 'en' ? 'Tour Itinerary' : 'Itinerario del Tour'}
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {sortedDays.map(([dayNum, acts]) => (
+                      <div
+                        key={`day-${dayNum}`}
+                        style={{
+                          border: '1px solid #e5e7eb',
+                          borderRadius: 'var(--radius-lg, 10px)',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            padding: '8px 14px',
+                            background: '#f9fafb',
+                            borderBottom: '1px solid #e5e7eb',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              background: '#dbeafe',
+                              color: '#1d4ed8',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {dayNum}
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
+                            {language === 'en' ? 'Day' : 'Día'} {dayNum}
+                          </span>
+                        </div>
+                        <div>
+                          {acts.map((act, idx) => (
+                            <div
+                              key={act.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '10px 14px',
+                                borderBottom: idx < acts.length - 1 ? '1px solid #f3f4f6' : 'none',
+                                background: idx % 2 === 0 ? 'white' : '#fafbfc',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  flexShrink: 0,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '2px 8px',
+                                  borderRadius: 9999,
+                                  background: '#f0f9ff',
+                                  border: '1px solid #bae6fd',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  color: '#0369a1',
+                                  minWidth: 60,
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <svg
+                                  width="10"
+                                  height="10"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                >
+                                  <circle cx="12" cy="12" r="10" />
+                                  <polyline points="12 6 12 12 16 14" />
+                                </svg>
+                                {act.hora}
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: '0.8rem',
+                                  color: '#374151',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {language === 'en' ? act.activity_en : act.activity_es}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Dates */}
             <div>
               <div
@@ -870,7 +1102,7 @@ export function CreateBookingModal({
                       onChange={handleInputChange}
                       error={errors.startDate}
                       min={minBookingDate}
-                      disabled={minBookingDate === ''}
+                      disabled={!canEnableDates}
                     />
                     {formData.tourId !== '' && (
                       <div
@@ -944,9 +1176,7 @@ export function CreateBookingModal({
                       onChange={handleInputChange}
                       error={errors.endDate}
                       min={minBookingDate}
-                      disabled={
-                        minBookingDate === '' || (tourDaysCount !== null && tourDaysCount > 0)
-                      }
+                      disabled={!canEnableDates || (tourDaysCount !== null && tourDaysCount > 0)}
                     />
                     {formData.tourId !== '' && (
                       <div
@@ -1025,8 +1255,13 @@ export function CreateBookingModal({
               <Select
                 options={[
                   { value: 'MXN', label: 'MXN - Mexican Peso' },
+                  { value: 'COP', label: 'COP - Colombian Peso' },
                   { value: 'USD', label: 'USD - US Dollar' },
                   { value: 'EUR', label: 'EUR - Euro' },
+                  { value: 'PEN', label: 'PEN - Peruvian Sol' },
+                  { value: 'CLP', label: 'CLP - Chilean Peso' },
+                  { value: 'ARS', label: 'ARS - Argentine Peso' },
+                  { value: 'BRL', label: 'BRL - Brazilian Real' },
                 ]}
                 value={formData.currency}
                 onChange={(value: string) => {
@@ -1037,6 +1272,7 @@ export function CreateBookingModal({
                 }}
                 placeholder={t('bookings.selectCurrency') ?? 'Select currency'}
                 id="select-currency"
+                disabled={true}
               />
               {errors.currency !== undefined && (
                 <span
@@ -1155,6 +1391,7 @@ export function CreateBookingModal({
                     type="button"
                     onClick={handleOpenAddClient}
                     className="modal-btn-add-client"
+                    disabled={!canAddClients}
                   >
                     <svg
                       width="16"
@@ -1183,6 +1420,7 @@ export function CreateBookingModal({
                     type="button"
                     onClick={handleOpenAddClient}
                     className="modal-btn-add-client"
+                    disabled={!canAddClients}
                   >
                     <svg
                       width="16"
@@ -1547,10 +1785,12 @@ export function CreateBookingModal({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 'var(--space-2)',
-                  cursor: 'pointer',
+                  cursor: canAddSpecialRequests ? 'pointer' : 'not-allowed',
                   fontSize: 'var(--text-sm)',
                   fontWeight: 'var(--font-weight-medium)',
-                  color: 'var(--color-neutral-700)',
+                  color: canAddSpecialRequests
+                    ? 'var(--color-neutral-700)'
+                    : 'var(--color-neutral-400)',
                   userSelect: 'none',
                 }}
               >
@@ -1563,7 +1803,12 @@ export function CreateBookingModal({
                       setFormData((prev) => ({ ...prev, specialRequests: '' }));
                     }
                   }}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  disabled={!canAddSpecialRequests}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    cursor: canAddSpecialRequests ? 'pointer' : 'not-allowed',
+                  }}
                 />
                 {t('bookings.hasSpecialRequests') ?? 'Add special requests'}
               </label>
@@ -1756,7 +2001,7 @@ export function CreateBookingModal({
               >
                 {t('common.cancel')}
               </button>
-              <button type="submit" disabled={isSubmitting} className="modal-btn modal-btn-primary">
+              <button type="submit" disabled={!canSubmit} className="modal-btn modal-btn-primary">
                 {isSubmitting ? t('common.saving') : t('bookings.newBooking')}
               </button>
             </div>
