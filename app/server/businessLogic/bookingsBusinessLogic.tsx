@@ -148,7 +148,19 @@ export const createBookingBusiness = async (
   language = 'es'
 ): Promise<{ success: boolean; message?: string; data?: Booking }> => {
   try {
-    const result = (await createBooking(bookingData, token ?? '', language)) as {
+    // 🔥 Agregar parámetros nuevos
+    const countryCodeFromPayload = bookingData.countryCode ?? '';
+    const payloadWithNewParams = {
+      ...bookingData,
+      source: 'admin', // Hardcoded: indica que viene del admin
+      countryCode: countryCodeFromPayload !== '' ? countryCodeFromPayload : 'MX', // Usa el código del país del payload o 'MX' por defecto
+      paymentMethods: ['card', 'oxxo'], // Hardcoded: métodos de pago disponibles
+      minimumPayment: bookingData.minimumPayment ?? 0,
+    };
+
+    console.warn('📦 [createBookingBusiness] Payload with new params:', payloadWithNewParams);
+
+    const result = (await createBooking(payloadWithNewParams, token ?? '', language)) as {
       success?: boolean;
       message?: string;
       data?: Booking;
@@ -391,6 +403,7 @@ export const getBookingStatusHistoryBusiness = async (
       success?: boolean;
       data?: BookingStatusHistory | null;
     };
+
     if (result.success === true) {
       return { success: true, data: result.data ?? null };
     }

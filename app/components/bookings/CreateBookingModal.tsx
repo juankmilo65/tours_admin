@@ -12,7 +12,7 @@ import { createBookingBusiness } from '~/server/businessLogic/bookingsBusinessLo
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { selectAuthToken, selectAuth } from '~/store/slices/authSlice';
 import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
-import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
+import { selectSelectedCurrencyCode, selectSelectedCountry } from '~/store/slices/countriesSlice';
 import {
   getToursDropdownBusiness,
   getTourHourRangeBusiness,
@@ -68,6 +68,7 @@ export function CreateBookingModal({
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectAuth).user;
   const selectedCountryCurrency = useAppSelector(selectSelectedCurrencyCode);
+  const selectedCountry = useAppSelector(selectSelectedCountry);
 
   const [isBookingForMe, setIsBookingForMe] = useState(false);
 
@@ -734,6 +735,7 @@ export function CreateBookingModal({
         specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
         totalPrice: priceSummary.total,
         minimumPayment: tourMinimumPayment ?? undefined,
+        countryCode: selectedCountry?.code ?? 'MX', // País seleccionado del header
       };
 
       const result = await createBookingBusiness(payloadWithCountry, token ?? '', language);
@@ -767,8 +769,17 @@ export function CreateBookingModal({
           title: t('common.success') ?? 'Success',
           isOpen: true,
           data: {
-            message:
-              result.message ?? t('bookings.createSuccess') ?? 'Booking created successfully',
+            message: (() => {
+              const code = result.data?.confirmationCode;
+              if (code !== undefined && code !== null && code !== '') {
+                return language === 'en'
+                  ? `Booking created successfully!\nConfirmation code: ${code}`
+                  : `¡Reserva creada exitosamente!\nCódigo de confirmación: ${code}`;
+              }
+              return (
+                result.message ?? t('bookings.createSuccess') ?? 'Booking created successfully'
+              );
+            })(),
             icon: 'success',
           },
         } as Parameters<typeof openModal>[0])

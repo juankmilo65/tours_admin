@@ -31,6 +31,9 @@ export interface Booking {
   email?: string;
   phone?: string;
   countryId?: string;
+  countryCode?: string; // ISO code like 'MX', 'US', 'CO'
+  source?: string; // e.g., 'admin', 'web', 'mobile'
+  paymentMethods?: string[]; // e.g., ['card', 'oxxo', 'paypal']
   isDeleted?: boolean;
   deletedAt?: string;
   deletedBy?: string;
@@ -203,6 +206,10 @@ export interface CreateBookingDto {
   specialRequests?: string | null;
   totalPrice?: number | null;
   minimumPayment?: number | null;
+  // 🆕 Nuevos campos agregados
+  source?: string; // e.g., 'admin', 'web', 'mobile'
+  countryCode?: string; // e.g., 'MX', 'US', 'CO'
+  paymentMethods?: string[]; // e.g., ['card', 'oxxo', 'paypal']
 }
 
 export interface Client {
@@ -251,9 +258,11 @@ export interface BookingStatusHistoryEntry {
   statusName: string;
   statusName_es: string;
   statusName_en: string;
+  amount: number | null;
+  currency: string;
   changeReason?: string;
   notes?: string;
-  changedBy?: string;
+  changedBy?: string | null;
   changedAt: string;
 }
 

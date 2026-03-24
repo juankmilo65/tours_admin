@@ -363,6 +363,26 @@ export function BookingStatusModal({
                       >
                         {label}
                       </span>
+                      {item.amount !== null && item.amount !== undefined && (
+                        <p
+                          style={{
+                            margin: '4px 0 0',
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            color: fg,
+                            background: bg,
+                            display: 'inline-block',
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                          }}
+                        >
+                          {new Intl.NumberFormat(language === 'en' ? 'en-US' : 'es-MX', {
+                            style: 'currency',
+                            currency: item.currency ?? 'MXN',
+                            minimumFractionDigits: 2,
+                          }).format(item.amount)}
+                        </p>
+                      )}
                       <p style={{ margin: '3px 0 0', fontSize: '0.76rem', color: '#9ca3af' }}>
                         {formatDate(item.changedAt, language)}
                       </p>
