@@ -10,7 +10,7 @@ import { useTranslation } from '~/lib/i18n/utils';
 import { bookingEs, bookingEn } from '~/lib/i18n';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { openModal, setGlobalLoading } from '~/store/slices/uiSlice';
-import { selectAuthToken } from '~/store/slices/authSlice';
+import { selectAuthToken, selectAuth } from '~/store/slices/authSlice';
 import {
   updateBookingBusiness,
   getBookingStatusHistoryBusiness,
@@ -74,6 +74,8 @@ export function BookingStatusModal({
   const bookingsT = language === 'en' ? bookingEn : bookingEs;
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
+  const auth = useAppSelector(selectAuth);
+  const isAdmin = auth.user?.role === 'admin';
 
   const [nextStatus, setNextStatus] = useState<NextBookingStatus | null>(null);
   const [nextStatusError, setNextStatusError] = useState<string | null>(null);
@@ -446,12 +448,14 @@ export function BookingStatusModal({
               {nextStatusError}
             </div>
           )}
-          {/* Next status button solo si hay siguiente estado y no hay error */}
+          {/* Next status button: solo visible para admin cuando el siguiente estado es 'paid' */}
           {!loadingData &&
           nextStatus &&
           !nextStatusError &&
           isActiveStatus &&
-          nextStatus.nextStatusName ? (
+          nextStatus.nextStatusName &&
+          booking.status === 'pending_confirmation' &&
+          isAdmin ? (
             <button
               type="button"
               disabled={isTransitioning}
