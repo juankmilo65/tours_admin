@@ -20,6 +20,8 @@ import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import { openModal, closeModal, setGlobalLoading } from '~/store/slices/uiSlice';
 import { getCachedLanguages, setLanguages as setLanguagesCache } from '~/store/slices/cacheSlice';
 import Select from '~/components/ui/Select';
+import { Dialog } from '~/components/ui/Dialog';
+import { Textarea } from '~/components/ui/Textarea';
 import { ActivitiesByDay } from '~/components/tours/ActivitiesByDay';
 import type {
   TourDay,
@@ -64,6 +66,16 @@ interface TourActivity {
   sortOrder: number; // orden en el itinerario
 }
 
+interface CancellationPolicy {
+  daysBeforeTour: number;
+  refundPercentage: number;
+  administrativeFee: number;
+  appliesToPaymentMethods: string[];
+  description_es: string;
+  description_en: string;
+  isActive: boolean;
+}
+
 interface TourFormData {
   userId: string;
   categoryId: string;
@@ -87,6 +99,8 @@ interface TourFormData {
   activities: TourActivity[];
   days: TourDay[]; // Activities grouped by day
   isActive: boolean;
+  termsConditions: { terms_conditions_es: string; terms_conditions_en: string } | null;
+  cancellationPolicies: CancellationPolicy[];
 }
 
 // Image file with preview
@@ -172,6 +186,8 @@ export function CreateTourModal({
       activities: initialData?.activities ?? [],
       days: initialData?.days ?? [],
       isActive: initialData?.isActive ?? true,
+      termsConditions: initialData?.termsConditions ?? null,
+      cancellationPolicies: initialData?.cancellationPolicies ?? [],
     }),
     [initialData, currentUser?.id]
   );
@@ -183,6 +199,25 @@ export function CreateTourModal({
   const [imageErrors, setImageErrors] = useState<string[]>([]);
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
   const [showLanguageWarningModal, setShowLanguageWarningModal] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [termsInputEs, setTermsInputEs] = useState('');
+  const [termsInputEn, setTermsInputEn] = useState('');
+  const [termsInputErrors, setTermsInputErrors] = useState<{ es?: string; en?: string }>({});
+  const [isPoliciesOpen, setIsPoliciesOpen] = useState(false);
+  const [isAddPolicyOpen, setIsAddPolicyOpen] = useState(false);
+  const defaultPolicyForm = (): CancellationPolicy => ({
+    daysBeforeTour: 0,
+    refundPercentage: 100,
+    administrativeFee: 0,
+    appliesToPaymentMethods: ['card'],
+    description_es: '',
+    description_en: '',
+    isActive: true,
+  });
+  const [policyForm, setPolicyForm] = useState<CancellationPolicy>(defaultPolicyForm());
+  const [policyFormErrors, setPolicyFormErrors] = useState<
+    Partial<Record<keyof CancellationPolicy, string>>
+  >({});
   // Cover image tracking: store the image ID that should be cover
   const [selectedCoverId, setSelectedCoverId] = useState<string | null>(() => {
     const coverImage = initialData?.existingImages?.find((img: TourImage) => img.isCover);
@@ -539,6 +574,12 @@ export function CreateTourModal({
     }
     if (formData.language.length === 0)
       newErrors.language = t('tours.languageRequired') ?? 'Language is required';
+    if (formData.termsConditions === null)
+      newErrors.termsConditions =
+        t('tours.tourTermsRequired') ?? 'Terms and Conditions are required';
+    if (formData.cancellationPolicies.length === 0)
+      newErrors.cancellationPolicies =
+        t('tours.cancellationPoliciesRequired') ?? 'At least one cancellation policy is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -583,6 +624,9 @@ export function CreateTourModal({
         difficulty: formData.difficulty,
         language: formData.language,
         isActive: formData.isActive,
+        termsConditions: formData.termsConditions ?? undefined,
+        cancellationPolicies:
+          formData.cancellationPolicies.length > 0 ? formData.cancellationPolicies : undefined,
         activities: formData.days.map((day) => ({
           day: day.day,
           activities: day.activities.map((activity) => ({
@@ -2138,6 +2182,71 @@ export function CreateTourModal({
               )}
             </div>
 
+            {/* Terms & Conditions */}
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-3)',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTermsInputEs(formData.termsConditions?.terms_conditions_es ?? '');
+                    setTermsInputEn(formData.termsConditions?.terms_conditions_en ?? '');
+                    setTermsInputErrors({});
+                    setIsTermsModalOpen(true);
+                  }}
+                  style={{
+                    padding: 'var(--space-2) var(--space-4)',
+                    backgroundColor:
+                      formData.termsConditions !== null
+                        ? 'var(--color-neutral-100)'
+                        : 'var(--color-primary-600)',
+                    color: formData.termsConditions !== null ? 'var(--color-neutral-700)' : 'white',
+                    border:
+                      formData.termsConditions !== null
+                        ? '1px solid var(--color-neutral-300)'
+                        : 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 'var(--font-weight-medium)',
+                  }}
+                >
+                  {formData.termsConditions !== null
+                    ? t('tours.editTermsConditions')
+                    : t('tours.addTermsConditions')}
+                </button>
+                {formData.termsConditions !== null && (
+                  <span
+                    style={{
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--color-success-600, #16a34a)',
+                      fontWeight: 'var(--font-weight-medium)',
+                    }}
+                  >
+                    ✓ {t('tours.termsConditionsAdded')}
+                  </span>
+                )}
+              </div>
+              {errors.termsConditions !== undefined && (
+                <span
+                  style={{
+                    color: 'red',
+                    fontSize: 'var(--text-xs)',
+                    marginTop: 'var(--space-1)',
+                    display: 'block',
+                  }}
+                >
+                  {errors.termsConditions}
+                </span>
+              )}
+            </div>
+
             {/* Active */}
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -2146,17 +2255,722 @@ export function CreateTourModal({
                   name="isActive"
                   checked={formData.isActive}
                   onChange={handleInputChange}
-                  style={{ cursor: 'pointer' }}
+                  disabled={formData.termsConditions === null}
+                  style={{
+                    cursor: formData.termsConditions === null ? 'not-allowed' : 'pointer',
+                    opacity: formData.termsConditions === null ? 0.5 : 1,
+                  }}
                 />
                 <span
                   style={{
                     fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
+                    color:
+                      formData.termsConditions === null
+                        ? 'var(--color-neutral-400)'
+                        : 'var(--color-neutral-700)',
                   }}
                 >
                   {t('tours.isActive')}
                 </span>
               </label>
+            </div>
+
+            {/* Terms & Conditions Dialog */}
+            <Dialog
+              isOpen={isTermsModalOpen}
+              onClose={() => setIsTermsModalOpen(false)}
+              title={
+                formData.termsConditions !== null
+                  ? (t('tours.editTermsConditions') ?? 'Edit Terms and Conditions')
+                  : (t('tours.addTermsConditions') ?? 'Add Terms and Conditions')
+              }
+              size="lg"
+              footer={
+                <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsTermsModalOpen(false)}
+                    style={{
+                      padding: 'var(--space-2) var(--space-4)',
+                      backgroundColor: 'var(--color-neutral-100)',
+                      color: 'var(--color-neutral-700)',
+                      border: '1px solid var(--color-neutral-300)',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      fontSize: 'var(--text-sm)',
+                    }}
+                  >
+                    {t('tours.cancelTermsConditions') ?? 'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newErrors: { es?: string; en?: string } = {};
+                      if (termsInputEs.trim() === '') {
+                        newErrors.es =
+                          t('tours.termsConditionsEsRequired') ?? 'Spanish terms are required';
+                      }
+                      if (termsInputEn.trim() === '') {
+                        newErrors.en =
+                          t('tours.termsConditionsEnRequired') ?? 'English terms are required';
+                      }
+                      if (Object.keys(newErrors).length > 0) {
+                        setTermsInputErrors(newErrors);
+                        return;
+                      }
+                      setFormData((prev) => ({
+                        ...prev,
+                        termsConditions: {
+                          terms_conditions_es: termsInputEs.trim(),
+                          terms_conditions_en: termsInputEn.trim(),
+                        },
+                        isActive: prev.termsConditions === null ? false : prev.isActive,
+                      }));
+                      setIsTermsModalOpen(false);
+                    }}
+                    style={{
+                      padding: 'var(--space-2) var(--space-4)',
+                      backgroundColor: 'var(--color-primary-600)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      fontSize: 'var(--text-sm)',
+                      fontWeight: 'var(--font-weight-medium)',
+                    }}
+                  >
+                    {t('tours.saveTermsConditions') ?? 'Save'}
+                  </button>
+                </div>
+              }
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <Textarea
+                  label={t('tours.termsConditionsEs') ?? 'Terms and Conditions (Spanish)'}
+                  rows={6}
+                  value={termsInputEs}
+                  onChange={(e) => {
+                    setTermsInputEs(e.target.value);
+                    if (termsInputErrors.es !== undefined) {
+                      setTermsInputErrors((prev) => ({ ...prev, es: undefined }));
+                    }
+                  }}
+                  error={termsInputErrors.es}
+                  placeholder="Escribe los términos y condiciones en español..."
+                />
+                <Textarea
+                  label={t('tours.termsConditionsEn') ?? 'Terms and Conditions (English)'}
+                  rows={6}
+                  value={termsInputEn}
+                  onChange={(e) => {
+                    setTermsInputEn(e.target.value);
+                    if (termsInputErrors.en !== undefined) {
+                      setTermsInputErrors((prev) => ({ ...prev, en: undefined }));
+                    }
+                  }}
+                  error={termsInputErrors.en}
+                  placeholder="Write the terms and conditions in English..."
+                />
+              </div>
+            </Dialog>
+
+            {/* Cancellation Policies Accordion */}
+            <div
+              style={{
+                border: '1px solid var(--color-neutral-200)',
+                borderRadius: 'var(--radius-md)',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Accordion Header */}
+              <button
+                type="button"
+                onClick={() => setIsPoliciesOpen((v) => !v)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 'var(--space-3) var(--space-4)',
+                  backgroundColor: 'var(--color-neutral-50)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <span
+                    style={{
+                      fontWeight: 'var(--font-weight-semibold)',
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--color-neutral-800)',
+                    }}
+                  >
+                    {t('tours.cancellationPolicies') ?? 'Cancellation Policies'}
+                  </span>
+                  {formData.cancellationPolicies.length > 0 && (
+                    <span
+                      style={{
+                        backgroundColor: 'var(--color-primary-100)',
+                        color: 'var(--color-primary-700)',
+                        borderRadius: '9999px',
+                        padding: '1px 8px',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 'var(--font-weight-medium)',
+                      }}
+                    >
+                      {formData.cancellationPolicies.length}
+                    </span>
+                  )}
+                  {errors.cancellationPolicies !== undefined && (
+                    <span
+                      style={{
+                        color: 'var(--color-error-600, #dc2626)',
+                        fontSize: 'var(--text-xs)',
+                      }}
+                    >
+                      ⚠ {errors.cancellationPolicies}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: '12px', color: 'var(--color-neutral-500)' }}>
+                  {isPoliciesOpen ? '▲' : '▼'}
+                </span>
+              </button>
+
+              {/* Accordion Body */}
+              {isPoliciesOpen && (
+                <div
+                  style={{
+                    padding: 'var(--space-4)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 'var(--space-3)',
+                    borderTop: '1px solid var(--color-neutral-200)',
+                  }}
+                >
+                  {/* Existing policies list */}
+                  {formData.cancellationPolicies.length === 0 ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: 'var(--space-6)',
+                        color: 'var(--color-neutral-400)',
+                        fontSize: 'var(--text-sm)',
+                      }}
+                    >
+                      <div style={{ marginBottom: 'var(--space-1)' }}>
+                        {t('tours.noPoliciesAdded') ?? 'No cancellation policies added yet'}
+                      </div>
+                      <div style={{ fontSize: 'var(--text-xs)' }}>
+                        {t('tours.noPoliciesDescription') ??
+                          'Click "Add Policy" to define your cancellation rules'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}
+                    >
+                      {formData.cancellationPolicies.map((policy, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            justifyContent: 'space-between',
+                            padding: 'var(--space-3)',
+                            backgroundColor: 'var(--color-neutral-50)',
+                            border: '1px solid var(--color-neutral-200)',
+                            borderRadius: 'var(--radius-sm)',
+                            gap: 'var(--space-3)',
+                          }}
+                        >
+                          <div
+                            style={{
+                              flex: 1,
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: 'var(--space-2)',
+                              fontSize: 'var(--text-xs)',
+                              color: 'var(--color-neutral-700)',
+                            }}
+                          >
+                            <span
+                              style={{
+                                backgroundColor: 'var(--color-neutral-200)',
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '2px 8px',
+                                fontWeight: 'var(--font-weight-medium)',
+                              }}
+                            >
+                              {policy.daysBeforeTour === 0
+                                ? currentLanguage === 'en'
+                                  ? 'Same day'
+                                  : 'Mismo día'
+                                : `${policy.daysBeforeTour} ${currentLanguage === 'en' ? 'days before' : 'días antes'}`}
+                            </span>
+                            <span
+                              style={{
+                                backgroundColor: 'var(--color-success-100, #dcfce7)',
+                                color: 'var(--color-success-700, #15803d)',
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '2px 8px',
+                                fontWeight: 'var(--font-weight-medium)',
+                              }}
+                            >
+                              {policy.refundPercentage}%{' '}
+                              {currentLanguage === 'en' ? 'refund' : 'reembolso'}
+                            </span>
+                            {policy.administrativeFee > 0 && (
+                              <span
+                                style={{
+                                  backgroundColor: 'var(--color-warning-100, #fef9c3)',
+                                  color: 'var(--color-warning-700, #a16207)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  padding: '2px 8px',
+                                }}
+                              >
+                                {currentLanguage === 'en' ? 'Fee' : 'Comisión'}:{' '}
+                                {policy.administrativeFee}
+                              </span>
+                            )}
+                            {policy.appliesToPaymentMethods.length > 0 && (
+                              <span style={{ color: 'var(--color-neutral-500)' }}>
+                                {policy.appliesToPaymentMethods.join(', ')}
+                              </span>
+                            )}
+                            {policy.description_es !== '' && (
+                              <span
+                                style={{
+                                  width: '100%',
+                                  color: 'var(--color-neutral-600)',
+                                  fontStyle: 'italic',
+                                }}
+                              >
+                                {currentLanguage === 'en'
+                                  ? policy.description_en
+                                  : policy.description_es}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                cancellationPolicies: prev.cancellationPolicies.filter(
+                                  (_, i) => i !== idx
+                                ),
+                              }));
+                            }}
+                            title={t('tours.removePolicy') ?? 'Remove'}
+                            style={{
+                              flexShrink: 0,
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--color-error-500, #ef4444)',
+                              fontSize: '18px',
+                              lineHeight: 1,
+                              padding: '2px 4px',
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add Policy inline form */}
+                  {isAddPolicyOpen ? (
+                    <div
+                      style={{
+                        border: '1px solid var(--color-primary-200)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: 'var(--space-4)',
+                        backgroundColor: 'var(--color-primary-50, #eff6ff)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 'var(--space-3)',
+                      }}
+                    >
+                      {/* Row 1: days / refund / fee */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr',
+                          gap: 'var(--space-3)',
+                        }}
+                      >
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'var(--font-weight-medium)',
+                              color: 'var(--color-neutral-700)',
+                              marginBottom: 'var(--space-1)',
+                            }}
+                          >
+                            {t('tours.policyDaysBeforeTour') ?? 'Days before tour'}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={policyForm.daysBeforeTour}
+                            onChange={(e) => {
+                              setPolicyForm((p) => ({
+                                ...p,
+                                daysBeforeTour: Math.max(0, parseInt(e.target.value, 10) || 0),
+                              }));
+                              setPolicyFormErrors((prev) => ({
+                                ...prev,
+                                daysBeforeTour: undefined,
+                              }));
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: 'var(--space-2)',
+                              border: `1px solid ${policyFormErrors.daysBeforeTour !== undefined ? 'red' : 'var(--color-neutral-300)'}`,
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: 'var(--text-sm)',
+                            }}
+                          />
+                          {policyFormErrors.daysBeforeTour !== undefined && (
+                            <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
+                              {policyFormErrors.daysBeforeTour}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'var(--font-weight-medium)',
+                              color: 'var(--color-neutral-700)',
+                              marginBottom: 'var(--space-1)',
+                            }}
+                          >
+                            {t('tours.policyRefundPercentage') ?? 'Refund (%)'}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={policyForm.refundPercentage}
+                            onChange={(e) => {
+                              setPolicyForm((p) => ({
+                                ...p,
+                                refundPercentage: Math.min(
+                                  100,
+                                  Math.max(0, parseInt(e.target.value, 10) || 0)
+                                ),
+                              }));
+                              setPolicyFormErrors((prev) => ({
+                                ...prev,
+                                refundPercentage: undefined,
+                              }));
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: 'var(--space-2)',
+                              border: `1px solid ${policyFormErrors.refundPercentage !== undefined ? 'red' : 'var(--color-neutral-300)'}`,
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: 'var(--text-sm)',
+                            }}
+                          />
+                          {policyFormErrors.refundPercentage !== undefined && (
+                            <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
+                              {policyFormErrors.refundPercentage}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'var(--font-weight-medium)',
+                              color: 'var(--color-neutral-700)',
+                              marginBottom: 'var(--space-1)',
+                            }}
+                          >
+                            {t('tours.policyAdministrativeFee') ?? 'Administrative fee'}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={policyForm.administrativeFee}
+                            onChange={(e) => {
+                              setPolicyForm((p) => ({
+                                ...p,
+                                administrativeFee: Math.max(0, parseFloat(e.target.value) || 0),
+                              }));
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: 'var(--space-2)',
+                              border: '1px solid var(--color-neutral-300)',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: 'var(--text-sm)',
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 2: payment methods checkboxes */}
+                      <div>
+                        <label
+                          style={{
+                            display: 'block',
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 'var(--font-weight-medium)',
+                            color: 'var(--color-neutral-700)',
+                            marginBottom: 'var(--space-1)',
+                          }}
+                        >
+                          {t('tours.policyAppliesToPaymentMethods') ?? 'Applies to payment methods'}
+                        </label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+                          {['card', 'oxxo', 'sepa_debit', 'ideal', 'bancontact', 'przelewy24'].map(
+                            (method) => (
+                              <label
+                                key={method}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 'var(--space-1)',
+                                  fontSize: 'var(--text-xs)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={policyForm.appliesToPaymentMethods.includes(method)}
+                                  onChange={(e) => {
+                                    setPolicyForm((p) => ({
+                                      ...p,
+                                      appliesToPaymentMethods: e.target.checked
+                                        ? [...p.appliesToPaymentMethods, method]
+                                        : p.appliesToPaymentMethods.filter((m) => m !== method),
+                                    }));
+                                  }}
+                                />
+                                {method}
+                              </label>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Row 3: descriptions */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: 'var(--space-3)',
+                        }}
+                      >
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'var(--font-weight-medium)',
+                              color: 'var(--color-neutral-700)',
+                              marginBottom: 'var(--space-1)',
+                            }}
+                          >
+                            {t('tours.policyDescriptionEs') ?? 'Description (Spanish)'}
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={policyForm.description_es}
+                            onChange={(e) => {
+                              setPolicyForm((p) => ({ ...p, description_es: e.target.value }));
+                              setPolicyFormErrors((prev) => ({
+                                ...prev,
+                                description_es: undefined,
+                              }));
+                            }}
+                            placeholder="Ej: Reembolso completo si cancelas con 30 días..."
+                            style={{
+                              width: '100%',
+                              padding: 'var(--space-2)',
+                              border: `1px solid ${policyFormErrors.description_es !== undefined ? 'red' : 'var(--color-neutral-300)'}`,
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: 'var(--text-sm)',
+                              resize: 'vertical',
+                              fontFamily: 'inherit',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                          {policyFormErrors.description_es !== undefined && (
+                            <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
+                              {policyFormErrors.description_es}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'var(--font-weight-medium)',
+                              color: 'var(--color-neutral-700)',
+                              marginBottom: 'var(--space-1)',
+                            }}
+                          >
+                            {t('tours.policyDescriptionEn') ?? 'Description (English)'}
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={policyForm.description_en}
+                            onChange={(e) => {
+                              setPolicyForm((p) => ({ ...p, description_en: e.target.value }));
+                              setPolicyFormErrors((prev) => ({
+                                ...prev,
+                                description_en: undefined,
+                              }));
+                            }}
+                            placeholder="E.g.: Full refund if you cancel 30 days in advance..."
+                            style={{
+                              width: '100%',
+                              padding: 'var(--space-2)',
+                              border: `1px solid ${policyFormErrors.description_en !== undefined ? 'red' : 'var(--color-neutral-300)'}`,
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: 'var(--text-sm)',
+                              resize: 'vertical',
+                              fontFamily: 'inherit',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                          {policyFormErrors.description_en !== undefined && (
+                            <span style={{ color: 'red', fontSize: 'var(--text-xs)' }}>
+                              {policyFormErrors.description_en}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Row 4: isActive toggle */}
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-2)',
+                          fontSize: 'var(--text-sm)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={policyForm.isActive}
+                          onChange={(e) =>
+                            setPolicyForm((p) => ({ ...p, isActive: e.target.checked }))
+                          }
+                        />
+                        {t('tours.policyIsActive') ?? 'Active'}
+                      </label>
+
+                      {/* Form action buttons */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 'var(--space-2)',
+                          justifyContent: 'flex-end',
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddPolicyOpen(false);
+                            setPolicyForm(defaultPolicyForm());
+                            setPolicyFormErrors({});
+                          }}
+                          style={{
+                            padding: 'var(--space-2) var(--space-4)',
+                            backgroundColor: 'var(--color-neutral-100)',
+                            color: 'var(--color-neutral-700)',
+                            border: '1px solid var(--color-neutral-300)',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            fontSize: 'var(--text-sm)',
+                          }}
+                        >
+                          {t('tours.cancelCancellationPolicy') ?? 'Cancel'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const errs: Partial<Record<keyof CancellationPolicy, string>> = {};
+                            if (policyForm.description_es.trim() === '')
+                              errs.description_es =
+                                t('tours.policyDescriptionEsRequired') ??
+                                'Spanish description is required';
+                            if (policyForm.description_en.trim() === '')
+                              errs.description_en =
+                                t('tours.policyDescriptionEnRequired') ??
+                                'English description is required';
+                            if (Object.keys(errs).length > 0) {
+                              setPolicyFormErrors(errs);
+                              return;
+                            }
+                            setFormData((prev) => ({
+                              ...prev,
+                              cancellationPolicies: [
+                                ...prev.cancellationPolicies,
+                                { ...policyForm },
+                              ],
+                            }));
+                            // Clear cancellationPolicies error if it existed
+                            setErrors((prev) => ({ ...prev, cancellationPolicies: undefined }));
+                            setIsAddPolicyOpen(false);
+                            setPolicyForm(defaultPolicyForm());
+                            setPolicyFormErrors({});
+                          }}
+                          style={{
+                            padding: 'var(--space-2) var(--space-4)',
+                            backgroundColor: 'var(--color-primary-600)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            fontSize: 'var(--text-sm)',
+                            fontWeight: 'var(--font-weight-medium)',
+                          }}
+                        >
+                          {t('tours.saveCancellationPolicy') ?? 'Add Policy'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPolicyForm(defaultPolicyForm());
+                        setPolicyFormErrors({});
+                        setIsAddPolicyOpen(true);
+                      }}
+                      style={{
+                        alignSelf: 'flex-start',
+                        padding: 'var(--space-2) var(--space-4)',
+                        backgroundColor: 'var(--color-primary-600)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 'var(--radius-md)',
+                        cursor: 'pointer',
+                        fontSize: 'var(--text-sm)',
+                        fontWeight: 'var(--font-weight-medium)',
+                      }}
+                    >
+                      + {t('tours.addCancellationPolicy') ?? 'Add Policy'}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Upload Progress */}

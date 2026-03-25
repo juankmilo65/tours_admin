@@ -114,9 +114,7 @@ const getTourByIdBusiness = async (
   token = ''
 ): Promise<ServiceResult<unknown>> => {
   try {
-    console.warn('[getTourByIdBusiness] Fetching tour details for:', tourId);
     const result = await getTourById(tourId, language, currency, token);
-    console.warn('[getTourByIdBusiness] Result:', result);
     return result;
   } catch (error) {
     console.error('Error in getTourByIdBusiness:', error);

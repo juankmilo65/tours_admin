@@ -697,6 +697,44 @@ function ToursClient(): JSX.Element {
               : [],
           }))
         : [],
+      termsConditions: (() => {
+        const tc = fullData.termsConditions as
+          | { terms_conditions_es?: string; terms_conditions_en?: string }
+          | undefined
+          | null;
+        if (
+          tc !== null &&
+          tc !== undefined &&
+          typeof tc.terms_conditions_es === 'string' &&
+          tc.terms_conditions_es !== '' &&
+          typeof tc.terms_conditions_en === 'string' &&
+          tc.terms_conditions_en !== ''
+        ) {
+          return {
+            terms_conditions_es: tc.terms_conditions_es,
+            terms_conditions_en: tc.terms_conditions_en,
+          };
+        }
+        return null;
+      })(),
+      cancellationPolicies: (() => {
+        const rawPolicies = fullData.cancellationPolicies;
+        if (!Array.isArray(rawPolicies)) return [];
+        return rawPolicies.map((p: Record<string, unknown>) => ({
+          daysBeforeTour: typeof p.daysBeforeTour === 'number' ? p.daysBeforeTour : 0,
+          refundPercentage: typeof p.refundPercentage === 'number' ? p.refundPercentage : 0,
+          administrativeFee:
+            typeof p.administrativeFee === 'number'
+              ? p.administrativeFee
+              : parseFloat(String(p.administrativeFee ?? '0')) || 0,
+          appliesToPaymentMethods: Array.isArray(p.appliesToPaymentMethods)
+            ? (p.appliesToPaymentMethods as string[])
+            : [],
+          description_es: typeof p.description_es === 'string' ? p.description_es : '',
+          description_en: typeof p.description_en === 'string' ? p.description_en : '',
+          isActive: typeof p.isActive === 'boolean' ? p.isActive : true,
+        }));
+      })(),
     };
 
     const isToursInfo = (
@@ -1615,6 +1653,19 @@ function ToursClient(): JSX.Element {
                 }>;
                 days: import('~/types/PayloadTourDataProps').TourDay[];
                 isActive: boolean;
+                termsConditions: {
+                  terms_conditions_es: string;
+                  terms_conditions_en: string;
+                } | null;
+                cancellationPolicies: Array<{
+                  daysBeforeTour: number;
+                  refundPercentage: number;
+                  administrativeFee: number;
+                  appliesToPaymentMethods: string[];
+                  description_es: string;
+                  description_en: string;
+                  isActive: boolean;
+                }>;
               }>
             }
             users={loaderData.data?.users ?? []}

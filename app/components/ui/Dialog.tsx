@@ -59,7 +59,7 @@ export function Dialog({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999, // High z-index to be on top of everything
+        zIndex: 10002, // High z-index to be on top of everything, including nested modals
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

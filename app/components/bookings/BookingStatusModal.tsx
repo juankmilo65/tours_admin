@@ -204,6 +204,10 @@ export function BookingStatusModal({
   if (!isOpen || !booking) return null;
 
   const isActiveStatus: boolean = booking.status !== null && booking.status !== 'cancelled';
+  const tourIsFuture: boolean =
+    booking.startDate !== undefined &&
+    booking.startDate !== null &&
+    new Date(booking.startDate) > new Date();
 
   return (
     <div
@@ -408,8 +412,8 @@ export function BookingStatusModal({
             flexWrap: 'wrap',
           }}
         >
-          {/* Cancel button – always shown unless already cancelled */}
-          {!loadingData && isActiveStatus && (
+          {/* Cancel button – only if booking is active AND tour hasn't started yet */}
+          {!loadingData && isActiveStatus && tourIsFuture && (
             <button
               type="button"
               disabled={isTransitioning}

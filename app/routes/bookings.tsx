@@ -704,8 +704,14 @@ export default function Bookings(): JSX.Element {
       key: 'actions',
       label: t('common.actions') ?? 'Acciones',
       render: (_value: unknown, row: Booking) => {
-        // Si es rol user, solo mostrar botón cancelar
+        const tourIsFuture =
+          row.startDate !== undefined &&
+          row.startDate !== null &&
+          new Date(row.startDate) > new Date();
+
+        // Si es rol user, solo mostrar botón cancelar (si el tour aún no pasó)
         if (currentUser?.role === 'user') {
+          if (!tourIsFuture) return null;
           return (
             <button
               type="button"
