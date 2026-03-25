@@ -35,6 +35,14 @@ import { TourAvailabilityDisplay } from '~/components/bookings/TourAvailabilityD
 import type { TourAvailabilityData } from '~/types/tourAvailability';
 import type { BookingTourActivity } from '~/types/booking';
 
+// Payment method option returned by /api/stripe/payment-methods
+interface PaymentMethodOption {
+  id: string;
+  label_es: string;
+  label_en: string;
+  icon: string;
+}
+
 // The dropdown endpoint returns minimal tour info (same as offers)
 interface TourOption {
   id: string;
@@ -105,6 +113,9 @@ export function CreateBookingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSpecialRequests, setHasSpecialRequests] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  const [availablePaymentMethods, setAvailablePaymentMethods] = useState<PaymentMethodOption[]>([]);
+  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
 
   // Reset all form state when the modal opens
@@ -132,6 +143,8 @@ export function CreateBookingModal({
     setAvailabilityError('');
     setTourBasePrice(null);
     setTourActivities([]);
+    setSelectedPaymentMethod('');
+    setAvailablePaymentMethods([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -445,6 +458,40 @@ export function CreateBookingModal({
     setClientModalOpen(false);
   };
 
+  // Fetch available Stripe payment methods when the form is ready (has clients)
+  useEffect(() => {
+    const hasClients = formData.clients.length > 0;
+    const countryCode = selectedCountry?.code ?? '';
+    if (!hasClients || countryCode === '') {
+      setAvailablePaymentMethods([]);
+      setSelectedPaymentMethod('');
+      return;
+    }
+    const fetchPaymentMethods = async () => {
+      setIsLoadingPaymentMethods(true);
+      try {
+        const res = await window.fetch(`/api/stripe/payment-methods?country=${countryCode}`);
+        const json = (await res.json()) as { success: boolean; methods: PaymentMethodOption[] };
+        if (json.success && json.methods.length > 0) {
+          setAvailablePaymentMethods(json.methods);
+          // Auto-select if only one method available
+          if (json.methods.length === 1 && json.methods[0] !== undefined) {
+            setSelectedPaymentMethod(json.methods[0].id);
+          } else {
+            setSelectedPaymentMethod('');
+          }
+        } else {
+          setAvailablePaymentMethods([]);
+        }
+      } catch {
+        setAvailablePaymentMethods([]);
+      } finally {
+        setIsLoadingPaymentMethods(false);
+      }
+    };
+    void fetchPaymentMethods();
+  }, [formData.clients.length, selectedCountry?.code]);
+
   // Price calculation
   const priceSummary = useMemo(() => {
     const basePrice = tourBasePrice ?? 0;
@@ -474,14 +521,23 @@ export function CreateBookingModal({
   }, [formData.clients.length]);
 
   const canSubmit = useMemo(() => {
-    // All components must have data
+    // All components must have data, including a chosen payment method
     const hasTour = formData.tourId !== '';
     const hasDates = formData.startDate !== '' && formData.endDate !== '';
     const hasCurrency = formData.currency !== '';
     const hasClients = formData.clients.length > 0;
     const hasAvailability = tourAvailability !== null && (tourAvailability.availableSlots ?? 0) > 0;
+    const hasPaymentMethod = selectedPaymentMethod !== '';
 
-    return hasTour && hasDates && hasCurrency && hasClients && hasAvailability && !isSubmitting;
+    return (
+      hasTour &&
+      hasDates &&
+      hasCurrency &&
+      hasClients &&
+      hasAvailability &&
+      hasPaymentMethod &&
+      !isSubmitting
+    );
   }, [
     formData.tourId,
     formData.startDate,
@@ -489,6 +545,7 @@ export function CreateBookingModal({
     formData.currency,
     formData.clients.length,
     tourAvailability,
+    selectedPaymentMethod,
     isSubmitting,
   ]);
 
@@ -735,7 +792,8 @@ export function CreateBookingModal({
         specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
         totalPrice: priceSummary.total,
         minimumPayment: tourMinimumPayment ?? undefined,
-        countryCode: selectedCountry?.code ?? 'MX', // País seleccionado del header
+        countryCode: selectedCountry?.code ?? 'MX',
+        paymentMethods: [selectedPaymentMethod],
       };
 
       const result = await createBookingBusiness(payloadWithCountry, token ?? '', language);
@@ -1866,6 +1924,108 @@ export function CreateBookingModal({
                 </>
               )}
             </div>
+
+            {/* Payment Method Selector — visible when clients are added */}
+            {formData.clients.length > 0 && (
+              <div
+                style={{
+                  marginTop: 'var(--space-4)',
+                  padding: '16px 20px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0 0 12px',
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    color: '#1e293b',
+                  }}
+                >
+                  {language === 'en' ? 'Payment method' : 'Método de pago'}
+                  <span style={{ color: 'red', marginLeft: 4 }}>*</span>
+                </p>
+
+                {isLoadingPaymentMethods ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      color: '#64748b',
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: '50%',
+                        border: '2px solid #e2e8f0',
+                        borderTopColor: '#2563eb',
+                        animation: 'spin 0.75s linear infinite',
+                        flexShrink: 0,
+                      }}
+                    />
+                    {language === 'en' ? 'Loading payment methods…' : 'Cargando métodos de pago…'}
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                  </div>
+                ) : availablePaymentMethods.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
+                    {language === 'en'
+                      ? 'No payment methods available for this country.'
+                      : 'No hay métodos de pago disponibles para este país.'}
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {availablePaymentMethods.map((method) => {
+                      const selected = selectedPaymentMethod === method.id;
+                      return (
+                        <button
+                          key={method.id}
+                          type="button"
+                          onClick={() => setSelectedPaymentMethod(method.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '10px 18px',
+                            borderRadius: 8,
+                            border: selected ? '2px solid #2563eb' : '2px solid #e2e8f0',
+                            background: selected ? '#eff6ff' : 'white',
+                            color: selected ? '#1d4ed8' : '#374151',
+                            fontWeight: selected ? 700 : 500,
+                            fontSize: '0.875rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            boxShadow: selected ? '0 0 0 3px rgba(37,99,235,0.12)' : 'none',
+                            flex: '1 1 140px',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <span style={{ fontSize: '1.15rem' }}>{method.icon}</span>
+                          {language === 'en' ? method.label_en : method.label_es}
+                          {selected && (
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="#2563eb"
+                              strokeWidth="3"
+                            >
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* API Error Banner */}
             {apiError !== null && (
