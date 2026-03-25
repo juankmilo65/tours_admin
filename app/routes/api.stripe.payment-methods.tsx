@@ -25,42 +25,39 @@ interface PaymentMethodEntry {
   icon: string;
 }
 
-// Pre-define all Stripe payment methods from your configuration
-const applePay: PaymentMethodEntry = {
-  id: 'apple_pay',
-  label_es: 'Apple Pay',
-  label_en: 'Apple Pay',
-  icon: '🍎',
-};
-const bancontact: PaymentMethodEntry = {
-  id: 'bancontact',
-  label_es: 'Bancontact',
-  label_en: 'Bancontact',
-  icon: '🏦',
-};
+// ---------------------------------------------------------------------------
+// NOTE: wallet methods (apple_pay, google_pay) are NOT listed here.
+// Stripe enables them automatically when 'card' is present in payment_method_types.
+// Passing them explicitly causes a StripeInvalidRequestError.
+//
+// NOTE: 'link' is NOT listed here either.
+// The backend (bookingsBusinessLogic) adds Link automatically when source='admin'.
+//
+// Only explicit payment_method_types are listed below.
+// ---------------------------------------------------------------------------
+
+// Card — universal (also enables Apple Pay + Google Pay automatically)
 const card: PaymentMethodEntry = {
   id: 'card',
   label_es: 'Tarjeta de crédito / débito',
   label_en: 'Credit / Debit card',
   icon: '💳',
 };
-const cartesBancaires: PaymentMethodEntry = {
-  id: 'cartes_bancaires',
-  label_es: 'Cartes Bancaires',
-  label_en: 'Cartes Bancaires',
-  icon: '💳',
+
+// Vouchers
+const oxxo: PaymentMethodEntry = {
+  id: 'oxxo',
+  label_es: 'OXXO',
+  label_en: 'OXXO',
+  icon: '🏪',
 };
-const crypto: PaymentMethodEntry = {
-  id: 'crypto',
-  label_es: 'Criptografía',
-  label_en: 'Crypto',
-  icon: '₿',
-};
-const customerBalance: PaymentMethodEntry = {
-  id: 'customer_balance',
-  label_es: 'Saldo de cliente',
-  label_en: 'Customer Balance',
-  icon: '💰',
+
+// Bank redirects
+const bancontact: PaymentMethodEntry = {
+  id: 'bancontact',
+  label_es: 'Bancontact',
+  label_en: 'Bancontact',
+  icon: '🏦',
 };
 const eps: PaymentMethodEntry = {
   id: 'eps',
@@ -74,47 +71,17 @@ const giropay: PaymentMethodEntry = {
   label_en: 'Giropay',
   icon: '🏦',
 };
-const googlePay: PaymentMethodEntry = {
-  id: 'google_pay',
-  label_es: 'Google Pay',
-  label_en: 'Google Pay',
-  icon: '🔵',
-};
 const ideal: PaymentMethodEntry = {
   id: 'ideal',
   label_es: 'iDEAL',
   label_en: 'iDEAL',
   icon: '🇳🇱',
 };
-const link: PaymentMethodEntry = {
-  id: 'link',
-  label_es: 'Link by Stripe',
-  label_en: 'Link by Stripe',
-  icon: '🔗',
-};
-const mbWay: PaymentMethodEntry = {
-  id: 'mb_way',
-  label_es: 'MB WAY',
-  label_en: 'MB WAY',
-  icon: '📱',
-};
-const oxxo: PaymentMethodEntry = {
-  id: 'oxxo',
-  label_es: 'OXXO',
-  label_en: 'OXXO',
-  icon: '🏪',
-};
 const przelewy24: PaymentMethodEntry = {
   id: 'p24',
   label_es: 'Przelewy24',
   label_en: 'Przelewy24',
   icon: '🇵🇱',
-};
-const sepaDebit: PaymentMethodEntry = {
-  id: 'sepa_debit',
-  label_es: 'SEPA Direct Debit',
-  label_en: 'SEPA Direct Debit',
-  icon: '🇪🇺',
 };
 const sofort: PaymentMethodEntry = {
   id: 'sofort',
@@ -123,48 +90,73 @@ const sofort: PaymentMethodEntry = {
   icon: '🇪🇺',
 };
 
-const PAYMENT_METHODS_BY_COUNTRY: Record<string, PaymentMethodEntry[]> = {
-  // North America
-  US: [card, applePay, googlePay, link, crypto, customerBalance],
-  CA: [card, applePay, googlePay, link, crypto, customerBalance],
-  MX: [card, applePay, googlePay, link, oxxo],
-
-  // Central/South America
-  BR: [card, applePay, googlePay, link],
-  AR: [card, applePay, googlePay, link],
-  CL: [card, applePay, googlePay, link],
-  CO: [card, applePay, googlePay, link],
-  PE: [card, applePay, googlePay, link],
-
-  // Europe
-  ES: [card, applePay, googlePay, link, sepaDebit],
-  FR: [card, applePay, googlePay, link, cartesBancaires, sepaDebit],
-  DE: [card, applePay, googlePay, link, sepaDebit, eps, giropay],
-  AT: [card, applePay, googlePay, link, sepaDebit, eps],
-  GB: [card, applePay, googlePay, link],
-  BE: [card, applePay, googlePay, link, bancontact, sepaDebit],
-  NL: [card, applePay, googlePay, link, ideal, sepaDebit, sofort],
-  IT: [card, applePay, googlePay, link, sepaDebit],
-  PT: [card, applePay, googlePay, link, mbWay, sepaDebit],
-  PL: [card, applePay, googlePay, link, przelewy24, sepaDebit],
-  SE: [card, applePay, googlePay, link, sepaDebit],
-  NO: [card, applePay, googlePay, link, sepaDebit],
-  DK: [card, applePay, googlePay, link, sepaDebit],
-  FI: [card, applePay, googlePay, link, sepaDebit],
-  CH: [card, applePay, googlePay, link, sepaDebit],
-  CZ: [card, applePay, googlePay, link, sepaDebit],
-  GR: [card, applePay, googlePay, link, sepaDebit],
-
-  // Asia
-  JP: [card, applePay, googlePay, link],
-  SG: [card, applePay, googlePay, link],
-  HK: [card, applePay, googlePay, link],
-  IN: [card, applePay, googlePay, link],
-  AU: [card, applePay, googlePay, link],
+// Bank debits
+const sepaDebit: PaymentMethodEntry = {
+  id: 'sepa_debit',
+  label_es: 'SEPA Direct Debit',
+  label_en: 'SEPA Direct Debit',
+  icon: '🇪🇺',
 };
 
-// Default fallback for unknown countries — card + wallets (universally available)
-const DEFAULT_METHODS = [card, applePay, googlePay, link];
+// Wallets (local)
+const cartesBancaires: PaymentMethodEntry = {
+  id: 'cartes_bancaires',
+  label_es: 'Cartes Bancaires',
+  label_en: 'Cartes Bancaires',
+  icon: '💳',
+};
+const mbWay: PaymentMethodEntry = {
+  id: 'mb_way',
+  label_es: 'MB WAY',
+  label_en: 'MB WAY',
+  icon: '📱',
+};
+
+const PAYMENT_METHODS_BY_COUNTRY: Record<string, PaymentMethodEntry[]> = {
+  // North America
+  // Apple Pay + Google Pay are automatic via 'card'; Link is added by backend for admin
+  US: [card],
+  CA: [card],
+  MX: [card, oxxo],
+
+  // Central/South America
+  BR: [card],
+  AR: [card],
+  CL: [card],
+  CO: [card],
+  PE: [card],
+
+  // Europe
+  // sepa_debit covers the SEPA zone (EU+ CH, NO)
+  // cartes_bancaires: automatic for French Visa/MC cards, but also explicit for non-French issuers
+  ES: [card, sepaDebit],
+  FR: [card, cartesBancaires, sepaDebit],
+  DE: [card, sepaDebit, eps, giropay],
+  AT: [card, sepaDebit, eps],
+  GB: [card],
+  BE: [card, bancontact, sepaDebit],
+  NL: [card, ideal, sepaDebit, sofort],
+  IT: [card, sepaDebit],
+  PT: [card, mbWay, sepaDebit],
+  PL: [card, przelewy24, sepaDebit],
+  SE: [card, sepaDebit],
+  NO: [card, sepaDebit],
+  DK: [card, sepaDebit],
+  FI: [card, sepaDebit],
+  CH: [card, sepaDebit],
+  CZ: [card],
+  GR: [card, sepaDebit],
+
+  // Asia / Oceania
+  JP: [card],
+  SG: [card],
+  HK: [card],
+  IN: [card],
+  AU: [card],
+};
+
+// Default fallback for unknown countries — card only (wallets + link are automatic)
+const DEFAULT_METHODS = [card];
 
 // Each payment method field on the configuration object has this shape.
 type PaymentMethodConfigEntry = {

@@ -154,7 +154,7 @@ export const createBookingBusiness = async (
       ...bookingData,
       source: 'admin', // Hardcoded: indica que viene del admin
       countryCode: countryCodeFromPayload !== '' ? countryCodeFromPayload : 'MX', // Usa el código del país del payload o 'MX' por defecto
-      paymentMethods: ['card', 'oxxo'], // Hardcoded: métodos de pago disponibles
+      paymentMethods: bookingData.paymentMethods ?? ['card'], // Usa el método seleccionado en el admin
       minimumPayment: bookingData.minimumPayment ?? 0,
     };
 
@@ -164,44 +164,16 @@ export const createBookingBusiness = async (
       success?: boolean;
       message?: string;
       data?: Booking;
-      error?: {
-        message?: string;
-        response?: { data?: { message?: string } };
-        code?: string;
-        status?: number;
-      };
+      error?: string;
     };
 
     if (result.success === true && result.data !== undefined) {
       return result as { success: boolean; message?: string; data?: Booking };
     }
 
-    // Extract error message from various possible structures
-    let errorMessage = 'Error creating booking';
-
-    if (result.message !== undefined) {
-      errorMessage = result.message;
-    } else if (result.error !== undefined) {
-      // Check axios response data first (contains the real API error)
-      const responseData = result.error.response?.data as
-        | { error?: string; message?: string }
-        | undefined;
-      if (responseData?.error !== undefined) {
-        errorMessage = responseData.error;
-      } else if (responseData?.message !== undefined) {
-        errorMessage = responseData.message;
-      } else if (typeof result.error === 'string') {
-        errorMessage = result.error;
-      } else if (result.error.message !== undefined) {
-        errorMessage = result.error.message;
-      } else {
-        errorMessage = String(result.error);
-      }
-    }
-
     return {
       success: false,
-      message: errorMessage,
+      message: result.message ?? result.error ?? 'Error creating booking',
     };
   } catch (error) {
     console.error('❌ [createBookingBusiness] Exception caught:', error);

@@ -163,6 +163,28 @@ export const getBookingById = async (
 };
 
 /**
+ * Extracts a human-readable error message from an AxiosError or any unknown error.
+ * Checks the actual API response body first, then falls back to the axios message.
+ */
+function extractApiError(error: unknown): string {
+  if (error !== null && typeof error === 'object') {
+    const e = error as {
+      response?: { data?: unknown; status?: number };
+      message?: string;
+    };
+    const data = e.response?.data;
+    if (data !== null && data !== undefined && typeof data === 'object') {
+      const d = data as Record<string, unknown>;
+      if (typeof d.error === 'string' && d.error !== '') return d.error;
+      if (typeof d.message === 'string' && d.message !== '') return d.message;
+    }
+    if (typeof e.message === 'string' && e.message !== '') return e.message;
+  }
+  if (typeof error === 'string' && error !== '') return error;
+  return 'An unknown error occurred';
+}
+
+/**
  * Create new booking
  */
 export const createBooking = async (
@@ -198,27 +220,18 @@ export const createBooking = async (
 
     // Check if result contains an error (from createServiceREST catch)
     if (result !== null && typeof result === 'object' && 'error' in result) {
-      console.error('❌ [CREATE BOOKING] Error in result:', result.error);
-      return { success: false, error: result.error };
+      const errorMessage = extractApiError(result.error);
+      console.error('❌ [CREATE BOOKING] Error in result:', errorMessage);
+      return { success: false, error: errorMessage };
     }
 
     console.warn('✅ [CREATE BOOKING] Success! Result:', JSON.stringify(result, null, 2));
     // Cast result to object type to allow spread
     return { success: true, ...(result as Record<string, unknown>) };
   } catch (error) {
-    console.error('❌ [CREATE BOOKING] Error caught:', error);
-    if (error instanceof Error) {
-      console.error('❌ [CREATE BOOKING] Error message:', error.message);
-      if (error.message.includes('ECONNREFUSED')) {
-        console.warn(
-          '⚠️ [CREATE BOOKING] Backend API is not available. Please ensure that backend server is running at:',
-          BASE_URL
-        );
-      }
-    } else {
-      console.error('❌ [CREATE BOOKING] Unknown error:', error);
-    }
-    return { error, success: false };
+    const errorMessage = extractApiError(error);
+    console.error('❌ [CREATE BOOKING] Error caught:', errorMessage);
+    return { success: false, error: errorMessage };
   }
 };
 
