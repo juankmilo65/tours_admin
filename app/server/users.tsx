@@ -354,13 +354,6 @@ export const getUsersDropdown = async (
   token: string | undefined = undefined,
   language = 'es'
 ): Promise<unknown> => {
-  console.warn('🎯 [GET USERS DROPDOWN] Starting with params:', {
-    roles,
-    isActive,
-    language,
-    BASE_URL,
-  });
-
   // Check if backend URL is configured
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn('⚠️ [GET USERS DROPDOWN] BACKEND_URL is not configured, returning empty');
@@ -369,8 +362,6 @@ export const getUsersDropdown = async (
 
   try {
     const usersEndpoint = 'users/dropdown';
-    const fullUrl = `${BASE_URL}/${usersEndpoint}`;
-    console.warn('🌐 [GET USERS DROPDOWN] Full URL to call:', fullUrl);
 
     // Build query params - use URLSearchParams for arrays
     const queryParams = new URLSearchParams();
@@ -397,11 +388,6 @@ export const getUsersDropdown = async (
       params[key] = value;
     });
 
-    console.warn('📡 [GET USERS DROPDOWN] Calling backend with headers:', {
-      'X-Language': language,
-      params,
-    });
-
     const result = await usersService.get({
       params,
       headers: {
@@ -409,7 +395,6 @@ export const getUsersDropdown = async (
       },
     });
 
-    console.warn('✅ [GET USERS DROPDOWN] Success! Result:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
     // Handle network errors gracefully (ECONNREFUSED, etc.)

@@ -273,12 +273,12 @@ export default function Bookings(): JSX.Element {
   });
 
   // Refresh bookings function
-  const refreshBookings = async () => {
+  const refreshBookings = async (pageOverride?: number) => {
     dispatch(setGlobalLoading({ isLoading: true, message: t('common.loading') ?? 'Cargando...' }));
 
     try {
       const result = await getAllBookingsBusiness({
-        page,
+        page: pageOverride ?? page,
         limit,
         user_id: userFilter, // Use user filter
         tour_id: tourIdFilter,
@@ -345,6 +345,7 @@ export default function Bookings(): JSX.Element {
     }
 
     if (countryId !== undefined && countryId !== null && countryId !== '') {
+      setHasSearched(true);
       void refreshBookings();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -421,7 +422,9 @@ export default function Bookings(): JSX.Element {
     setHasSearched(true);
     setFiltersChanged(false);
     setPage(1);
-    await refreshBookings();
+    // Pass pageOverride=1 explicitly: setPage(1) is async so
+    // refreshBookings() would otherwise read the stale page value.
+    await refreshBookings(1);
   };
 
   // Wrapper functions to mark filters as changed when modified
