@@ -76,6 +76,7 @@ export function BookingStatusModal({
   const token = useAppSelector(selectAuthToken);
   const auth = useAppSelector(selectAuth);
   const isAdmin = auth.user?.role === 'admin';
+  const isOwner = auth.user?.role === 'owner';
 
   const [nextStatus, setNextStatus] = useState<NextBookingStatus | null>(null);
   const [nextStatusError, setNextStatusError] = useState<string | null>(null);
@@ -448,14 +449,14 @@ export function BookingStatusModal({
               {nextStatusError}
             </div>
           )}
-          {/* Next status button: solo visible para admin cuando el siguiente estado es 'paid' */}
+          {/* Next status button: admin siempre que esté en pending_confirmation; owner solo cuando el siguiente es 'confirmed' */}
           {!loadingData &&
           nextStatus &&
           !nextStatusError &&
           isActiveStatus &&
           nextStatus.nextStatusName &&
           booking.status === 'pending_confirmation' &&
-          isAdmin ? (
+          (isAdmin || (isOwner && nextStatus.nextStatusCode === 'confirmed')) ? (
             <button
               type="button"
               disabled={isTransitioning}
