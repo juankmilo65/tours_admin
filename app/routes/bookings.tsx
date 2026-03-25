@@ -257,7 +257,11 @@ export default function Bookings(): JSX.Element {
   }>({ isOpen: false, clients: [], confirmationCode: '' });
 
   // Edit modal state
-  const [editModal, setEditModal] = useState<{ isOpen: boolean; booking: Booking | null }>({
+  const [editModal, setEditModal] = useState<{
+    isOpen: boolean;
+    booking: Booking | null;
+    readOnly?: boolean;
+  }>({
     isOpen: false,
     booking: null,
   });
@@ -396,12 +400,12 @@ export default function Bookings(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, currentUser]);
 
-  const handleEditBooking = async (bookingId: string) => {
+  const handleEditBooking = async (bookingId: string, readOnly = false) => {
     dispatch(setGlobalLoading({ isLoading: true, message: t('common.loading') ?? 'Cargando...' }));
     try {
       const result = await getBookingByIdBusiness(bookingId, token ?? '', language);
       if (result.success === true && result.data !== undefined) {
-        setEditModal({ isOpen: true, booking: result.data });
+        setEditModal({ isOpen: true, booking: result.data, readOnly });
       } else {
         showError({ messageKey: 'common.loadError', fallback: result.error });
       }
@@ -746,48 +750,90 @@ export default function Bookings(): JSX.Element {
         // Si es admin, mostrar editar y modal de estados
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Edit booking */}
-            <button
-              type="button"
-              onClick={() => void handleEditBooking(row.id)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 38,
-                height: 38,
-                borderRadius: 'var(--radius-lg, 10px)',
-                border: 'none',
-                cursor: 'pointer',
-                backgroundColor: 'var(--color-neutral-100, #f3f4f6)',
-                color: 'var(--color-neutral-600, #4b5563)',
-                transition: 'all .18s ease',
-                lineHeight: 1,
-              }}
-              title={language === 'en' ? 'Edit' : 'Editar'}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-neutral-200, #e5e7eb)';
-                e.currentTarget.style.color = 'var(--color-neutral-800, #1f2937)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-neutral-100, #f3f4f6)';
-                e.currentTarget.style.color = 'var(--color-neutral-600, #4b5563)';
-              }}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            {/* Edit (solo 'requested') o Ver (resto de estados) */}
+            {row.status === 'requested' ? (
+              <button
+                type="button"
+                onClick={() => void handleEditBooking(row.id, false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 38,
+                  height: 38,
+                  borderRadius: 'var(--radius-lg, 10px)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: 'var(--color-neutral-100, #f3f4f6)',
+                  color: 'var(--color-neutral-600, #4b5563)',
+                  transition: 'all .18s ease',
+                  lineHeight: 1,
+                }}
+                title={language === 'en' ? 'Edit' : 'Editar'}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-neutral-200, #e5e7eb)';
+                  e.currentTarget.style.color = 'var(--color-neutral-800, #1f2937)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-neutral-100, #f3f4f6)';
+                  e.currentTarget.style.color = 'var(--color-neutral-600, #4b5563)';
+                }}
               >
-                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                <path d="m15 5 4 4" />
-              </svg>
-            </button>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  <path d="m15 5 4 4" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleEditBooking(row.id, true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 38,
+                  height: 38,
+                  borderRadius: 'var(--radius-lg, 10px)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: '#eff6ff',
+                  color: '#2563eb',
+                  transition: 'all .18s ease',
+                  lineHeight: 1,
+                }}
+                title={language === 'en' ? 'View' : 'Ver'}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#dbeafe';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = '#eff6ff';
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            )}
             {/* Status history */}
             <button
               type="button"
@@ -1230,6 +1276,7 @@ export default function Bookings(): JSX.Element {
       <EditBookingModal
         isOpen={editModal.isOpen}
         booking={editModal.booking}
+        readOnly={editModal.readOnly ?? false}
         onClose={() => setEditModal({ isOpen: false, booking: null })}
         onSuccess={() => {
           void refreshBookings();
