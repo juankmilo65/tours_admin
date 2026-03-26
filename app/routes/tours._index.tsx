@@ -1674,8 +1674,16 @@ function ToursClient(): JSX.Element {
             onClose={() => setEditingTour(null)}
             onSuccess={() => {
               setEditingTour(null);
-              window.sessionStorage.setItem('tours_success_message', 'update');
-              window.location.reload();
+              dispatch(
+                openModal({
+                  id: 'update-tour-success',
+                  type: 'confirm',
+                  title: t('common.success'),
+                  isOpen: true,
+                  data: { message: t('tours.tourUpdatedSuccess'), icon: 'success' },
+                })
+              );
+              void fetchTours();
             }}
           />
         )}
