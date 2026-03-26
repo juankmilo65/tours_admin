@@ -5,13 +5,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
-import type { Tour, Language, TourDay, TourActivity } from '~/types/PayloadTourDataProps';
+import type {
+  Tour,
+  Language,
+  TourDay,
+  TourActivity,
+  CancellationPolicy,
+} from '~/types/PayloadTourDataProps';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
 import { selectLanguage } from '~/store/slices/uiSlice';
 import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
 import { setGlobalLoading, openModal } from '~/store/slices/uiSlice';
+import { selectAuthToken } from '~/store/slices/authSlice';
+import { updateTourBusiness } from '~/server/businessLogic/toursBusinessLogic';
 import Select from '~/components/ui/Select';
 import { Button } from '~/components/ui/Button';
 import { ActivitiesByDay } from '~/components/tours/ActivitiesByDay';
@@ -106,6 +114,7 @@ export function TourEditForm({
   const currentLanguage = useAppSelector(selectLanguage) as Language;
   const currencyCode = useAppSelector(selectSelectedCurrencyCode);
   const rawCities = useAppSelector(selectCities);
+  const token = useAppSelector(selectAuthToken);
   const cities = translateCities(
     rawCities.filter((city) => city.isActive === true),
     currentLanguage
@@ -133,6 +142,32 @@ export function TourEditForm({
   // Days and activities state
   const [days, setDays] = useState<TourDay[]>([]);
   const [availableActivities, setAvailableActivities] = useState<TourActivity[]>([]);
+
+  // Cancellation policies state
+  const defaultPolicyForm = (): CancellationPolicy => ({
+    daysBeforeTour: 0,
+    refundPercentage: 100,
+    administrativeFee: 0,
+    appliesToPaymentMethods: ['card'],
+    description_es: '',
+    description_en: '',
+    isActive: true,
+  });
+  const [cancellationPolicies, setCancellationPolicies] = useState<CancellationPolicy[]>([]);
+  const [isPoliciesOpen, setIsPoliciesOpen] = useState(true);
+  const [isAddPolicyOpen, setIsAddPolicyOpen] = useState(false);
+  const [editingPolicyIndex, setEditingPolicyIndex] = useState<number | null>(null);
+  const [policyForm, setPolicyForm] = useState<CancellationPolicy>(defaultPolicyForm());
+  const [policyFormErrors, setPolicyFormErrors] = useState<
+    Partial<Record<keyof CancellationPolicy, string>>
+  >({});
+
+  // Terms & conditions state
+  const [termsConditions, setTermsConditions] = useState<{
+    terms_conditions_es: string;
+    terms_conditions_en: string;
+  }>({ terms_conditions_es: '', terms_conditions_en: '' });
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
 
   // Track if data has been initialized to prevent re-runs
   const dataInitialized = useRef(false);
@@ -201,6 +236,20 @@ export function TourEditForm({
         setDays(data.days);
       }
 
+      // Load cancellation policies
+      setCancellationPolicies(
+        Array.isArray(data.cancellationPolicies) ? data.cancellationPolicies : []
+      );
+
+      // Load terms & conditions
+      const tc = data.termsConditions;
+      if (tc !== null && tc !== undefined) {
+        setTermsConditions({
+          terms_conditions_es: tc.terms_conditions_es ?? '',
+          terms_conditions_en: tc.terms_conditions_en ?? '',
+        });
+      }
+
       setLoading(false);
       dataInitialized.current = true;
       return;
@@ -251,6 +300,20 @@ export function TourEditForm({
           // Load days from API response
           if (Array.isArray(data.days) && data.days.length > 0) {
             setDays(data.days);
+          }
+
+          // Load cancellation policies
+          setCancellationPolicies(
+            Array.isArray(data.cancellationPolicies) ? data.cancellationPolicies : []
+          );
+
+          // Load terms & conditions
+          const tc = data.termsConditions;
+          if (tc !== null && tc !== undefined) {
+            setTermsConditions({
+              terms_conditions_es: tc.terms_conditions_es ?? '',
+              terms_conditions_en: tc.terms_conditions_en ?? '',
+            });
           }
 
           dataInitialized.current = true;
@@ -429,28 +492,34 @@ export function TourEditForm({
     dispatch(setGlobalLoading({ isLoading: true, message: 'Guardando tour...' }));
 
     try {
-      // Prepare data for API
-      const formData = new FormData();
-      formData.append('action', 'updateTourBusiness');
-      formData.append('tourId', tourId);
-      formData.append(
-        'data',
-        JSON.stringify({
-          ...tourData,
-          days,
-          daysCount: days.length,
-          amenities: selectedAmenities,
-          requirements: selectedRequirements,
-          offers: selectedOffers,
-          included: Object.entries(selectedIncluded).map(([id, included]) => ({ id, included })),
-          language: selectedLanguages,
-        })
-      );
+      const payload: Record<string, unknown> = {
+        ...tourData,
+        days,
+        daysCount: days.length,
+        amenities: selectedAmenities,
+        requirements: selectedRequirements,
+        offers: selectedOffers,
+        included: Object.entries(selectedIncluded).map(([id, included]) => ({ id, included })),
+        language: selectedLanguages,
+      };
 
-      // Add new images
-      newImages.forEach((file, index) => {
-        formData.append(`images[${index}]`, file);
-      });
+      const result = await updateTourBusiness(tourId, payload, token ?? '');
+
+      if (result !== null && typeof result === 'object' && 'error' in result) {
+        const err = result.error as { message?: string };
+        dispatch(
+          openModal({
+            id: 'error-save-tour',
+            type: 'confirm',
+            title: 'Error',
+            isOpen: true,
+            data: { message: err.message ?? 'Failed to save tour', icon: 'alert' },
+          })
+        );
+        setSaving(false);
+        dispatch(setGlobalLoading({ isLoading: false }));
+        return;
+      }
 
       await onSave();
     } catch (error) {
@@ -459,15 +528,6 @@ export function TourEditForm({
       } else {
         console.error('Error saving tour:', error);
       }
-      dispatch(
-        openModal({
-          id: 'error-load-tour',
-          type: 'confirm',
-          title: 'Error',
-          isOpen: true,
-          data: { message: 'Failed to load tour data', icon: 'error' },
-        })
-      );
       dispatch(
         openModal({
           id: 'error-save-tour',
@@ -1271,6 +1331,289 @@ export function TourEditForm({
             setDays(days.filter((_, i) => i !== dayIndex));
           }}
         />
+      </div>
+
+      {/* Cancellation Policies */}
+      <div style={{ marginBottom: 'var(--space-6)' }}>
+        {/* Accordion header */}
+        <button
+          type="button"
+          onClick={() => setIsPoliciesOpen((prev) => !prev)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: 'var(--space-3) var(--space-4)',
+            backgroundColor: 'var(--color-neutral-50)',
+            border: '1px solid var(--color-neutral-200)',
+            borderRadius: isPoliciesOpen
+              ? 'var(--radius-md) var(--radius-md) 0 0'
+              : 'var(--radius-md)',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <span
+              style={{
+                fontWeight: 'var(--font-weight-semibold)',
+                fontSize: 'var(--text-sm)',
+                color: 'var(--color-neutral-800)',
+              }}
+            >
+              {t('tours.cancellationPolicies') ?? 'Políticas de Cancelación'}
+            </span>
+            {cancellationPolicies.length > 0 && (
+              <span
+                style={{
+                  backgroundColor: 'var(--color-primary-100)',
+                  color: 'var(--color-primary-700)',
+                  borderRadius: '9999px',
+                  padding: '1px 8px',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 'var(--font-weight-medium)',
+                }}
+              >
+                {cancellationPolicies.length}
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: '12px', color: 'var(--color-neutral-500)' }}>
+            {isPoliciesOpen ? '▲' : '▼'}
+          </span>
+        </button>
+
+        {isPoliciesOpen && (
+          <div
+            style={{
+              border: '1px solid var(--color-neutral-200)',
+              borderTop: 'none',
+              borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+              padding: 'var(--space-4)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-3)',
+            }}
+          >
+            {/* Policy list */}
+            {cancellationPolicies.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: 'var(--space-6)',
+                  color: 'var(--color-neutral-400)',
+                  fontSize: 'var(--text-sm)',
+                }}
+              >
+                <div style={{ marginBottom: 'var(--space-1)' }}>
+                  {t('tours.noPoliciesAdded') ?? 'No hay políticas de cancelación'}
+                </div>
+                <div style={{ fontSize: 'var(--text-xs)' }}>
+                  {t('tours.noPoliciesDescription') ??
+                    'Haz clic en "+ Agregar Política" para definir las reglas'}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                {cancellationPolicies.map((policy, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      padding: 'var(--space-3)',
+                      backgroundColor: 'var(--color-neutral-50)',
+                      border: '1px solid var(--color-neutral-200)',
+                      borderRadius: 'var(--radius-sm)',
+                      gap: 'var(--space-3)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 'var(--space-2)',
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-neutral-700)',
+                      }}
+                    >
+                      <span
+                        style={{
+                          backgroundColor: 'var(--color-neutral-200)',
+                          borderRadius: 'var(--radius-sm)',
+                          padding: '2px 8px',
+                          fontWeight: 'var(--font-weight-medium)',
+                        }}
+                      >
+                        {policy.daysBeforeTour === 0
+                          ? currentLanguage === 'en'
+                            ? 'Same day'
+                            : 'Mismo día'
+                          : `${policy.daysBeforeTour} ${currentLanguage === 'en' ? 'days before' : 'días antes'}`}
+                      </span>
+                      <span
+                        style={{
+                          backgroundColor: 'var(--color-success-100, #dcfce7)',
+                          color: 'var(--color-success-700, #15803d)',
+                          borderRadius: 'var(--radius-sm)',
+                          padding: '2px 8px',
+                          fontWeight: 'var(--font-weight-medium)',
+                        }}
+                      >
+                        {policy.refundPercentage}%{' '}
+                        {currentLanguage === 'en' ? 'refund' : 'reembolso'}
+                      </span>
+                      {policy.administrativeFee > 0 && (
+                        <span
+                          style={{
+                            backgroundColor: 'var(--color-warning-100, #fef9c3)',
+                            color: 'var(--color-warning-700, #a16207)',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '2px 8px',
+                          }}
+                        >
+                          {currentLanguage === 'en' ? 'Fee' : 'Comisión'}:{' '}
+                          {policy.administrativeFee}
+                        </span>
+                      )}
+                      {policy.appliesToPaymentMethods.length > 0 && (
+                        <span style={{ color: 'var(--color-neutral-500)' }}>
+                          {policy.appliesToPaymentMethods.join(', ')}
+                        </span>
+                      )}
+                      {(policy.description_es !== '' || policy.description_en !== '') && (
+                        <span
+                          style={{
+                            width: '100%',
+                            color: 'var(--color-neutral-600)',
+                            fontStyle: 'italic',
+                          }}
+                        >
+                          {currentLanguage === 'en' ? policy.description_en : policy.description_es}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Terms & Conditions */}
+      <div style={{ marginBottom: 'var(--space-6)' }}>
+        <button
+          type="button"
+          onClick={() => setIsTermsOpen((prev) => !prev)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: 'var(--space-3) var(--space-4)',
+            backgroundColor: 'var(--color-neutral-50)',
+            border: '1px solid var(--color-neutral-200)',
+            borderRadius: isTermsOpen
+              ? 'var(--radius-md) var(--radius-md) 0 0'
+              : 'var(--radius-md)',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 'var(--font-weight-semibold)',
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-neutral-800)',
+            }}
+          >
+            {t('tours.termsConditions') ?? 'Términos y Condiciones'}
+          </span>
+          <span style={{ fontSize: '12px', color: 'var(--color-neutral-500)' }}>
+            {isTermsOpen ? '▲' : '▼'}
+          </span>
+        </button>
+
+        {isTermsOpen && (
+          <div
+            style={{
+              border: '1px solid var(--color-neutral-200)',
+              borderTop: 'none',
+              borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+              padding: 'var(--space-4)',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 'var(--space-4)',
+            }}
+          >
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-700)',
+                  marginBottom: 'var(--space-1)',
+                }}
+              >
+                {t('tours.termsSpanish') ?? 'Términos (Español)'}
+              </label>
+              <textarea
+                rows={8}
+                value={termsConditions.terms_conditions_es}
+                readOnly
+                style={{
+                  width: '100%',
+                  padding: 'var(--space-2)',
+                  border: '1px solid var(--color-neutral-300)',
+                  borderRadius: 'var(--radius-md)',
+                  resize: 'none',
+                  fontFamily: 'inherit',
+                  fontSize: 'var(--text-sm)',
+                  boxSizing: 'border-box',
+                  backgroundColor: 'var(--color-neutral-50)',
+                  color: 'var(--color-neutral-700)',
+                  cursor: 'default',
+                }}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-700)',
+                  marginBottom: 'var(--space-1)',
+                }}
+              >
+                {t('tours.termsEnglish') ?? 'Terms (English)'}
+              </label>
+              <textarea
+                rows={8}
+                value={termsConditions.terms_conditions_en}
+                readOnly
+                style={{
+                  width: '100%',
+                  padding: 'var(--space-2)',
+                  border: '1px solid var(--color-neutral-300)',
+                  borderRadius: 'var(--radius-md)',
+                  resize: 'none',
+                  fontFamily: 'inherit',
+                  fontSize: 'var(--text-sm)',
+                  boxSizing: 'border-box',
+                  backgroundColor: 'var(--color-neutral-50)',
+                  color: 'var(--color-neutral-700)',
+                  cursor: 'default',
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Error Summary */}

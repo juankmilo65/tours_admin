@@ -73,6 +73,17 @@ export interface TourIncludedItem {
   sortOrder: number;
 }
 
+// Cancellation Policy Types
+export interface CancellationPolicy {
+  daysBeforeTour: number;
+  refundPercentage: number;
+  administrativeFee: number;
+  appliesToPaymentMethods: string[];
+  description_es: string;
+  description_en: string;
+  isActive: boolean;
+}
+
 // Category Types (with translations)
 export interface Category {
   id: string;
@@ -148,6 +159,7 @@ export interface Tour {
   amenities: TourAmenity[];
   requirements: TourRequirement[];
   included: TourIncludedItem[];
+  cancellationPolicies: CancellationPolicy[];
   termsConditions: {
     id: string;
     terms_conditions_es: string;

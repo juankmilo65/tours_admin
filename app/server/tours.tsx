@@ -232,7 +232,7 @@ export const updateTour = async (
     const toursEndpoint = `tours/${tourId}`;
     const toursService = createServiceREST(BASE_URL, toursEndpoint, token);
 
-    const result = await toursService.update(payload);
+    const result = await toursService.update(payload, { timeout: 60000 });
 
     console.warn('✅ [UPDATE TOUR] Success! Result:', JSON.stringify(result, null, 2));
     return result;
