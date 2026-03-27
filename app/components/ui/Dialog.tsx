@@ -8,6 +8,8 @@ interface DialogProps {
   children: ReactNode;
   footer?: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  closeOnOverlayClick?: boolean;
+  closeOnEscape?: boolean;
 }
 
 export function Dialog({
@@ -17,6 +19,8 @@ export function Dialog({
   children,
   footer,
   size = 'md',
+  closeOnOverlayClick = true,
+  closeOnEscape = true,
 }: DialogProps): JSX.Element | null {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -30,7 +34,9 @@ export function Dialog({
   // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && closeOnEscape) {
+        onClose();
+      }
     };
 
     if (isOpen) {
@@ -42,11 +48,11 @@ export function Dialog({
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, closeOnEscape]);
 
   // Close on click outside
   const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) {
+    if (e.target === overlayRef.current && closeOnOverlayClick) {
       onClose();
     }
   };

@@ -1702,6 +1702,76 @@ input[type='range']::-moz-range-track {
   margin-bottom: 0;
 }
 
+/* Languages Toggle Switch */
+.language-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.language-toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 24px;
+  background-color: #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.language-toggle-switch.active {
+  background-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+.language-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: white;
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.language-toggle-switch.active .language-toggle-knob {
+  left: 26px;
+}
+
+.language-toggle-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  text-transform: uppercase;
+  min-width: 60px;
+}
+
+.language-toggle-label.active {
+  color: #047857;
+}
+
+/* Edit Button for Languages */
+.language-edit-btn {
+  padding: 10px;
+  border-radius: 12px;
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.language-edit-btn:hover {
+  background-color: rgba(59, 130, 246, 0.2);
+  transform: translateY(-2px);
+}
+
 /* Responsive Utilities - Hidden on Mobile */
 @media (max-width: 1023px) {
   .lg\:block {

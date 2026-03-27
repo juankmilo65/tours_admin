@@ -30,7 +30,7 @@ export function GlobalLoader(): JSX.Element | null {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10000,
+        zIndex: 99999,
         backdropFilter: 'blur(4px)',
       }}
     >
