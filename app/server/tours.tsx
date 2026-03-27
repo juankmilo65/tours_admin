@@ -185,7 +185,7 @@ export const createTour = async (
     const toursEndpoint = 'tours';
     const toursService = createServiceREST(BASE_URL, toursEndpoint, token);
 
-    const result = await toursService.create(payload);
+    const result = await toursService.create(payload, { timeout: 60000 });
 
     console.warn('✅ [CREATE TOUR] Success! Result:', JSON.stringify(result, null, 2));
     return result;

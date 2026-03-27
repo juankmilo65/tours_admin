@@ -717,6 +717,7 @@ export function CreateTourModal({
       }
 
       // Success
+      dispatch(setGlobalLoading({ isLoading: false }));
       dispatch(closeModal(isEditMode ? 'edit-tour' : 'create-tour'));
       if (onSuccess !== undefined) {
         onSuccess();
@@ -2196,20 +2197,48 @@ export function CreateTourModal({
                 }}
               >
                 {isEditMode ? (
-                  <span
-                    style={{
-                      fontSize: 'var(--text-sm)',
-                      color:
-                        formData.termsConditions !== null
-                          ? 'var(--color-success-600, #16a34a)'
-                          : 'var(--color-neutral-500)',
-                      fontWeight: 'var(--font-weight-medium)',
-                    }}
-                  >
-                    {formData.termsConditions !== null
-                      ? `✓ ${t('tours.termsConditionsAdded') ?? 'Términos y condiciones registrados'}`
-                      : (t('tours.noTermsConditions') ?? 'Sin términos y condiciones')}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <span
+                      style={{
+                        fontSize: 'var(--text-sm)',
+                        color:
+                          formData.termsConditions !== null
+                            ? 'var(--color-success-600, #16a34a)'
+                            : 'var(--color-neutral-500)',
+                        fontWeight: 'var(--font-weight-medium)',
+                      }}
+                    >
+                      {formData.termsConditions !== null
+                        ? `✓ ${t('tours.termsConditionsAdded') ?? 'Términos y condiciones registrados'}`
+                        : (t('tours.noTermsConditions') ?? 'Sin términos y condiciones')}
+                    </span>
+                    {formData.termsConditions !== null && (
+                      <button
+                        type="button"
+                        title={t('tours.viewTermsConditions') ?? 'Ver términos y condiciones'}
+                        onClick={() => {
+                          setTermsInputEs(formData.termsConditions?.terms_conditions_es ?? '');
+                          setTermsInputEn(formData.termsConditions?.terms_conditions_en ?? '');
+                          setIsTermsModalOpen(true);
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'none',
+                          border: '1px solid var(--color-neutral-300)',
+                          borderRadius: 'var(--radius-md)',
+                          cursor: 'pointer',
+                          padding: '4px 10px',
+                          color: 'var(--color-neutral-600)',
+                          fontSize: 'var(--text-sm)',
+                          gap: '4px',
+                        }}
+                      >
+                        👁️
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <button
                     type="button"
@@ -2301,9 +2330,11 @@ export function CreateTourModal({
               isOpen={isTermsModalOpen}
               onClose={() => setIsTermsModalOpen(false)}
               title={
-                formData.termsConditions !== null
-                  ? (t('tours.editTermsConditions') ?? 'Edit Terms and Conditions')
-                  : (t('tours.addTermsConditions') ?? 'Add Terms and Conditions')
+                isEditMode
+                  ? (t('tours.viewTermsConditions') ?? 'Términos y Condiciones')
+                  : formData.termsConditions !== null
+                    ? (t('tours.editTermsConditions') ?? 'Edit Terms and Conditions')
+                    : (t('tours.addTermsConditions') ?? 'Add Terms and Conditions')
               }
               size="lg"
               footer={
@@ -2323,45 +2354,47 @@ export function CreateTourModal({
                   >
                     {t('tours.cancelTermsConditions') ?? 'Cancel'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newErrors: { es?: string; en?: string } = {};
-                      if (termsInputEs.trim() === '') {
-                        newErrors.es =
-                          t('tours.termsConditionsEsRequired') ?? 'Spanish terms are required';
-                      }
-                      if (termsInputEn.trim() === '') {
-                        newErrors.en =
-                          t('tours.termsConditionsEnRequired') ?? 'English terms are required';
-                      }
-                      if (Object.keys(newErrors).length > 0) {
-                        setTermsInputErrors(newErrors);
-                        return;
-                      }
-                      setFormData((prev) => ({
-                        ...prev,
-                        termsConditions: {
-                          terms_conditions_es: termsInputEs.trim(),
-                          terms_conditions_en: termsInputEn.trim(),
-                        },
-                        isActive: prev.termsConditions === null ? false : prev.isActive,
-                      }));
-                      setIsTermsModalOpen(false);
-                    }}
-                    style={{
-                      padding: 'var(--space-2) var(--space-4)',
-                      backgroundColor: 'var(--color-primary-600)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 'var(--radius-md)',
-                      cursor: 'pointer',
-                      fontSize: 'var(--text-sm)',
-                      fontWeight: 'var(--font-weight-medium)',
-                    }}
-                  >
-                    {t('tours.saveTermsConditions') ?? 'Save'}
-                  </button>
+                  {!isEditMode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newErrors: { es?: string; en?: string } = {};
+                        if (termsInputEs.trim() === '') {
+                          newErrors.es =
+                            t('tours.termsConditionsEsRequired') ?? 'Spanish terms are required';
+                        }
+                        if (termsInputEn.trim() === '') {
+                          newErrors.en =
+                            t('tours.termsConditionsEnRequired') ?? 'English terms are required';
+                        }
+                        if (Object.keys(newErrors).length > 0) {
+                          setTermsInputErrors(newErrors);
+                          return;
+                        }
+                        setFormData((prev) => ({
+                          ...prev,
+                          termsConditions: {
+                            terms_conditions_es: termsInputEs.trim(),
+                            terms_conditions_en: termsInputEn.trim(),
+                          },
+                          isActive: prev.termsConditions === null ? false : prev.isActive,
+                        }));
+                        setIsTermsModalOpen(false);
+                      }}
+                      style={{
+                        padding: 'var(--space-2) var(--space-4)',
+                        backgroundColor: 'var(--color-primary-600)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 'var(--radius-md)',
+                        cursor: 'pointer',
+                        fontSize: 'var(--text-sm)',
+                        fontWeight: 'var(--font-weight-medium)',
+                      }}
+                    >
+                      {t('tours.saveTermsConditions') ?? 'Save'}
+                    </button>
+                  )}
                 </div>
               }
             >
@@ -2371,11 +2404,13 @@ export function CreateTourModal({
                   rows={6}
                   value={termsInputEs}
                   onChange={(e) => {
+                    if (isEditMode) return;
                     setTermsInputEs(e.target.value);
                     if (termsInputErrors.es !== undefined) {
                       setTermsInputErrors((prev) => ({ ...prev, es: undefined }));
                     }
                   }}
+                  readOnly={isEditMode}
                   error={termsInputErrors.es}
                   placeholder="Escribe los términos y condiciones en español..."
                 />
@@ -2384,11 +2419,13 @@ export function CreateTourModal({
                   rows={6}
                   value={termsInputEn}
                   onChange={(e) => {
+                    if (isEditMode) return;
                     setTermsInputEn(e.target.value);
                     if (termsInputErrors.en !== undefined) {
                       setTermsInputErrors((prev) => ({ ...prev, en: undefined }));
                     }
                   }}
+                  readOnly={isEditMode}
                   error={termsInputErrors.en}
                   placeholder="Write the terms and conditions in English..."
                 />
@@ -2470,6 +2507,73 @@ export function CreateTourModal({
                     borderTop: '1px solid var(--color-neutral-200)',
                   }}
                 >
+                  {/* Legal immutability warning — create mode only */}
+                  {!isEditMode && (
+                    <div
+                      role="alert"
+                      style={{
+                        display: 'flex',
+                        gap: 'var(--space-3)',
+                        padding: 'var(--space-4)',
+                        backgroundColor: '#fffbeb',
+                        border: '1px solid #f59e0b',
+                        borderLeft: '4px solid #d97706',
+                        borderRadius: 'var(--radius-md)',
+                      }}
+                    >
+                      <span style={{ fontSize: '20px', flexShrink: 0, lineHeight: 1.4 }}>⚖️</span>
+                      <div
+                        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-2)',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <strong
+                            style={{
+                              fontSize: 'var(--text-sm)',
+                              color: '#92400e',
+                              fontWeight: 'var(--font-weight-semibold)',
+                            }}
+                          >
+                            {t('tours.cancellationPoliciesImmutableTitle') ??
+                              'Cancellation policies are final and cannot be changed'}
+                          </strong>
+                          <span
+                            style={{
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'var(--font-weight-semibold)',
+                              color: '#92400e',
+                              backgroundColor: '#fde68a',
+                              border: '1px solid #f59e0b',
+                              borderRadius: '9999px',
+                              padding: '1px 10px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {t('tours.cancellationPoliciesImmutableBadge') ??
+                              'Permanent & irrevocable'}
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 'var(--text-xs)',
+                            color: '#78350f',
+                            lineHeight: '1.6',
+                          }}
+                        >
+                          {t('tours.cancellationPoliciesImmutableBody') ??
+                            'Once the tour is created, the cancellation policies will be permanently recorded and cannot be modified or removed.'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Existing policies list */}
                   {formData.cancellationPolicies.length === 0 ? (
                     <div

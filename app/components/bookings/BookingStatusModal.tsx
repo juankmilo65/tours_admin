@@ -94,7 +94,7 @@ export function BookingStatusModal({
 
     const currentCode = booking.status;
 
-    // Solo consultar el próximo estado si no es 'cancelled' o 'confirmed' (sí consultar para 'paid')
+    // Solo consultar el próximo estado si no es 'cancelled' o 'confirmed'
     const needsNextStatus =
       Boolean(currentCode) && currentCode !== 'cancelled' && currentCode !== 'confirmed';
 
@@ -453,14 +453,17 @@ export function BookingStatusModal({
               {nextStatusError}
             </div>
           )}
-          {/* Next status button: admin siempre que esté en pending_confirmation; owner solo cuando el siguiente es 'confirmed' */}
+          {/* Next status button: admin y owner pueden confirmar; solo owner puede poner pending_payment */}
           {!loadingData &&
           nextStatus &&
           !nextStatusError &&
           isActiveStatus &&
           nextStatus.nextStatusName &&
-          booking.status === 'pending_confirmation' &&
-          (isAdmin || (isOwner && nextStatus.nextStatusCode === 'confirmed')) ? (
+          (booking.status === 'pending_confirmation' || booking.status === 'requested') &&
+          ((isAdmin && nextStatus.nextStatusCode === 'confirmed') ||
+            (isOwner &&
+              (nextStatus.nextStatusCode === 'confirmed' ||
+                nextStatus.nextStatusCode === 'pending_payment'))) ? (
             <button
               type="button"
               disabled={isTransitioning}
