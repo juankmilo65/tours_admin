@@ -756,6 +756,8 @@ export default function TermsConditions(): JSX.Element {
               : t('termsConditions.createTermsTitle')
         }
         size="lg"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           viewMode === true ? (
             <>

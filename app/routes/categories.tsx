@@ -470,44 +470,47 @@ export default function Categories(): JSX.Element {
       label: t('categories.actions'),
       render: (_: unknown, row: Category) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          {/* Edit Button */}
+          {/* Edit Button - Pencil Icon like TourCard */}
           <button
             type="button"
             onClick={() => handleOpenEditModal(row)}
             style={{
-              padding: '10px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              color: '#2563eb',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              width: 38,
+              height: 38,
+              borderRadius: 'var(--radius-lg, 10px)',
+              backgroundColor: 'var(--color-neutral-100, #f3f4f6)',
+              color: 'var(--color-neutral-600, #4b5563)',
+              border: 'none',
+              cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+              e.currentTarget.style.backgroundColor = 'var(--color-neutral-200, #e5e7eb)';
+              e.currentTarget.style.color = 'var(--color-neutral-800, #1f2937)';
               e.currentTarget.style.transform = 'translateY(-2px)';
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+              e.currentTarget.style.backgroundColor = 'var(--color-neutral-100, #f3f4f6)';
+              e.currentTarget.style.color = 'var(--color-neutral-600, #4b5563)';
               e.currentTarget.style.transform = 'translateY(0)';
             }}
-            title="Edit Category"
+            title={t('common.edit')}
           >
             <svg
-              style={{ width: '20px', height: '20px' }}
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              viewBox="0 0 24 24"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+              <path d="m15 5 4 4" />
             </svg>
           </button>
 
@@ -754,6 +757,8 @@ export default function Categories(): JSX.Element {
             : t('categories.createCategoryTitle')
         }
         size="lg"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           <>
             <Button

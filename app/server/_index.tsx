@@ -136,6 +136,22 @@ function createServiceREST<T = unknown>(url: string, endpoint: string, token: st
         .catch((error: unknown) => ({ error }));
     },
 
+    put: (payload: unknown, config?: AxiosRequestConfig): Promise<ServiceResult<T>> => {
+      const fullUrl = `${baseURL}${config?.url ?? endpoint}`;
+      logCurlPost({
+        url: fullUrl,
+        method: 'PUT',
+        body: payload,
+        headers: config?.headers as Record<string, string> | undefined,
+        token: token !== '' ? token : undefined,
+        label: `PUT ${config?.url ?? endpoint}`,
+      });
+      return service(token, config)
+        .put<T>(config?.url ?? `/${endpoint}`, payload, config)
+        .then((response: import('axios').AxiosResponse<T>) => response.data)
+        .catch((error: unknown) => ({ error }));
+    },
+
     delete: (): Promise<ServiceResult<T>> => {
       const fullUrl = `${baseURL}${endpoint}`;
       logCurlPost({

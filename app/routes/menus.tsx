@@ -878,6 +878,8 @@ export default function Menus(): JSX.Element {
         }}
         title={isEditMode ? t('menus.editMenuTitle') : t('menus.createMenuTitle')}
         size="md"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           <>
             <Button
@@ -1141,6 +1143,8 @@ export default function Menus(): JSX.Element {
         }}
         title={t('menus.associateRolesTitle')}
         size="md"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           <>
             <Button

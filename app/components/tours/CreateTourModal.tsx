@@ -2337,6 +2337,8 @@ export function CreateTourModal({
                     : (t('tours.addTermsConditions') ?? 'Add Terms and Conditions')
               }
               size="lg"
+              closeOnOverlayClick={false}
+              closeOnEscape={false}
               footer={
                 <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
                   <button

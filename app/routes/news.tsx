@@ -1017,6 +1017,8 @@ export default function NewsRoute(): JSX.Element {
         }}
         title={isEditMode === true ? t('news.editNewsTitle') : t('news.createNewsTitle')}
         size="lg"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           <>
             <Button

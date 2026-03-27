@@ -250,7 +250,7 @@ export const updateCategory = async (
   const categoriesEndpoint = `categories/${categoryId}`;
   const categoriesService = createServiceREST(BASE_URL, 'categories', token);
 
-  const result = await categoriesService.update(data, {
+  const result = await categoriesService.put(data, {
     headers: {
       'X-Language': language,
     },

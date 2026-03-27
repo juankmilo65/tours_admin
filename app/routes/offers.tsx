@@ -880,6 +880,8 @@ export default function Offers(): JSX.Element {
         }}
         title={isEditMode === true ? t('offers.editOfferTitle') : t('offers.createOfferTitle')}
         size="lg"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           <>
             <Button

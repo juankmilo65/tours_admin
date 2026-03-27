@@ -598,6 +598,8 @@ export default function Roles(): JSX.Element {
         }}
         title={isEditMode ? t('roles.editRoleTitle') : t('roles.createRoleTitle')}
         size="md"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           <>
             <Button

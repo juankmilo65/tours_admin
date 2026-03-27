@@ -890,6 +890,8 @@ export default function Users(): JSX.Element {
         }}
         title={isEditMode ? t('users.editUserTitle') : t('users.createUserTitle')}
         size="md"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           <>
             <Button

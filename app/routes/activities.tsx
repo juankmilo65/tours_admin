@@ -697,6 +697,8 @@ export default function ActivitiesRoute(): JSX.Element {
             : t('activities.createActivityTitle')
         }
         size="md"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           <>
             <Button

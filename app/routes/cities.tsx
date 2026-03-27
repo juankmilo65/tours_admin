@@ -759,6 +759,8 @@ export default function Cities(): JSX.Element {
         }}
         title={isEditMode === true ? t('cities.editCityTitle') : t('cities.createCityTitle')}
         size="lg"
+        closeOnOverlayClick={false}
+        closeOnEscape={false}
         footer={
           <>
             <Button
