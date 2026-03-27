@@ -517,7 +517,13 @@ export default function Bookings(): JSX.Element {
         };
         const labelText = statusLabels[statusValue] ?? statusValue;
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--gap-6)',
+            }}
+          >
             <div
               style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', maxWidth: 200 }}
               title={title}
@@ -891,7 +897,13 @@ export default function Bookings(): JSX.Element {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--gap-6)',
+      }}
+    >
       <Card title={bookingsT.allBookings}>
         {/* Filters Section */}
         <div
@@ -899,7 +911,7 @@ export default function Bookings(): JSX.Element {
             marginBottom: 'var(--space-6)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 'var(--space-4)',
+            gap: 'var(--gap-4)',
           }}
         >
           {/* Filters Changed Warning */}

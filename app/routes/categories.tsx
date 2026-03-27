@@ -434,21 +434,50 @@ export default function Categories(): JSX.Element {
     {
       key: 'isActive',
       label: t('categories.status'),
-      render: (value: unknown) => (
-        <span
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
-            (value as boolean)
-              ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border border-green-200'
-              : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border border-red-200'
-          }`}
-        >
+      render: (_value: unknown, row: Category) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            onClick={() => void handleToggleStatus(row)}
+            style={{
+              position: 'relative',
+              width: 'var(--toggle-width)',
+              height: 'var(--toggle-height)',
+              backgroundColor: row.isActive
+                ? 'var(--toggle-bg-active)'
+                : 'var(--toggle-bg-inactive)',
+              borderRadius: 'var(--toggle-radius)',
+              cursor: 'pointer',
+              transition: 'all 0.3s var(--toggle-transition)',
+              boxShadow: row.isActive ? 'var(--toggle-shadow-active)' : 'none',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: '2px',
+                left: row.isActive ? 'var(--toggle-thumb-offset)' : '2px',
+                width: 'var(--toggle-thumb-size)',
+                height: 'var(--toggle-thumb-size)',
+                backgroundColor: 'var(--toggle-thumb-bg)',
+                borderRadius: '50%',
+                transition: 'all 0.3s var(--toggle-transition)',
+                boxShadow: 'var(--toggle-thumb-shadow)',
+              }}
+            />
+          </div>
           <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              (value as boolean) ? 'bg-green-600' : 'bg-red-600'
-            }`}
-          />
-          {(value as boolean) ? t('categories.active') : t('categories.inactive')}
-        </span>
+            style={{
+              fontSize: 'var(--status-badge-font-size)',
+              fontWeight: 'var(--status-badge-font-weight)',
+              letterSpacing: 'var(--status-badge-letter-spacing)',
+              color: row.isActive ? 'var(--color-active-text)' : 'var(--color-inactive-text)',
+              textTransform: 'var(--status-badge-text-transform)',
+              minWidth: 'var(--status-badge-min-width)',
+            }}
+          >
+            {row.isActive ? t('categories.active') : t('categories.inactive')}
+          </span>
+        </div>
       ),
     },
     {
@@ -469,127 +498,78 @@ export default function Categories(): JSX.Element {
       key: 'id',
       label: t('categories.actions'),
       render: (_: unknown, row: Category) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          {/* Edit Button - Pencil Icon like TourCard */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <button
             type="button"
             onClick={() => handleOpenEditModal(row)}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 38,
-              height: 38,
-              borderRadius: 'var(--radius-lg, 10px)',
-              backgroundColor: 'var(--color-neutral-100, #f3f4f6)',
-              color: 'var(--color-neutral-600, #4b5563)',
+              padding: '8px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              color: '#2563eb',
               border: 'none',
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-neutral-200, #e5e7eb)';
-              e.currentTarget.style.color = 'var(--color-neutral-800, #1f2937)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-neutral-100, #f3f4f6)';
-              e.currentTarget.style.color = 'var(--color-neutral-600, #4b5563)';
-              e.currentTarget.style.transform = 'translateY(0)';
             }}
             title={t('common.edit')}
           >
             <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
+              style={{ width: '16px', height: '16px' }}
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              viewBox="0 0 24 24"
             >
-              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-              <path d="m15 5 4 4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
             </svg>
           </button>
-
-          {/* Premium iOS-style Toggle Switch */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              onClick={() => void handleToggleStatus(row)}
-              style={{
-                position: 'relative',
-                width: '48px',
-                height: '24px',
-                backgroundColor: row.isActive ? '#10b981' : '#e5e7eb',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: row.isActive ? '0 0 10px rgba(16, 185, 129, 0.2)' : 'none',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '2px',
-                  left: row.isActive ? '26px' : '2px',
-                  width: '20px',
-                  height: '20px',
-                  backgroundColor: 'white',
-                  borderRadius: '50%',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                }}
-              />
-            </div>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: '700',
-                letterSpacing: '0.05em',
-                color: row.isActive ? '#047857' : '#6b7280',
-                textTransform: 'uppercase',
-                minWidth: '60px',
-              }}
-            >
-              {row.isActive ? t('categories.active') : t('categories.inactive')}
-            </span>
-          </div>
         </div>
       ),
     },
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+    <div
+      style={{
+        display: 'var(--display-flex)',
+        flexDirection: 'column' as const,
+        gap: 'var(--gap-6)',
+      }}
+    >
       <Card title={t('categories.allCategories')}>
         {/* Filters & Actions Toolbar */}
         <div
           style={{
             marginBottom: 'var(--space-6)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-4)',
+            display: 'var(--display-flex)',
+            alignItems: 'var(--align-items-center)',
+            gap: 'var(--gap-4)',
           }}
         >
           {/* Search */}
-          <div style={{ flex: 1 }}>
-            <div style={{ position: 'relative' }}>
+          <div style={{ flex: 'var(--flex-1)' }}>
+            <div style={{ position: 'relative' as const }}>
               <div
                 style={{
-                  position: 'absolute',
+                  position: 'absolute' as const,
                   top: 0,
                   bottom: 0,
                   left: 0,
-                  paddingLeft: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
+                  paddingLeft: 'var(--search-input-icon-padding)',
+                  display: 'var(--display-flex)',
+                  alignItems: 'var(--align-items-center)',
                   pointerEvents: 'none',
                 }}
               >
                 <svg
-                  style={{ height: '1.25rem', width: '1.25rem', color: 'var(--color-neutral-400)' }}
+                  style={{
+                    height: 'var(--search-input-icon-size)',
+                    width: 'var(--search-input-icon-size)',
+                    color: 'var(--color-neutral-400)',
+                  }}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -605,7 +585,7 @@ export default function Categories(): JSX.Element {
               <input
                 type="search"
                 className="form-input"
-                style={{ paddingLeft: '2.5rem' }}
+                style={{ paddingLeft: 'var(--search-input-text-padding)' }}
                 placeholder={t('categories.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => {
@@ -617,7 +597,7 @@ export default function Categories(): JSX.Element {
           </div>
 
           {/* Status Filter */}
-          <div style={{ width: '14rem' }}>
+          <div style={{ width: 'var(--filter-min-width)' }}>
             <Select
               options={[
                 { value: '', label: t('categories.allStatus') },
