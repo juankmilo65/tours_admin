@@ -1256,6 +1256,7 @@ export const en: Translation = {
     selectTour: 'Select a tour',
     termsEs: 'Terms (Spanish)',
     termsEn: 'Terms (English)',
+    terms: 'Terms',
     created: 'Created',
     actions: 'Actions',
     active: 'Active',

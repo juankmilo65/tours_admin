@@ -443,21 +443,50 @@ export default function Cities(): JSX.Element {
     {
       key: 'isActive',
       label: t('cities.status'),
-      render: (value: unknown) => (
-        <span
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
-            (value as boolean)
-              ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border border-green-200'
-              : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border border-red-200'
-          }`}
-        >
+      render: (_value: unknown, row: City) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            onClick={() => void handleToggleStatus(row)}
+            style={{
+              position: 'relative',
+              width: 'var(--toggle-width)',
+              height: 'var(--toggle-height)',
+              backgroundColor: row.isActive
+                ? 'var(--toggle-bg-active)'
+                : 'var(--toggle-bg-inactive)',
+              borderRadius: 'var(--toggle-radius)',
+              cursor: 'pointer',
+              transition: 'all 0.3s var(--toggle-transition)',
+              boxShadow: row.isActive ? 'var(--toggle-shadow-active)' : 'none',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: '2px',
+                left: row.isActive ? 'var(--toggle-thumb-offset)' : '2px',
+                width: 'var(--toggle-thumb-size)',
+                height: 'var(--toggle-thumb-size)',
+                backgroundColor: 'var(--toggle-thumb-bg)',
+                borderRadius: '50%',
+                transition: 'all 0.3s var(--toggle-transition)',
+                boxShadow: 'var(--toggle-thumb-shadow)',
+              }}
+            />
+          </div>
           <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              (value as boolean) ? 'bg-green-600' : 'bg-red-600'
-            }`}
-          />
-          {(value as boolean) ? t('cities.active') : t('cities.inactive')}
-        </span>
+            style={{
+              fontSize: 'var(--status-badge-font-size)',
+              fontWeight: 'var(--status-badge-font-weight)',
+              letterSpacing: 'var(--status-badge-letter-spacing)',
+              color: row.isActive ? 'var(--color-active-text)' : 'var(--color-inactive-text)',
+              textTransform: 'var(--status-badge-text-transform)',
+              minWidth: 'var(--status-badge-min-width)',
+            }}
+          >
+            {row.isActive ? t('cities.active') : t('cities.inactive')}
+          </span>
+        </div>
       ),
     },
     {
@@ -478,35 +507,22 @@ export default function Cities(): JSX.Element {
       key: 'id',
       label: t('cities.actions'),
       render: (_: unknown, row: City) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          {/* Edit Button with restored premium style */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <button
             type="button"
             onClick={() => handleOpenEditModal(row)}
             style={{
-              padding: '10px',
-              borderRadius: '12px',
+              padding: '8px',
+              borderRadius: '8px',
               backgroundColor: 'rgba(59, 130, 246, 0.1)',
               color: '#2563eb',
               border: 'none',
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
             }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            title="Edit City"
+            title={t('common.edit')}
           >
             <svg
-              style={{ width: '20px', height: '20px' }}
+              style={{ width: '16px', height: '16px' }}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -519,49 +535,6 @@ export default function Cities(): JSX.Element {
               />
             </svg>
           </button>
-
-          {/* Premium iOS-style Toggle Switch */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              onClick={() => void handleToggleStatus(row)}
-              style={{
-                position: 'relative',
-                width: '48px',
-                height: '24px',
-                backgroundColor: row.isActive ? '#10b981' : '#e5e7eb',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: row.isActive ? '0 0 10px rgba(16, 185, 129, 0.2)' : 'none',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '2px',
-                  left: row.isActive ? '26px' : '2px',
-                  width: '20px',
-                  height: '20px',
-                  backgroundColor: 'white',
-                  borderRadius: '50%',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                }}
-              />
-            </div>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: '700',
-                letterSpacing: '0.05em',
-                color: row.isActive ? '#047857' : '#6b7280',
-                textTransform: 'uppercase',
-                minWidth: '60px',
-              }}
-            >
-              {row.isActive ? t('cities.active') : t('cities.inactive')}
-            </span>
-          </div>
         </div>
       ),
     },

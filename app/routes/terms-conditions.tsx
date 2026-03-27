@@ -375,17 +375,40 @@ export default function TermsConditions(): JSX.Element {
     },
     {
       key: 'terms_es',
-      label: t('termsConditions.termsEs'),
+      label: t('termsConditions.terms'),
       render: (_: unknown, row: TourTerm) => (
-        <div className="text-sm text-gray-600 line-clamp-3 max-w-xs">{row.terms_conditions_es}</div>
-      ),
-      hideOnMobile: true,
-    },
-    {
-      key: 'terms_en',
-      label: t('termsConditions.termsEn'),
-      render: (_: unknown, row: TourTerm) => (
-        <div className="text-sm text-gray-600 line-clamp-3 max-w-xs">{row.terms_conditions_en}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '320px' }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                minWidth: '28px',
+                paddingTop: '1px',
+              }}
+            >
+              ES:
+            </span>
+            <span className="text-sm text-gray-600 line-clamp-2">{row.terms_conditions_es}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                minWidth: '28px',
+                paddingTop: '1px',
+              }}
+            >
+              EN:
+            </span>
+            <span className="text-sm text-gray-600 line-clamp-2">{row.terms_conditions_en}</span>
+          </div>
+        </div>
       ),
       hideOnMobile: true,
     },
@@ -411,27 +434,21 @@ export default function TermsConditions(): JSX.Element {
         const isLatestActive = latestActive !== null && latestActive.id === row.id && row.isActive;
 
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-            {/* Active/Inactive Status */}
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                row.isActive
-                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200'
-                  : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border-red-200'
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${row.isActive ? 'bg-green-600' : 'bg-red-600'}`}
-              />
-              {row.isActive ? t('termsConditions.active') : t('termsConditions.inactive')}
-            </span>
-
-            {/* View Button - Show for all terms */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            {/* View Button */}
             <button
+              type="button"
               onClick={() => {
                 handleViewTerm(row);
               }}
-              className="p-1.5 rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+              style={{
+                padding: '8px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(107, 114, 128, 0.1)',
+                color: '#374151',
+                border: 'none',
+                cursor: 'pointer',
+              }}
               title={t('common.view') ?? 'View'}
             >
               <svg
@@ -455,13 +472,21 @@ export default function TermsConditions(): JSX.Element {
               </svg>
             </button>
 
-            {/* Edit Button - Show only for latest active version */}
+            {/* Edit Button - only for latest active version */}
             {isLatestActive && (
               <button
+                type="button"
                 onClick={() => {
                   handleEditTerm(row);
                 }}
-                className="p-1.5 rounded-md text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                style={{
+                  padding: '8px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                  color: '#2563eb',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
                 title={t('common.edit') ?? 'Edit'}
               >
                 <svg
