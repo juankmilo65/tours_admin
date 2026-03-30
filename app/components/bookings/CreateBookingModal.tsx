@@ -237,6 +237,24 @@ export function CreateBookingModal({
     void checkAvailability();
   }, [formData.tourId, formData.startDate, formData.endDate, token]);
 
+  // Recalculate end date when daysCount changes and a start date is already set
+  useEffect(() => {
+    if (tourDaysCount !== null && tourDaysCount > 0 && formData.startDate !== '') {
+      const parts = formData.startDate.split('-').map(Number);
+      const y = parts[0] ?? 2000;
+      const m = parts[1] ?? 1;
+      const d = parts[2] ?? 1;
+      const end = new Date(y, m - 1, d + (tourDaysCount - 1));
+      const endDate = [
+        end.getFullYear(),
+        String(end.getMonth() + 1).padStart(2, '0'),
+        String(end.getDate()).padStart(2, '0'),
+      ].join('-');
+      setFormData((prev) => ({ ...prev, endDate }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tourDaysCount]);
+
   // Fetch hour range when tour selection changes
   useEffect(() => {
     if (formData.tourId === '' || token === null || token === '') {
@@ -368,9 +386,16 @@ export function CreateBookingModal({
     if (apiError !== null) setApiError(null);
 
     if (name === 'startDate' && tourDaysCount !== null && tourDaysCount > 0 && value !== '') {
-      const start = new Date(value);
-      start.setDate(start.getDate() + (tourDaysCount - 1));
-      const endDate = start.toISOString().split('T')[0] ?? '';
+      const parts = value.split('-').map(Number);
+      const y = parts[0] ?? 2000;
+      const m = parts[1] ?? 1;
+      const d = parts[2] ?? 1;
+      const end = new Date(y, m - 1, d + (tourDaysCount - 1));
+      const endDate = [
+        end.getFullYear(),
+        String(end.getMonth() + 1).padStart(2, '0'),
+        String(end.getDate()).padStart(2, '0'),
+      ].join('-');
       setFormData((prev) => ({ ...prev, startDate: value, endDate }));
       if (errors.startDate !== undefined || errors.endDate !== undefined) {
         setErrors((prev) => ({ ...prev, startDate: undefined, endDate: undefined }));
