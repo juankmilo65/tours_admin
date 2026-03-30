@@ -505,3 +505,39 @@ export const getBookingStatusHistory = async (
     return { success: false, data: null };
   }
 };
+
+/**
+ * Resend payment link email for a pending_payment booking
+ */
+export const resendPaymentLink = async (
+  bookingId: string,
+  token: string,
+  language = 'es'
+): Promise<unknown> => {
+  console.warn('🔗 [RESEND PAYMENT LINK] Starting for bookingId:', bookingId);
+
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn('⚠️ [RESEND PAYMENT LINK] BACKEND_URL is not configured, returning error');
+    return { success: false, error: 'Backend URL not configured' };
+  }
+
+  try {
+    const endpoint = `bookings/${bookingId}/resend-payment-link`;
+    const service = createServiceREST(BASE_URL, endpoint, token);
+
+    const result = await service.create(
+      {},
+      {
+        headers: { 'X-Language': language },
+        params: { locale: language },
+      }
+    );
+
+    console.warn('✅ [RESEND PAYMENT LINK] Success! Result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    const errorMessage = extractApiError(error);
+    console.error('❌ [RESEND PAYMENT LINK] Error caught:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+};

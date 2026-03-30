@@ -142,4 +142,8 @@ export const bookingEs = {
   subtotal: 'Subtotal',
   minorDiscount: 'Descuento menores (10%)',
   minimumPayment: 'Pago mínimo',
+  resendPaymentLink: 'Reenviar enlace de pago',
+  paymentLinkSentTitle: 'Enlace de pago enviado',
+  paymentLinkSentMessage: 'El enlace de pago fue reenviado exitosamente.',
+  paymentLinkSentError: 'Error al reenviar el enlace de pago',
 };

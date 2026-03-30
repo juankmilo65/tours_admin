@@ -19,6 +19,7 @@ import {
   getBookingPayments,
   createPayment,
   getBookingStatusHistory,
+  resendPaymentLink,
 } from '../bookings';
 
 export type { Booking, Payment, BookingStats };
@@ -383,5 +384,27 @@ export const getBookingStatusHistoryBusiness = async (
   } catch (error) {
     console.error('Error in getBookingStatusHistoryBusiness:', error);
     return { success: false, data: null };
+  }
+};
+
+/**
+ * Resend payment link for a pending_payment booking
+ */
+export const resendPaymentLinkBusiness = async (
+  bookingId: string,
+  token: string,
+  language = 'es'
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const raw = await resendPaymentLink(bookingId, token, language);
+    const result = raw as { success?: boolean; error?: string };
+
+    if (result.success === false) {
+      return { success: false, error: result.error };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error in resendPaymentLinkBusiness:', error);
+    return { success: false, error: 'Unexpected error' };
   }
 };

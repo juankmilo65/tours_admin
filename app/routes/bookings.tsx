@@ -18,6 +18,7 @@ import { Input } from '~/components/ui/Input';
 import {
   getAllBookingsBusiness,
   getBookingByIdBusiness,
+  resendPaymentLinkBusiness,
   type Booking,
 } from '~/server/businessLogic/bookingsBusinessLogic';
 import citiesBL from '~/server/businessLogic/citiesBusinessLogic';
@@ -271,6 +272,34 @@ export default function Bookings(): JSX.Element {
     isOpen: false,
     booking: null,
   });
+
+  // Resend payment link state
+  const [resendModal, setResendModal] = useState<{
+    isOpen: boolean;
+    isLoading: boolean;
+    bookingId: string | null;
+    error: string | null;
+  }>({
+    isOpen: false,
+    isLoading: false,
+    bookingId: null,
+    error: null,
+  });
+
+  const handleResendPaymentLink = async (bookingId: string): Promise<void> => {
+    setResendModal({ isOpen: false, isLoading: true, bookingId, error: null });
+    const result = await resendPaymentLinkBusiness(bookingId, token ?? '', language);
+    if (result.success) {
+      setResendModal({ isOpen: true, isLoading: false, bookingId, error: null });
+    } else {
+      setResendModal({
+        isOpen: true,
+        isLoading: false,
+        bookingId,
+        error: result.error ?? bookingsT.paymentLinkSentError,
+      });
+    }
+  };
 
   // Refresh bookings function
   const refreshBookings = async (pageOverride?: number) => {
@@ -890,6 +919,53 @@ export default function Bookings(): JSX.Element {
                 <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
               </svg>
             </button>
+            {/* Resend payment link — only for pending_payment */}
+            {row.status === 'pending_payment' && (
+              <button
+                type="button"
+                disabled={resendModal.isLoading && resendModal.bookingId === row.id}
+                onClick={() => void handleResendPaymentLink(row.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 38,
+                  height: 38,
+                  borderRadius: 'var(--radius-lg, 10px)',
+                  border: 'none',
+                  cursor:
+                    resendModal.isLoading && resendModal.bookingId === row.id ? 'wait' : 'pointer',
+                  backgroundColor: '#fff7ed',
+                  color: '#ea580c',
+                  transition: 'all .18s ease',
+                  lineHeight: 1,
+                  opacity: resendModal.isLoading && resendModal.bookingId === row.id ? 0.6 : 1,
+                }}
+                title={bookingsT.resendPaymentLink}
+                onMouseOver={(e) => {
+                  if (!(resendModal.isLoading && resendModal.bookingId === row.id)) {
+                    e.currentTarget.style.backgroundColor = '#ffedd5';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = '#fff7ed';
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M22 2L11 13" />
+                  <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                </svg>
+              </button>
+            )}
           </div>
         );
       },
@@ -1312,6 +1388,209 @@ export default function Bookings(): JSX.Element {
           void refreshBookings();
         }}
       />
+
+      {/* Resend payment link result modal */}
+      {(resendModal.isOpen || resendModal.isLoading) && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.45)',
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 16,
+              padding: '32px 36px',
+              maxWidth: 420,
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+              textAlign: 'center',
+            }}
+          >
+            {resendModal.isLoading ? (
+              <>
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    backgroundColor: '#fff7ed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px',
+                  }}
+                >
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#ea580c"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    style={{
+                      animation: 'spin 0.9s linear infinite',
+                    }}
+                  >
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                </div>
+                <h2
+                  style={{
+                    fontSize: '1.15rem',
+                    fontWeight: 700,
+                    color: '#111827',
+                    marginBottom: 8,
+                  }}
+                >
+                  {bookingsT.resendPaymentLink}
+                </h2>
+                <p style={{ fontSize: '0.9rem', color: '#6b7280' }}>
+                  {language === 'en' ? 'Sending...' : 'Enviando...'}
+                </p>
+              </>
+            ) : resendModal.error === null ? (
+              <>
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    backgroundColor: '#f0fdf4',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px',
+                  }}
+                >
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#16a34a"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M22 2L11 13" />
+                    <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                  </svg>
+                </div>
+                <h2
+                  style={{
+                    fontSize: '1.15rem',
+                    fontWeight: 700,
+                    color: '#111827',
+                    marginBottom: 8,
+                  }}
+                >
+                  {bookingsT.paymentLinkSentTitle}
+                </h2>
+                <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: 24 }}>
+                  {bookingsT.paymentLinkSentMessage}
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setResendModal({
+                      isOpen: false,
+                      isLoading: false,
+                      bookingId: null,
+                      error: null,
+                    })
+                  }
+                  style={{
+                    padding: '10px 28px',
+                    borderRadius: 10,
+                    border: 'none',
+                    backgroundColor: '#16a34a',
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {language === 'en' ? 'Close' : 'Cerrar'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    backgroundColor: '#fef2f2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px',
+                  }}
+                >
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#dc2626"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
+                <h2
+                  style={{
+                    fontSize: '1.15rem',
+                    fontWeight: 700,
+                    color: '#111827',
+                    marginBottom: 8,
+                  }}
+                >
+                  {bookingsT.paymentLinkSentError}
+                </h2>
+                <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: 24 }}>
+                  {resendModal.error}
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setResendModal({
+                      isOpen: false,
+                      isLoading: false,
+                      bookingId: null,
+                      error: null,
+                    })
+                  }
+                  style={{
+                    padding: '10px 28px',
+                    borderRadius: 10,
+                    border: 'none',
+                    backgroundColor: '#dc2626',
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {language === 'en' ? 'Close' : 'Cerrar'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
