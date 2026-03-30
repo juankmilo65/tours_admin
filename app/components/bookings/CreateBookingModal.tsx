@@ -94,6 +94,9 @@ export function CreateBookingModal({
   const [tourMinimumPayment, setTourMinimumPayment] = useState<number | null>(null);
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [tourActivities, setTourActivities] = useState<BookingTourActivity[]>([]);
+  const [isTourLoading, setIsTourLoading] = useState(false);
+  const [itineraryOpen, setItineraryOpen] = useState(false);
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
 
   // Cache-first dropdown loaders
   const { loadNationalities } = useDropdownCache();
@@ -374,6 +377,7 @@ export function CreateBookingModal({
         setTourActivities([]);
       } finally {
         setIsLoadingHourRange(false);
+        setIsTourLoading(false);
       }
     };
     void fetchTourDetails();
@@ -894,6 +898,7 @@ export function CreateBookingModal({
     >
       <div
         style={{
+          position: 'relative',
           backgroundColor: 'white',
           borderRadius: 'var(--radius-lg)',
           maxWidth: '1100px',
@@ -907,6 +912,43 @@ export function CreateBookingModal({
           e.stopPropagation();
         }}
       >
+        {/* Tour loading spinner overlay */}
+        {isTourLoading && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              borderRadius: 'var(--radius-lg)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              zIndex: 10,
+            }}
+          >
+            <svg
+              style={{ animation: 'spin 0.8s linear infinite', width: 40, height: 40 }}
+              viewBox="0 0 40 40"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+              <circle cx="20" cy="20" r="16" stroke="#dbeafe" strokeWidth="4" />
+              <path
+                d="M20 4a16 16 0 0 1 16 16"
+                stroke="#2563eb"
+                strokeWidth="4"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
+              {bookingsT.loadingTourInfo}
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div
           style={{
@@ -982,7 +1024,19 @@ export function CreateBookingModal({
                 ]}
                 value={formData.tourId}
                 onChange={(value: string) => {
-                  setFormData((prev) => ({ ...prev, tourId: value }));
+                  setFormData((prev) => ({
+                    ...prev,
+                    tourId: value,
+                    startDate: '',
+                    endDate: '',
+                    clients: [],
+                    specialRequests: '',
+                  }));
+                  setIsTourLoading(value !== '');
+                  setItineraryOpen(false);
+                  setExpandedDays(new Set());
+                  setTourAvailability(null);
+                  setAvailabilityError('');
                   if (errors.tourId !== undefined) {
                     setErrors((prev) => ({ ...prev, tourId: undefined }));
                   }
@@ -1004,9 +1058,11 @@ export function CreateBookingModal({
               )}
             </div>
 
-            {/* Tour days count pill */}
-            {tourDaysCount !== null && tourDaysCount > 0 && (
-              <div
+            {/* Tour days count pill — also toggles the itinerary */}
+            {tourDaysCount !== null && tourDaysCount > 0 && !isLoadingHourRange && (
+              <button
+                type="button"
+                onClick={() => tourActivities.length > 0 && setItineraryOpen((v) => !v)}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1019,6 +1075,8 @@ export function CreateBookingModal({
                   color: 'var(--color-primary-700, #15803d)',
                   fontWeight: 500,
                   lineHeight: 1.4,
+                  cursor: tourActivities.length > 0 ? 'pointer' : 'default',
+                  background: 'var(--color-primary-50, #f0fdf4)',
                 }}
               >
                 <svg
@@ -1039,7 +1097,35 @@ export function CreateBookingModal({
                 {language === 'en'
                   ? `This tour consists of ${tourDaysCount} day${tourDaysCount !== 1 ? 's' : ''}`
                   : `Este tour consta de ${tourDaysCount} día${tourDaysCount !== 1 ? 's' : ''}`}
-              </div>
+                {tourActivities.length > 0 && (
+                  <>
+                    <span style={{ margin: '0 2px', opacity: 0.5 }}>·</span>
+                    <span
+                      style={{
+                        textDecoration: 'underline',
+                        textUnderlineOffset: '2px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {bookingsT.viewItinerary}
+                    </span>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      style={{
+                        transition: 'transform 0.2s',
+                        transform: itineraryOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      }}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </>
+                )}
+              </button>
             )}
 
             {/* Tour Activities / Itinerary */}
@@ -1060,114 +1146,147 @@ export function CreateBookingModal({
 
               return (
                 <div>
-                  <h3
-                    style={{
-                      margin: '0 0 var(--space-3) 0',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                      color: '#111827',
-                    }}
-                  >
-                    {language === 'en' ? 'Tour Itinerary' : 'Itinerario del Tour'}
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {sortedDays.map(([dayNum, acts]) => (
-                      <div
-                        key={`day-${dayNum}`}
-                        style={{
-                          border: '1px solid #e5e7eb',
-                          borderRadius: 'var(--radius-lg, 10px)',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: '8px 14px',
-                            background: '#f9fafb',
-                            borderBottom: '1px solid #e5e7eb',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                          }}
-                        >
-                          <span
+                  {itineraryOpen && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {sortedDays.map(([dayNum, acts]) => {
+                        const isOpen = expandedDays.has(dayNum);
+                        const toggle = () =>
+                          setExpandedDays((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(dayNum)) next.delete(dayNum);
+                            else next.add(dayNum);
+                            return next;
+                          });
+                        return (
+                          <div
+                            key={`day-${dayNum}`}
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: 24,
-                              height: 24,
-                              borderRadius: '50%',
-                              background: '#dbeafe',
-                              color: '#1d4ed8',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
+                              border: '1px solid #e5e7eb',
+                              borderRadius: 'var(--radius-lg, 10px)',
+                              overflow: 'hidden',
                             }}
                           >
-                            {dayNum}
-                          </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
-                            {language === 'en' ? 'Day' : 'Día'} {dayNum}
-                          </span>
-                        </div>
-                        <div>
-                          {acts.map((act, idx) => (
-                            <div
-                              key={act.id}
+                            <button
+                              type="button"
+                              onClick={toggle}
                               style={{
+                                width: '100%',
+                                padding: '8px 14px',
+                                background: '#f9fafb',
+                                borderBottom: isOpen ? '1px solid #e5e7eb' : 'none',
+                                border: 'none',
+                                cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '12px',
-                                padding: '10px 14px',
-                                borderBottom: idx < acts.length - 1 ? '1px solid #f3f4f6' : 'none',
-                                background: idx % 2 === 0 ? 'white' : '#fafbfc',
+                                gap: '8px',
                               }}
                             >
-                              <div
-                                style={{
-                                  flexShrink: 0,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '2px 8px',
-                                  borderRadius: 9999,
-                                  background: '#f0f9ff',
-                                  border: '1px solid #bae6fd',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 600,
-                                  color: '#0369a1',
-                                  minWidth: 60,
-                                  justifyContent: 'center',
-                                }}
-                              >
-                                <svg
-                                  width="10"
-                                  height="10"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                >
-                                  <circle cx="12" cy="12" r="10" />
-                                  <polyline points="12 6 12 12 16 14" />
-                                </svg>
-                                {act.hora}
-                              </div>
                               <span
                                 style={{
-                                  fontSize: '0.8rem',
-                                  color: '#374151',
-                                  fontWeight: 500,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: '50%',
+                                  background: '#dbeafe',
+                                  color: '#1d4ed8',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
                                 }}
                               >
-                                {language === 'en' ? act.activity_en : act.activity_es}
+                                {dayNum}
                               </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                              <span
+                                style={{
+                                  flex: 1,
+                                  textAlign: 'left',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 600,
+                                  color: '#374151',
+                                }}
+                              >
+                                {language === 'en' ? 'Day' : 'Día'} {dayNum}
+                              </span>
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                style={{
+                                  transition: 'transform 0.2s',
+                                  transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                  color: '#6b7280',
+                                }}
+                              >
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
+                            </button>
+                            {isOpen && (
+                              <div>
+                                {acts.map((act, idx) => (
+                                  <div
+                                    key={act.id}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '12px',
+                                      padding: '10px 14px',
+                                      borderBottom:
+                                        idx < acts.length - 1 ? '1px solid #f3f4f6' : 'none',
+                                      background: idx % 2 === 0 ? 'white' : '#fafbfc',
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        flexShrink: 0,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '2px 8px',
+                                        borderRadius: 9999,
+                                        background: '#f0f9ff',
+                                        border: '1px solid #bae6fd',
+                                        fontSize: '0.7rem',
+                                        fontWeight: 600,
+                                        color: '#0369a1',
+                                        minWidth: 60,
+                                        justifyContent: 'center',
+                                      }}
+                                    >
+                                      <svg
+                                        width="10"
+                                        height="10"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.5"
+                                      >
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                      </svg>
+                                      {act.hora}
+                                    </div>
+                                    <span
+                                      style={{
+                                        fontSize: '0.8rem',
+                                        color: '#374151',
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      {language === 'en' ? act.activity_en : act.activity_es}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })()}

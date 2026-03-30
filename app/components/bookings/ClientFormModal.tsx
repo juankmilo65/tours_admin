@@ -122,7 +122,11 @@ export function ClientFormModal({
       }
     } else {
       // Si es el primer cliente, setear isPrimary en true por defecto
-      setForm({ ...emptyForm, isPrimary: showPrimary && isFirstClient ? true : false });
+      setForm({
+        ...emptyForm,
+        isPrimary: showPrimary && isFirstClient ? true : false,
+        clientAge: isFirstClient ? 18 : 0,
+      });
     }
     setErrors({});
     void loadNationalities(language);
@@ -144,6 +148,14 @@ export function ClientFormModal({
       errs.clientAge = tr.clientAgeMin;
     } else if (form.clientAge > 120) {
       errs.clientAge = tr.clientAgeMax;
+    }
+
+    const isPrimary = isFirstClient || form.isPrimary === true;
+    if (isPrimary && form.clientAge < 18) {
+      errs.clientAge =
+        language === 'en'
+          ? 'Primary client must be at least 18 years old'
+          : 'El cliente principal debe tener al menos 18 años';
     }
 
     if (!form.countryCode) {
@@ -411,7 +423,10 @@ export function ClientFormModal({
                 type="number"
                 value={form.clientAge}
                 onChange={(e) => {
-                  setForm((p) => ({ ...p, clientAge: Number(e.target.value) }));
+                  const isPrimary = isFirstClient || form.isPrimary === true;
+                  const raw = Number(e.target.value);
+                  const val = isPrimary ? Math.max(18, raw) : raw;
+                  setForm((p) => ({ ...p, clientAge: val }));
                   if (errors.clientAge !== undefined)
                     setErrors((p) => {
                       const n = { ...p };
@@ -420,7 +435,7 @@ export function ClientFormModal({
                     });
                 }}
                 placeholder={tr.clientAgePlaceholder}
-                min={0}
+                min={isFirstClient || form.isPrimary === true ? 18 : 0}
                 max={120}
                 error={errors.clientAge}
                 disabled={shouldDisableFields}

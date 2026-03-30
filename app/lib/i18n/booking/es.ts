@@ -121,6 +121,8 @@ export const bookingEs = {
   validationErrorsTitle: 'Por favor corrige los siguientes errores:',
   loadIdTypesError: 'Error al cargar los tipos de identificación',
   tourItinerary: 'Itinerario del Tour',
+  viewItinerary: 'Ver itinerario',
+  loadingTourInfo: 'Cargando información del tour...',
   dayLabel: 'Día',
   editClient: 'Editar Cliente',
   primaryLabel: 'Principal',
