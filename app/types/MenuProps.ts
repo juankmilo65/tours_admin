@@ -18,6 +18,7 @@ export interface NavItem {
   label_es: string;
   label_en: string;
   icon: string;
+  path?: string;
   sortOrder?: number;
   submenu: SubMenuItem[];
 }

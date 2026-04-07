@@ -3,6 +3,7 @@
  */
 
 import { createServiceREST } from './_index';
+import { logCurlGet } from './curlHelper';
 import type { CreateMenuDto, UpdateMenuDto, GetMenusParams } from '../types/MenuProps';
 
 // Type declaration for Vite environment variables
@@ -226,12 +227,23 @@ export const getUserMenu = async (
     const menuEndpoint = `menus/my-menu`;
     const menuService = createServiceREST(BASE_URL, menuEndpoint, token);
 
+    logCurlGet({
+      url: `${BASE_URL}/${menuEndpoint}`,
+      params: Object.fromEntries(Object.entries(queryParams).map(([k, v]) => [k, String(v)])),
+      headers: { 'X-Language': language },
+      token,
+      label: 'GET USER MENU',
+    });
+
     const result = await menuService.get({
       params: queryParams,
       headers: {
         'X-Language': language,
       },
     });
+
+    // eslint-disable-next-line no-console
+    console.log('🔍 [GET USER MENU] Response:', JSON.stringify(result, null, 2));
 
     return result;
   } catch (error) {
