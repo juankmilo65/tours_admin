@@ -41,17 +41,17 @@ export const getKycStatus = async (token: string, language = 'es'): Promise<unkn
 /**
  * Initialize KYC flow (returns Stripe Express dashboard URL)
  */
-export const initKyc = async (token: string, language = 'es'): Promise<unknown> => {
+export const initKyc = async (token: string, language = 'es', country = 'MX'): Promise<unknown> => {
   if (BASE_URL === '' || BASE_URL === undefined) {
     return { success: false, error: 'Backend URL not configured' };
   }
 
   try {
-    const kycEndpoint = 'kyc/init';
+    const kycEndpoint = 'kyc/initiate';
     const kycService = createServiceREST(BASE_URL, kycEndpoint, token);
 
     const result = await kycService.create(
-      {},
+      { country },
       {
         headers: { 'X-Language': language },
       }

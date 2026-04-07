@@ -14,7 +14,7 @@ export interface KycStatusResponse {
 
 export interface KycInitResponse {
   success: boolean;
-  dashboardUrl?: string;
+  onboardingUrl?: string;
   error?: string;
 }
 
@@ -59,15 +59,15 @@ export const initKycBusiness = async (
   try {
     const result = (await initKyc(token ?? '', language)) as {
       success?: boolean;
-      dashboardUrl?: string;
+      data?: { onboardingUrl?: string };
       error?: {
         message?: string;
         response?: { data?: { error?: string } };
       };
     };
 
-    if (result.success === true && result.dashboardUrl !== undefined) {
-      return { success: true, dashboardUrl: result.dashboardUrl };
+    if (result.success === true && result.data?.onboardingUrl !== undefined) {
+      return { success: true, onboardingUrl: result.data.onboardingUrl };
     }
 
     let errorMessage = language === 'en' ? 'Could not initialize KYC' : 'No se pudo iniciar KYC';
@@ -105,12 +105,12 @@ export const getKycDashboardUrlBusiness = async (
   try {
     const result = (await getKycDashboardUrl(token ?? '', language)) as {
       success?: boolean;
-      dashboardUrl?: string;
+      data?: { onboardingUrl?: string };
       error?: { message?: string };
     };
 
-    if (result.success === true && result.dashboardUrl !== undefined) {
-      return { success: true, dashboardUrl: result.dashboardUrl };
+    if (result.success === true && result.data?.onboardingUrl !== undefined) {
+      return { success: true, onboardingUrl: result.data.onboardingUrl };
     }
 
     return {

@@ -30,8 +30,12 @@ export function KycSection({ kycStatus }: KycSectionProps): JSX.Element {
     dispatch(fetchKycStart());
     try {
       const result = await initKycBusiness(token ?? undefined, language);
-      if (result.success && typeof result.dashboardUrl === 'string' && result.dashboardUrl !== '') {
-        window.open(result.dashboardUrl, '_blank');
+      if (
+        result.success &&
+        typeof result.onboardingUrl === 'string' &&
+        result.onboardingUrl !== ''
+      ) {
+        window.open(result.onboardingUrl, '_blank');
       } else {
         dispatch(fetchKycError(result.error ?? 'Error'));
       }
