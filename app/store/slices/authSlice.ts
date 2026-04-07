@@ -17,6 +17,7 @@ export interface User {
   role: string;
   isActive: boolean;
   emailVerified: boolean;
+  ownerKycVerified?: boolean;
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string;

@@ -16,7 +16,13 @@ import {
 } from '~/store/slices/uiSlice';
 import type { Option } from '~/components/ui/Select';
 import Select from '~/components/ui/Select';
-import { useSubmit, useNavigation, useLocation, useSearchParams } from '@remix-run/react';
+import {
+  useSubmit,
+  useNavigation,
+  useLocation,
+  useSearchParams,
+  useNavigate,
+} from '@remix-run/react';
 import { useTranslation } from '~/lib/i18n/utils';
 import type { Language } from '~/lib/i18n/types';
 
@@ -40,7 +46,9 @@ export function Header({
   selectedCountryCode,
 }: HeaderProps): JSX.Element {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   // i18n hook
@@ -100,6 +108,11 @@ export function Header({
     };
   }, [currentUser, t]);
 
+  // KYC notification check
+  const hasKycNotification =
+    currentUser?.role === 'owner' && currentUser?.ownerKycVerified !== true;
+  const notificationCount = hasKycNotification ? 1 : 0;
+
   // Translate countries based on current language usando props
   const translatedCountries = useMemo(
     () => translateCountries(countries, currentLanguage as Language),
@@ -116,6 +129,7 @@ export function Header({
   const submit = useSubmit();
   const navigation = useNavigation();
   const location = useLocation();
+  const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
 
   const isChangingCountry = navigation.state === 'submitting' || navigation.state === 'loading';
@@ -177,6 +191,9 @@ export function Header({
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
       }
     }
 
@@ -376,28 +393,303 @@ export function Header({
             )}
           </div>
 
-          <button
-            style={{
-              padding: 'var(--space-2)',
-              color: 'var(--color-neutral-500)',
-              backgroundColor: 'transparent',
-              border: 'none',
-              borderRadius: 'var(--radius-lg)',
-              cursor: 'pointer',
-              fontSize: 'var(--text-lg)',
-              transition: 'background-color var(--transition-base)',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';
-              e.currentTarget.style.color = 'var(--color-neutral-700)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = 'var(--color-neutral-500)';
-            }}
-          >
-            🔔
-          </button>
+          {/* Notification Bell */}
+          <div style={{ position: 'relative' }} ref={notificationsRef}>
+            <button
+              type="button"
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              aria-label={t('header.notificationBell')}
+              style={{
+                position: 'relative',
+                padding: 'var(--space-2)',
+                color: 'var(--color-neutral-500)',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: 'var(--radius-lg)',
+                cursor: 'pointer',
+                fontSize: 'var(--text-lg)',
+                transition: 'all var(--transition-base)',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-neutral-200)';
+                e.currentTarget.style.color = 'var(--color-neutral-700)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--color-neutral-500)';
+              }}
+            >
+              🔔
+              {notificationCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '2px',
+                    right: '2px',
+                    width: '18px',
+                    height: '18px',
+                    backgroundColor: 'var(--color-error-500)',
+                    color: 'white',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: '11px',
+                    fontWeight: 'var(--font-weight-bold)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1,
+                    border: '2px solid var(--color-neutral-50)',
+                    animation: 'pulse 2s infinite',
+                  }}
+                >
+                  {notificationCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notifications Dropdown */}
+            {isNotificationsOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + var(--space-2))',
+                  right: 0,
+                  width: '380px',
+                  maxHeight: '480px',
+                  backgroundColor: 'white',
+                  border: '1px solid var(--color-neutral-200)',
+                  borderRadius: 'var(--radius-xl)',
+                  boxShadow: '0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 10px rgba(0, 0, 0, 0.08)',
+                  zIndex: 'var(--z-dropdown)',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Header */}
+                <div
+                  style={{
+                    padding: 'var(--space-4) var(--space-5)',
+                    borderBottom: '1px solid var(--color-neutral-100)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 'var(--text-base)',
+                      fontWeight: 'var(--font-weight-semibold)',
+                      color: 'var(--color-neutral-800)',
+                    }}
+                  >
+                    {t('header.notificationBell')}
+                  </h3>
+                  {notificationCount > 0 && (
+                    <span
+                      style={{
+                        backgroundColor: 'var(--color-error-100)',
+                        color: 'var(--color-error-700)',
+                        fontSize: '12px',
+                        fontWeight: 'var(--font-weight-semibold)',
+                        padding: '2px 8px',
+                        borderRadius: 'var(--radius-full)',
+                      }}
+                    >
+                      {notificationCount}
+                    </span>
+                  )}
+                </div>
+
+                {/* Notification List */}
+                <div style={{ overflowY: 'auto', maxHeight: '400px' }}>
+                  {hasKycNotification ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsNotificationsOpen(false);
+                        navigate('/profile');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: 'var(--space-4) var(--space-5)',
+                        display: 'flex',
+                        gap: 'var(--space-3)',
+                        alignItems: 'flex-start',
+                        backgroundColor: 'var(--color-error-50)',
+                        border: 'none',
+                        borderBottom: '1px solid var(--color-neutral-100)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background-color var(--transition-base)',
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-error-100)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
+                      }}
+                    >
+                      {/* Icon */}
+                      <div
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          minWidth: '40px',
+                          borderRadius: 'var(--radius-full)',
+                          backgroundColor: 'var(--color-error-500)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '18px',
+                        }}
+                      >
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                          <line x1="12" y1="9" x2="12" y2="13" />
+                          <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                      </div>
+
+                      {/* Content */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-2)',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 'var(--font-weight-bold)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              color: 'white',
+                              backgroundColor: 'var(--color-error-500)',
+                              padding: '1px 6px',
+                              borderRadius: 'var(--radius-sm)',
+                            }}
+                          >
+                            {t('header.kycUrgent')}
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            margin: '0 0 4px 0',
+                            fontSize: 'var(--text-sm)',
+                            fontWeight: 'var(--font-weight-semibold)',
+                            color: 'var(--color-neutral-800)',
+                            lineHeight: '1.3',
+                          }}
+                        >
+                          {t('header.kycTitle')}
+                        </p>
+                        <p
+                          style={{
+                            margin: '0 0 8px 0',
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-neutral-600)',
+                            lineHeight: '1.4',
+                          }}
+                        >
+                          {t('header.kycDescription')}
+                        </p>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              color: 'var(--color-neutral-400)',
+                            }}
+                          >
+                            {t('header.justNow')}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'var(--font-weight-semibold)',
+                              color: 'var(--color-error-600)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            {t('header.kycAction')}
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M5 12h14M12 5l7 7-7 7" />
+                            </svg>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Unread dot */}
+                      <div
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          minWidth: '8px',
+                          borderRadius: 'var(--radius-full)',
+                          backgroundColor: 'var(--color-error-500)',
+                          marginTop: '6px',
+                        }}
+                      />
+                    </button>
+                  ) : (
+                    /* Empty state */
+                    <div
+                      style={{
+                        padding: 'var(--space-8) var(--space-5)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '40px',
+                          marginBottom: 'var(--space-3)',
+                          opacity: 0.4,
+                        }}
+                      >
+                        🔔
+                      </div>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 'var(--text-sm)',
+                          color: 'var(--color-neutral-400)',
+                        }}
+                      >
+                        {t('header.noNotifications')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <div style={{ position: 'relative' }} ref={menuRef}>
             <button
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -493,6 +785,10 @@ export function Header({
                 }}
               >
                 <button
+                  onClick={() => {
+                    navigate('/profile');
+                    setIsUserMenuOpen(false);
+                  }}
                   style={{
                     width: '100%',
                     display: 'flex',

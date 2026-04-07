@@ -18,6 +18,7 @@ import { useDropdownCache } from '~/hooks/useDropdownCache';
 import type { Booking, BookingClient, BookingTourActivity } from '~/types/booking';
 import { ClientFormModal } from '~/components/bookings/ClientFormModal';
 import type { ClientFormData } from '~/components/bookings/ClientFormModal';
+import { isWithinRestrictionWindow } from '~/utilities/validationHelpers';
 
 interface EditBookingModalProps {
   isOpen: boolean;
@@ -424,6 +425,15 @@ export function EditBookingModal({
   };
 
   if (!isOpen || !booking) return null;
+
+  // 48h edit restriction: disable editing if first tour starts within 48 hours
+  const isEditRestricted = (() => {
+    if (readOnly) return false; // already read-only, skip check
+    const firstTourDate = booking.tours?.[0]?.startDate ?? booking.startDate;
+    const firstTourTime = booking.tours?.[0]?.startTime ?? '00:00';
+    if (!firstTourDate) return false;
+    return isWithinRestrictionWindow(firstTourDate, firstTourTime, 48);
+  })();
 
   const readonlyStyle: CSSProperties = {
     width: '100%',
@@ -1367,15 +1377,37 @@ export function EditBookingModal({
 
           {/* Footer */}
           <div className="modal-footer">
+            {isEditRestricted && (
+              <div
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  backgroundColor: '#fef9c3',
+                  border: '1px solid #fde68a',
+                  borderRadius: 8,
+                  fontSize: '0.82rem',
+                  color: '#854d0e',
+                  marginRight: 'auto',
+                }}
+              >
+                {language === 'en'
+                  ? '⚠️ Cannot edit booking within 48 hours of tour start'
+                  : '⚠️ No se puede editar la reserva dentro de las 48 horas previas al tour'}
+              </div>
+            )}
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
               className="modal-btn modal-btn-secondary"
             >
-              {readOnly ? (language === 'en' ? 'Close' : 'Cerrar') : t('common.cancel')}
+              {readOnly || isEditRestricted
+                ? language === 'en'
+                  ? 'Close'
+                  : 'Cerrar'
+                : t('common.cancel')}
             </button>
-            {!readOnly && (
+            {!readOnly && !isEditRestricted && (
               <button type="submit" disabled={isSubmitting} className="modal-btn modal-btn-primary">
                 {isSubmitting
                   ? (t('common.saving') ?? 'Guardando...')

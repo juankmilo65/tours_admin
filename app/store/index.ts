@@ -24,6 +24,9 @@ import authReducer from '~/store/slices/authSlice';
 import cacheReducer from '~/store/slices/cacheSlice';
 import bookingsReducer from '~/store/slices/bookingsSlice';
 import toursReducer from '~/store/slices/toursSlice';
+import paymentsReducer from '~/store/slices/paymentsSlice';
+import kycReducer from '~/store/slices/kycSlice';
+import cancellationPoliciesReducer from '~/store/slices/cancellationPoliciesSlice';
 
 // Redux Persist configuration
 const persistConfig = {
@@ -43,6 +46,9 @@ const rootReducer = combineReducers({
   cache: cacheReducer,
   bookings: bookingsReducer,
   tours: toursReducer,
+  payments: paymentsReducer,
+  kyc: kycReducer,
+  cancellationPolicies: cancellationPoliciesReducer,
   /* offers: offersReducer, */
 });
 

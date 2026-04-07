@@ -45,6 +45,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string;
+  ownerKycVerified?: boolean;
 }
 
 export interface CreateUserDto {

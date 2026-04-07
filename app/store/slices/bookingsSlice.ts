@@ -5,7 +5,7 @@
 
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { Booking, Payment, BookingFilters, BookingStats } from '~/types/booking';
+import type { Booking, BookingTour, Payment, BookingFilters, BookingStats } from '~/types/booking';
 
 interface BookingsState {
   bookings: Booking[];
@@ -200,6 +200,21 @@ const bookingsSlice = createSlice({
     setHasSearched: (state, action: PayloadAction<boolean>) => {
       state.hasSearched = action.payload;
     },
+    updateMultiTourBooking: (
+      state,
+      action: PayloadAction<{
+        bookingId: string;
+        tours: BookingTour[];
+      }>
+    ) => {
+      const booking = state.bookings.find((b) => b.id === action.payload.bookingId);
+      if (booking) {
+        booking.tours = action.payload.tours;
+        if (booking.tours.length > 0) {
+          booking.totalPrice = booking.tours.reduce((sum, t) => sum + (t.price ?? 0), 0);
+        }
+      }
+    },
   },
 });
 
@@ -234,6 +249,7 @@ export const {
   clearError,
   resetFiltersChanged,
   setHasSearched,
+  updateMultiTourBooking,
 } = bookingsSlice.actions;
 
 // Selectors

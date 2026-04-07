@@ -148,11 +148,11 @@ export interface Tour {
   // Related entities (with translations)
   category: Category;
   city: City;
-  owners: Array<{
-    id: string;
-    name: string;
-    email: string;
-  }>;
+  // Owner info (flat fields from backend)
+  ownerId: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerKycVerified: boolean;
   offers: Offer[];
   activities: TourActivity[];
   days?: TourDay[]; // Activities grouped by day

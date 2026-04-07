@@ -440,6 +440,15 @@ export const uploadTourImages = async (
     return result.data;
   } catch (error) {
     console.error('❌ [UPLOAD TOUR IMAGES] Error caught:', error);
+    // Extract response body from Axios error
+    const axiosErr = error as { response?: { data?: unknown; status?: number; headers?: unknown } };
+    if (axiosErr.response !== undefined) {
+      console.error('❌ [UPLOAD TOUR IMAGES] Response status:', axiosErr.response.status);
+      console.error(
+        '❌ [UPLOAD TOUR IMAGES] Response body:',
+        JSON.stringify(axiosErr.response.data, null, 2)
+      );
+    }
     if (error instanceof Error) {
       console.error('❌ [UPLOAD TOUR IMAGES] Error message:', error.message);
       console.error('❌ [UPLOAD TOUR IMAGES] Error stack:', error.stack);

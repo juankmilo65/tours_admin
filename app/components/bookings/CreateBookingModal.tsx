@@ -30,10 +30,18 @@ import {
   getTimezoneForCountry,
   buildDateTimeInTimezone,
 } from '~/utilities/timezoneValidation';
+import {
+  checkTimeOverlap,
+  checkDifferentCitySameDay,
+  sortToursChronologically,
+} from '~/utilities/validationHelpers';
 import { getTourAvailabilityBusiness } from '~/server/businessLogic/tourAvailabilityBusinessLogic';
 import { TourAvailabilityDisplay } from '~/components/bookings/TourAvailabilityDisplay';
 import type { TourAvailabilityData } from '~/types/tourAvailability';
-import type { BookingTourActivity } from '~/types/booking';
+import type { BookingTourActivity, BookingTour } from '~/types/booking';
+import { MultiTourSelector } from '~/components/bookings/MultiTourSelector';
+import { useMultiTourValidation } from '~/hooks/useMultiTourValidation';
+import { calculateBookingTotal } from '~/services/bookingService';
 
 // Payment method option returned by /api/stripe/payment-methods
 interface PaymentMethodOption {
@@ -97,6 +105,18 @@ export function CreateBookingModal({
   const [isTourLoading, setIsTourLoading] = useState(false);
   const [itineraryOpen, setItineraryOpen] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
+  const [tourCityId, setTourCityId] = useState<string>('');
+  const [tourCityName, setTourCityName] = useState<string>('');
+
+  // Multi-tour state
+  const [selectedTours, setSelectedTours] = useState<BookingTour[]>([]);
+  const isMultiTourMode = true;
+  const { validationResult, validate: validateMultiTour } = useMultiTourValidation();
+  const [addTourAlert, setAddTourAlert] = useState<{
+    type: 'error' | 'warning';
+    message: string;
+  } | null>(null);
+  const [showTourFields, setShowTourFields] = useState(false);
 
   // Cache-first dropdown loaders
   const { loadNationalities } = useDropdownCache();
@@ -148,6 +168,7 @@ export function CreateBookingModal({
     setTourActivities([]);
     setSelectedPaymentMethod('');
     setAvailablePaymentMethods([]);
+    setSelectedTours([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -308,7 +329,7 @@ export function CreateBookingModal({
         const tourResult = (await getTourByIdBusiness(formData.tourId, language, 'MXN', token)) as {
           success?: boolean;
           data?: {
-            city?: { countryId?: string };
+            city?: { id?: string; countryId?: string; name_es?: string; name_en?: string };
             days?: Array<{
               day: number;
               activities: BookingTourActivity[];
@@ -324,6 +345,11 @@ export function CreateBookingModal({
         if (tourResult.success === true && tourResult.data !== undefined) {
           const countryCode = tourResult.data.city?.countryId ?? '';
           setTourCountryCode(countryCode);
+          setTourCityId(tourResult.data.city?.id ?? '');
+          setTourCityName(
+            (language === 'en' ? tourResult.data.city?.name_en : tourResult.data.city?.name_es) ??
+              ''
+          );
 
           // Extract activities from days array
           const days = tourResult.data.days ?? [];
@@ -362,6 +388,8 @@ export function CreateBookingModal({
           setTourCountryCode('');
           setMinBookingDate('');
           setTourActivities([]);
+          setTourCityId('');
+          setTourCityName('');
         }
       } catch (error) {
         console.error('💥 Error fetching tour details:', error);
@@ -375,6 +403,8 @@ export function CreateBookingModal({
         setTourBasePrice(null);
         setTourMinimumPayment(null);
         setTourActivities([]);
+        setTourCityId('');
+        setTourCityName('');
       } finally {
         setIsLoadingHourRange(false);
         setIsTourLoading(false);
@@ -539,11 +569,22 @@ export function CreateBookingModal({
   }, [formData.tourId, isLoadingHourRange]);
 
   const canAddClients = useMemo(() => {
-    // Clients can be added after dates are selected and availability is checked
+    // In multi-tour mode, clients can be added once at least 1 tour is in the list
+    if (isMultiTourMode) {
+      return selectedTours.length > 0;
+    }
+    // Otherwise, clients can be added after dates are selected and availability is checked
     const datesSet = formData.startDate !== '' && formData.endDate !== '';
     const hasAvailability = tourAvailability !== null && (tourAvailability.availableSlots ?? 0) > 0;
     return datesSet && hasAvailability && !isLoadingAvailability;
-  }, [formData.startDate, formData.endDate, tourAvailability, isLoadingAvailability]);
+  }, [
+    formData.startDate,
+    formData.endDate,
+    tourAvailability,
+    isLoadingAvailability,
+    isMultiTourMode,
+    selectedTours.length,
+  ]);
 
   const canAddSpecialRequests = useMemo(() => {
     return formData.clients.length > 0;
@@ -551,11 +592,13 @@ export function CreateBookingModal({
 
   const canSubmit = useMemo(() => {
     // All components must have data, including a chosen payment method
-    const hasTour = formData.tourId !== '';
-    const hasDates = formData.startDate !== '' && formData.endDate !== '';
+    const hasTour = isMultiTourMode ? selectedTours.length > 0 : formData.tourId !== '';
+    const hasDates = isMultiTourMode ? true : formData.startDate !== '' && formData.endDate !== '';
     const hasCurrency = formData.currency !== '';
     const hasClients = formData.clients.length > 0;
-    const hasAvailability = tourAvailability !== null && (tourAvailability.availableSlots ?? 0) > 0;
+    const hasAvailability = isMultiTourMode
+      ? true
+      : tourAvailability !== null && (tourAvailability.availableSlots ?? 0) > 0;
     const hasPaymentMethod = selectedPaymentMethod !== '';
 
     return (
@@ -576,6 +619,8 @@ export function CreateBookingModal({
     tourAvailability,
     selectedPaymentMethod,
     isSubmitting,
+    isMultiTourMode,
+    selectedTours.length,
   ]);
 
   // 🛡️ Don't render if modal is not open (after all hooks for React rules)
@@ -637,15 +682,19 @@ export function CreateBookingModal({
         t('bookings.noPrimaryClient') ?? 'Debes marcar un cliente como principal';
     }
 
-    if (!formData.tourId) {
+    if (!formData.tourId && !isMultiTourMode) {
       newErrors.tourId = t('bookings.tours.tourRequired') ?? 'Tour is required';
     }
 
-    if (!formData.startDate) {
+    if (isMultiTourMode && selectedTours.length === 0) {
+      newErrors.tourId = bookingsT.multiTourMinRequired;
+    }
+
+    if (!formData.startDate && !isMultiTourMode) {
       newErrors.startDate = `${t('bookings.startDate') ?? 'Start Date'}: ${t('validation.required') ?? 'Required'}`;
     }
 
-    if (!formData.endDate) {
+    if (!formData.endDate && !isMultiTourMode) {
       newErrors.endDate = `${t('bookings.endDate') ?? 'End Date'}: ${t('validation.required') ?? 'Required'}`;
     }
 
@@ -819,10 +868,26 @@ export function CreateBookingModal({
           countryCode: clientNationalities[index] ?? '',
         })),
         specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
-        totalPrice: priceSummary.total,
+        totalPrice: isMultiTourMode ? calculateBookingTotal(selectedTours) : priceSummary.total,
         minimumPayment: tourMinimumPayment ?? undefined,
         countryCode: selectedCountry?.code ?? 'MX',
         paymentMethods: [selectedPaymentMethod],
+        ...(isMultiTourMode && selectedTours.length > 0
+          ? {
+              tours: selectedTours.map((tour) => ({
+                id: tour.id,
+                name_es: tour.name_es,
+                name_en: tour.name_en,
+                startDate: tour.startDate,
+                startTime: tour.startTime,
+                endTime: tour.endTime,
+                price: tour.price,
+                currency: tour.currency,
+                capacity: tour.capacity,
+                bookedSlots: tour.bookedSlots,
+              })),
+            }
+          : {}),
       };
 
       const result = await createBookingBusiness(payloadWithCountry, token ?? '', language);
@@ -1002,81 +1067,24 @@ export function CreateBookingModal({
 
         <form onSubmit={(e) => void handleSubmit(e)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            {/* Tour Selection */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: 'var(--space-2)',
-                  fontWeight: 'var(--font-weight-medium)',
-                  color: 'var(--color-neutral-700)',
-                }}
-              >
-                {t('bookings.tour')} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <Select
-                options={[
-                  { value: '', label: t('bookings.tours.selectTour') ?? 'Select tour' },
-                  ...tours.map((tour) => ({
-                    value: tour.id,
-                    label: language === 'en' ? tour.title_en : tour.title_es,
-                  })),
-                ]}
-                value={formData.tourId}
-                onChange={(value: string) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    tourId: value,
-                    startDate: '',
-                    endDate: '',
-                    clients: [],
-                    specialRequests: '',
-                  }));
-                  setIsTourLoading(value !== '');
-                  setItineraryOpen(false);
-                  setExpandedDays(new Set());
-                  setTourAvailability(null);
-                  setAvailabilityError('');
-                  if (errors.tourId !== undefined) {
-                    setErrors((prev) => ({ ...prev, tourId: undefined }));
-                  }
-                }}
-                placeholder={t('bookings.tours.selectTour') ?? 'Select tour'}
-                id="select-tour"
-              />
-              {errors.tourId !== undefined && (
-                <span
-                  style={{
-                    color: 'red',
-                    fontSize: 'var(--text-xs)',
-                    marginTop: 'var(--space-1)',
-                    display: 'block',
-                  }}
-                >
-                  {errors.tourId}
-                </span>
-              )}
-            </div>
-
-            {/* Tour days count pill — also toggles the itinerary */}
-            {tourDaysCount !== null && tourDaysCount > 0 && !isLoadingHourRange && (
+            {/* Seleccionar Tour button + tour list header */}
+            {!showTourFields && (
               <button
                 type="button"
-                onClick={() => tourActivities.length > 0 && setItineraryOpen((v) => !v)}
+                onClick={() => setShowTourFields(true)}
                 style={{
-                  display: 'inline-flex',
+                  padding: '10px 16px',
+                  backgroundColor: 'var(--color-primary-500, #3b82f6)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 14px',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'var(--color-primary-50, #f0fdf4)',
-                  border: '1px solid var(--color-primary-200, #bbf7d0)',
-                  fontSize: 'var(--text-sm)',
-                  color: 'var(--color-primary-700, #15803d)',
-                  fontWeight: 500,
-                  lineHeight: 1.4,
-                  cursor: tourActivities.length > 0 ? 'pointer' : 'default',
-                  background: 'var(--color-primary-50, #f0fdf4)',
+                  gap: '8px',
+                  width: 'fit-content',
                 }}
               >
                 <svg
@@ -1086,372 +1094,704 @@ export function CreateBookingModal({
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
                 >
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                {language === 'en'
-                  ? `This tour consists of ${tourDaysCount} day${tourDaysCount !== 1 ? 's' : ''}`
-                  : `Este tour consta de ${tourDaysCount} día${tourDaysCount !== 1 ? 's' : ''}`}
-                {tourActivities.length > 0 && (
-                  <>
-                    <span style={{ margin: '0 2px', opacity: 0.5 }}>·</span>
-                    <span
-                      style={{
-                        textDecoration: 'underline',
-                        textUnderlineOffset: '2px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {bookingsT.viewItinerary}
-                    </span>
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      style={{
-                        transition: 'transform 0.2s',
-                        transform: itineraryOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                      }}
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </>
-                )}
+                {bookingsT.selectTourButton}
               </button>
             )}
 
-            {/* Tour Activities / Itinerary */}
-            {(() => {
-              console.warn('🎨 tourActivities.length:', tourActivities.length);
-              if (tourActivities.length === 0) return null;
-
-              // Group by day
-              const dayMap = new Map<number, BookingTourActivity[]>();
-              tourActivities.forEach((act) => {
-                const d = act.day ?? 1;
-                if (!dayMap.has(d)) dayMap.set(d, []);
-                const group = dayMap.get(d);
-                if (group) group.push(act);
-              });
-              const sortedDays = [...dayMap.entries()].sort(([a], [b]) => a - b);
-              sortedDays.forEach(([, acts]) => acts.sort((a, b) => a.sortOrder - b.sortOrder));
-
-              return (
+            {/* Tour fields — only visible when 'Seleccionar Tour' is clicked */}
+            {showTourFields && (
+              <>
+                {/* Tour Selection */}
                 <div>
-                  {itineraryOpen && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {sortedDays.map(([dayNum, acts]) => {
-                        const isOpen = expandedDays.has(dayNum);
-                        const toggle = () =>
-                          setExpandedDays((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(dayNum)) next.delete(dayNum);
-                            else next.add(dayNum);
-                            return next;
-                          });
-                        return (
-                          <div
-                            key={`day-${dayNum}`}
-                            style={{
-                              border: '1px solid #e5e7eb',
-                              borderRadius: 'var(--radius-lg, 10px)',
-                              overflow: 'hidden',
-                            }}
-                          >
-                            <button
-                              type="button"
-                              onClick={toggle}
-                              style={{
-                                width: '100%',
-                                padding: '8px 14px',
-                                background: '#f9fafb',
-                                borderBottom: isOpen ? '1px solid #e5e7eb' : 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                              }}
-                            >
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: 24,
-                                  height: 24,
-                                  borderRadius: '50%',
-                                  background: '#dbeafe',
-                                  color: '#1d4ed8',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {dayNum}
-                              </span>
-                              <span
-                                style={{
-                                  flex: 1,
-                                  textAlign: 'left',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 600,
-                                  color: '#374151',
-                                }}
-                              >
-                                {language === 'en' ? 'Day' : 'Día'} {dayNum}
-                              </span>
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                style={{
-                                  transition: 'transform 0.2s',
-                                  transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                                  color: '#6b7280',
-                                }}
-                              >
-                                <polyline points="6 9 12 15 18 9" />
-                              </svg>
-                            </button>
-                            {isOpen && (
-                              <div>
-                                {acts.map((act, idx) => (
-                                  <div
-                                    key={act.id}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '12px',
-                                      padding: '10px 14px',
-                                      borderBottom:
-                                        idx < acts.length - 1 ? '1px solid #f3f4f6' : 'none',
-                                      background: idx % 2 === 0 ? 'white' : '#fafbfc',
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        flexShrink: 0,
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        padding: '2px 8px',
-                                        borderRadius: 9999,
-                                        background: '#f0f9ff',
-                                        border: '1px solid #bae6fd',
-                                        fontSize: '0.7rem',
-                                        fontWeight: 600,
-                                        color: '#0369a1',
-                                        minWidth: 60,
-                                        justifyContent: 'center',
-                                      }}
-                                    >
-                                      <svg
-                                        width="10"
-                                        height="10"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2.5"
-                                      >
-                                        <circle cx="12" cy="12" r="10" />
-                                        <polyline points="12 6 12 12 16 14" />
-                                      </svg>
-                                      {act.hora}
-                                    </div>
-                                    <span
-                                      style={{
-                                        fontSize: '0.8rem',
-                                        color: '#374151',
-                                        fontWeight: 500,
-                                      }}
-                                    >
-                                      {language === 'en' ? act.activity_en : act.activity_es}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                  <label
+                    style={{
+                      display: 'block',
+                      marginBottom: 'var(--space-2)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      color: 'var(--color-neutral-700)',
+                    }}
+                  >
+                    {t('bookings.tour')} <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <Select
+                    options={[
+                      { value: '', label: t('bookings.tours.selectTour') ?? 'Select tour' },
+                      ...tours.map((tour) => ({
+                        value: tour.id,
+                        label: language === 'en' ? tour.title_en : tour.title_es,
+                      })),
+                    ]}
+                    value={formData.tourId}
+                    onChange={(value: string) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        tourId: value,
+                        startDate: '',
+                        endDate: '',
+                        clients: [],
+                        specialRequests: '',
+                      }));
+                      setIsTourLoading(value !== '');
+                      setItineraryOpen(false);
+                      setExpandedDays(new Set());
+                      setTourAvailability(null);
+                      setAvailabilityError('');
+                      if (errors.tourId !== undefined) {
+                        setErrors((prev) => ({ ...prev, tourId: undefined }));
+                      }
+                    }}
+                    placeholder={t('bookings.tours.selectTour') ?? 'Select tour'}
+                    id="select-tour"
+                  />
+                  {errors.tourId !== undefined && (
+                    <span
+                      style={{
+                        color: 'red',
+                        fontSize: 'var(--text-xs)',
+                        marginTop: 'var(--space-1)',
+                        display: 'block',
+                      }}
+                    >
+                      {errors.tourId}
+                    </span>
                   )}
                 </div>
-              );
-            })()}
 
-            {/* Dates */}
-            <div>
-              <div
-                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}
-              >
-                <div>
-                  <label
+                {/* Tour days count pill — also toggles the itinerary */}
+                {tourDaysCount !== null && tourDaysCount > 0 && !isLoadingHourRange && (
+                  <button
+                    type="button"
+                    onClick={() => tourActivities.length > 0 && setItineraryOpen((v) => !v)}
                     style={{
-                      display: 'block',
-                      marginBottom: 'var(--space-2)',
-                      fontWeight: 'var(--font-weight-medium)',
-                      color: 'var(--color-neutral-700)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: 'var(--radius-lg)',
+                      backgroundColor: 'var(--color-primary-50, #f0fdf4)',
+                      border: '1px solid var(--color-primary-200, #bbf7d0)',
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--color-primary-700, #15803d)',
+                      fontWeight: 500,
+                      lineHeight: 1.4,
+                      cursor: tourActivities.length > 0 ? 'pointer' : 'default',
+                      background: 'var(--color-primary-50, #f0fdf4)',
                     }}
                   >
-                    {t('bookings.startDate')} <span style={{ color: 'red' }}>*</span>
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <Input
-                      type="date"
-                      name="startDate"
-                      value={formData.startDate}
-                      onChange={handleInputChange}
-                      error={errors.startDate}
-                      min={minBookingDate}
-                      disabled={!canEnableDates}
-                    />
-                    {formData.tourId !== '' && (
-                      <div
-                        style={{
-                          flexShrink: 0,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 'var(--space-2)',
-                          padding: '3px 10px',
-                          borderRadius: 'var(--radius-full, 9999px)',
-                          whiteSpace: 'nowrap',
-                          backgroundColor: isLoadingHourRange
-                            ? 'var(--color-neutral-100)'
-                            : hourRange !== null
-                              ? 'var(--color-primary-50, #eff6ff)'
-                              : 'var(--color-neutral-100)',
-                          border: `1px solid ${
-                            isLoadingHourRange
-                              ? 'var(--color-neutral-200)'
-                              : hourRange !== null
-                                ? 'var(--color-primary-200, #bfdbfe)'
-                                : 'var(--color-neutral-200)'
-                          }`,
-                          fontSize: 'var(--text-sm)',
-                          color: isLoadingHourRange
-                            ? 'var(--color-neutral-500)'
-                            : hourRange !== null
-                              ? 'var(--color-primary-700, #1d4ed8)'
-                              : 'var(--color-neutral-500)',
-                          fontWeight: 500,
-                        }}
-                      >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    {language === 'en'
+                      ? `This tour consists of ${tourDaysCount} day${tourDaysCount !== 1 ? 's' : ''}`
+                      : `Este tour consta de ${tourDaysCount} día${tourDaysCount !== 1 ? 's' : ''}`}
+                    {tourActivities.length > 0 && (
+                      <>
+                        <span style={{ margin: '0 2px', opacity: 0.5 }}>·</span>
+                        <span
+                          style={{
+                            textDecoration: 'underline',
+                            textUnderlineOffset: '2px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {bookingsT.viewItinerary}
+                        </span>
                         <svg
-                          width="13"
-                          height="13"
+                          width="12"
+                          height="12"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="2"
+                          strokeWidth="2.5"
+                          style={{
+                            transition: 'transform 0.2s',
+                            transform: itineraryOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                          }}
                         >
-                          <circle cx="12" cy="12" r="10" />
-                          <polyline points="12 6 12 12 16 14" />
+                          <polyline points="6 9 12 15 18 9" />
                         </svg>
-                        {isLoadingHourRange
-                          ? language === 'en'
-                            ? 'Loading...'
-                            : 'Cargando...'
-                          : (hourRange?.split(' - ')[0] ??
-                            (language === 'en' ? 'No schedule' : 'Sin horario'))}
-                      </div>
+                      </>
                     )}
+                  </button>
+                )}
+
+                {/* Tour Activities / Itinerary */}
+                {(() => {
+                  console.warn('🎨 tourActivities.length:', tourActivities.length);
+                  if (tourActivities.length === 0) return null;
+
+                  // Group by day
+                  const dayMap = new Map<number, BookingTourActivity[]>();
+                  tourActivities.forEach((act) => {
+                    const d = act.day ?? 1;
+                    if (!dayMap.has(d)) dayMap.set(d, []);
+                    const group = dayMap.get(d);
+                    if (group) group.push(act);
+                  });
+                  const sortedDays = [...dayMap.entries()].sort(([a], [b]) => a - b);
+                  sortedDays.forEach(([, acts]) => acts.sort((a, b) => a.sortOrder - b.sortOrder));
+
+                  return (
+                    <div>
+                      {itineraryOpen && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {sortedDays.map(([dayNum, acts]) => {
+                            const isOpen = expandedDays.has(dayNum);
+                            const toggle = () =>
+                              setExpandedDays((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(dayNum)) next.delete(dayNum);
+                                else next.add(dayNum);
+                                return next;
+                              });
+                            return (
+                              <div
+                                key={`day-${dayNum}`}
+                                style={{
+                                  border: '1px solid #e5e7eb',
+                                  borderRadius: 'var(--radius-lg, 10px)',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={toggle}
+                                  style={{
+                                    width: '100%',
+                                    padding: '8px 14px',
+                                    background: '#f9fafb',
+                                    borderBottom: isOpen ? '1px solid #e5e7eb' : 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 24,
+                                      height: 24,
+                                      borderRadius: '50%',
+                                      background: '#dbeafe',
+                                      color: '#1d4ed8',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {dayNum}
+                                  </span>
+                                  <span
+                                    style={{
+                                      flex: 1,
+                                      textAlign: 'left',
+                                      fontSize: '0.85rem',
+                                      fontWeight: 600,
+                                      color: '#374151',
+                                    }}
+                                  >
+                                    {language === 'en' ? 'Day' : 'Día'} {dayNum}
+                                  </span>
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    style={{
+                                      transition: 'transform 0.2s',
+                                      transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                      color: '#6b7280',
+                                    }}
+                                  >
+                                    <polyline points="6 9 12 15 18 9" />
+                                  </svg>
+                                </button>
+                                {isOpen && (
+                                  <div>
+                                    {acts.map((act, idx) => (
+                                      <div
+                                        key={act.id}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '12px',
+                                          padding: '10px 14px',
+                                          borderBottom:
+                                            idx < acts.length - 1 ? '1px solid #f3f4f6' : 'none',
+                                          background: idx % 2 === 0 ? 'white' : '#fafbfc',
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            flexShrink: 0,
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            padding: '2px 8px',
+                                            borderRadius: 9999,
+                                            background: '#f0f9ff',
+                                            border: '1px solid #bae6fd',
+                                            fontSize: '0.7rem',
+                                            fontWeight: 600,
+                                            color: '#0369a1',
+                                            minWidth: 60,
+                                            justifyContent: 'center',
+                                          }}
+                                        >
+                                          <svg
+                                            width="10"
+                                            height="10"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2.5"
+                                          >
+                                            <circle cx="12" cy="12" r="10" />
+                                            <polyline points="12 6 12 12 16 14" />
+                                          </svg>
+                                          {act.hora}
+                                        </div>
+                                        <span
+                                          style={{
+                                            fontSize: '0.8rem',
+                                            color: '#374151',
+                                            fontWeight: 500,
+                                          }}
+                                        >
+                                          {language === 'en' ? act.activity_en : act.activity_es}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Dates */}
+                <div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 'var(--space-4)',
+                    }}
+                  >
+                    <div>
+                      <label
+                        style={{
+                          display: 'block',
+                          marginBottom: 'var(--space-2)',
+                          fontWeight: 'var(--font-weight-medium)',
+                          color: 'var(--color-neutral-700)',
+                        }}
+                      >
+                        {t('bookings.startDate')} <span style={{ color: 'red' }}>*</span>
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <Input
+                          type="date"
+                          name="startDate"
+                          value={formData.startDate}
+                          onChange={handleInputChange}
+                          error={errors.startDate}
+                          min={minBookingDate}
+                          disabled={!canEnableDates}
+                        />
+                        {formData.tourId !== '' && (
+                          <div
+                            style={{
+                              flexShrink: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-2)',
+                              padding: '3px 10px',
+                              borderRadius: 'var(--radius-full, 9999px)',
+                              whiteSpace: 'nowrap',
+                              backgroundColor: isLoadingHourRange
+                                ? 'var(--color-neutral-100)'
+                                : hourRange !== null
+                                  ? 'var(--color-primary-50, #eff6ff)'
+                                  : 'var(--color-neutral-100)',
+                              border: `1px solid ${
+                                isLoadingHourRange
+                                  ? 'var(--color-neutral-200)'
+                                  : hourRange !== null
+                                    ? 'var(--color-primary-200, #bfdbfe)'
+                                    : 'var(--color-neutral-200)'
+                              }`,
+                              fontSize: 'var(--text-sm)',
+                              color: isLoadingHourRange
+                                ? 'var(--color-neutral-500)'
+                                : hourRange !== null
+                                  ? 'var(--color-primary-700, #1d4ed8)'
+                                  : 'var(--color-neutral-500)',
+                              fontWeight: 500,
+                            }}
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            {isLoadingHourRange
+                              ? language === 'en'
+                                ? 'Loading...'
+                                : 'Cargando...'
+                              : (hourRange?.split(' - ')[0] ??
+                                (language === 'en' ? 'No schedule' : 'Sin horario'))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label
+                        style={{
+                          display: 'block',
+                          marginBottom: 'var(--space-2)',
+                          fontWeight: 'var(--font-weight-medium)',
+                          color: 'var(--color-neutral-700)',
+                        }}
+                      >
+                        {t('bookings.endDate')} <span style={{ color: 'red' }}>*</span>
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <Input
+                          type="date"
+                          name="endDate"
+                          value={formData.endDate}
+                          onChange={handleInputChange}
+                          error={errors.endDate}
+                          min={minBookingDate}
+                          disabled={
+                            !canEnableDates || (tourDaysCount !== null && tourDaysCount > 0)
+                          }
+                        />
+                        {formData.tourId !== '' && (
+                          <div
+                            style={{
+                              flexShrink: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 'var(--space-2)',
+                              padding: '3px 10px',
+                              borderRadius: 'var(--radius-full, 9999px)',
+                              whiteSpace: 'nowrap',
+                              backgroundColor: isLoadingHourRange
+                                ? 'var(--color-neutral-100)'
+                                : hourRange !== null
+                                  ? 'var(--color-primary-50, #eff6ff)'
+                                  : 'var(--color-neutral-100)',
+                              border: `1px solid ${
+                                isLoadingHourRange
+                                  ? 'var(--color-neutral-200)'
+                                  : hourRange !== null
+                                    ? 'var(--color-primary-200, #bfdbfe)'
+                                    : 'var(--color-neutral-200)'
+                              }`,
+                              fontSize: 'var(--text-sm)',
+                              color: isLoadingHourRange
+                                ? 'var(--color-neutral-500)'
+                                : hourRange !== null
+                                  ? 'var(--color-primary-700, #1d4ed8)'
+                                  : 'var(--color-neutral-500)',
+                              fontWeight: 500,
+                            }}
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            {isLoadingHourRange
+                              ? language === 'en'
+                                ? 'Loading...'
+                                : 'Cargando...'
+                              : (hourRange?.split(' - ')[1] ??
+                                (language === 'en' ? 'No schedule' : 'Sin horario'))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label
+                {/* Tour Availability Display */}
+                <TourAvailabilityDisplay
+                  availability={tourAvailability}
+                  isLoading={isLoadingAvailability}
+                  error={availabilityError}
+                />
+
+                {/* Add Tour to List Button — when fields are visible */}
+                {showTourFields &&
+                  (() => {
+                    const canAddTour =
+                      formData.tourId !== '' &&
+                      formData.startDate !== '' &&
+                      tourAvailability !== null &&
+                      (tourAvailability.availableSlots ?? 0) > 0 &&
+                      hourRange !== null &&
+                      !isLoadingHourRange &&
+                      !isLoadingAvailability;
+
+                    return (
+                      <div style={{ marginTop: '4px' }}>
+                        {/* Alert message */}
+                        {addTourAlert !== null && (
+                          <div
+                            style={{
+                              marginBottom: '8px',
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              backgroundColor:
+                                addTourAlert.type === 'error' ? '#fef2f2' : '#fffbeb',
+                              border: `1px solid ${addTourAlert.type === 'error' ? '#fca5a5' : '#fcd34d'}`,
+                              color: addTourAlert.type === 'error' ? '#dc2626' : '#92400e',
+                            }}
+                          >
+                            {addTourAlert.type === 'error' ? '❌ ' : '⚠️ '}
+                            {addTourAlert.message}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowTourFields(false);
+                              setAddTourAlert(null);
+                              setFormData((prev) => ({
+                                ...prev,
+                                tourId: '',
+                                startDate: '',
+                                endDate: '',
+                              }));
+                              setHourRange(null);
+                              setTourAvailability(null);
+                              setTourBasePrice(null);
+                              setTourMinimumPayment(null);
+                              setTourActivities([]);
+                              setTourCityId('');
+                              setTourCityName('');
+                            }}
+                            style={{
+                              padding: '10px 16px',
+                              backgroundColor: 'var(--color-neutral-100, #f3f4f6)',
+                              color: 'var(--color-neutral-600, #4b5563)',
+                              border: '1px solid var(--color-neutral-300, #d1d5db)',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: 500,
+                            }}
+                          >
+                            {bookingsT.cancelAddTour}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!canAddTour}
+                            onClick={() => {
+                              setAddTourAlert(null);
+
+                              const newTour: BookingTour = {
+                                id: formData.tourId,
+                                name_es:
+                                  tours.find((t) => t.id === formData.tourId)?.title_es ?? '',
+                                name_en:
+                                  tours.find((t) => t.id === formData.tourId)?.title_en ?? '',
+                                startDate: formData.startDate,
+                                startTime: hourRange?.split(' - ')[0] ?? '00:00',
+                                endTime: hourRange?.split(' - ')[1] ?? '00:00',
+                                price: tourBasePrice ?? 0,
+                                currency: formData.currency,
+                                capacity: tourAvailability?.maxCapacity ?? 0,
+                                bookedSlots: tourAvailability?.totalReservedSlots ?? 0,
+                                cityId: tourCityId,
+                                cityName: tourCityName,
+                              };
+
+                              // Check if same tour already in list
+                              if (
+                                selectedTours.some(
+                                  (t) => t.id === newTour.id && t.startDate === newTour.startDate
+                                )
+                              ) {
+                                setAddTourAlert({
+                                  type: 'error',
+                                  message: bookingsT.tourAlreadyAdded,
+                                });
+                                return;
+                              }
+
+                              // Check time overlap
+                              const overlapError = checkTimeOverlap(newTour, selectedTours);
+                              if (overlapError !== null) {
+                                setAddTourAlert({ type: 'error', message: overlapError });
+                                return;
+                              }
+
+                              // Check different city same day (warning — allow but inform)
+                              const cityWarning = checkDifferentCitySameDay(newTour, selectedTours);
+                              if (cityWarning !== null) {
+                                setAddTourAlert({ type: 'warning', message: cityWarning });
+                              }
+
+                              // Add and sort chronologically
+                              const updated = sortToursChronologically([...selectedTours, newTour]);
+                              setSelectedTours(updated);
+
+                              // Reset form and hide fields
+                              setShowTourFields(false);
+                              setFormData((prev) => ({
+                                ...prev,
+                                tourId: '',
+                                startDate: '',
+                                endDate: '',
+                              }));
+                              setHourRange(null);
+                              setTourAvailability(null);
+                              setTourBasePrice(null);
+                              setTourMinimumPayment(null);
+                              setTourActivities([]);
+                              setTourCityId('');
+                              setTourCityName('');
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '10px 16px',
+                              backgroundColor: canAddTour
+                                ? 'var(--color-primary-500, #3b82f6)'
+                                : 'var(--color-neutral-200, #e5e7eb)',
+                              color: canAddTour ? 'white' : 'var(--color-neutral-400, #9ca3af)',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: canAddTour ? 'pointer' : 'not-allowed',
+                              fontSize: '14px',
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                            }}
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <line x1="12" y1="5" x2="12" y2="19" />
+                              <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            {bookingsT.addTourToList}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+              </>
+            )}
+
+            {/* Multi-Tour: Selected Tours List — always visible */}
+            {isMultiTourMode && (
+              <div style={{ marginTop: '8px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: 'var(--space-2)',
+                    fontWeight: 'var(--font-weight-medium)',
+                    color: 'var(--color-neutral-700)',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  {bookingsT.selectedTours} ({selectedTours.length})
+                </label>
+                {selectedTours.length > 0 ? (
+                  <>
+                    <MultiTourSelector
+                      tours={selectedTours}
+                      onRemoveTour={(tourId) => {
+                        const updated = selectedTours.filter((t) => t.id !== tourId);
+                        setSelectedTours(updated);
+                        void validateMultiTour(updated);
+                      }}
+                      onReorderTours={(reorderedTours) => {
+                        setSelectedTours(reorderedTours);
+                        void validateMultiTour(reorderedTours);
+                      }}
+                      warnings={validationResult.warnings}
+                      errors={validationResult.errors}
+                    />
+                    <div
+                      style={{
+                        marginTop: '8px',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: 'var(--color-neutral-700)',
+                      }}
+                    >
+                      {language === 'en' ? 'Total' : 'Total'}: {formData.currency}{' '}
+                      {calculateBookingTotal(selectedTours).toFixed(2)}
+                    </div>
+                  </>
+                ) : (
+                  <div
                     style={{
-                      display: 'block',
-                      marginBottom: 'var(--space-2)',
-                      fontWeight: 'var(--font-weight-medium)',
-                      color: 'var(--color-neutral-700)',
+                      padding: '24px',
+                      borderRadius: '8px',
+                      border: '2px dashed var(--color-neutral-200, #e5e7eb)',
+                      textAlign: 'center',
+                      color: 'var(--color-neutral-400, #9ca3af)',
+                      fontSize: '14px',
                     }}
                   >
-                    {t('bookings.endDate')} <span style={{ color: 'red' }}>*</span>
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <Input
-                      type="date"
-                      name="endDate"
-                      value={formData.endDate}
-                      onChange={handleInputChange}
-                      error={errors.endDate}
-                      min={minBookingDate}
-                      disabled={!canEnableDates || (tourDaysCount !== null && tourDaysCount > 0)}
-                    />
-                    {formData.tourId !== '' && (
-                      <div
-                        style={{
-                          flexShrink: 0,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 'var(--space-2)',
-                          padding: '3px 10px',
-                          borderRadius: 'var(--radius-full, 9999px)',
-                          whiteSpace: 'nowrap',
-                          backgroundColor: isLoadingHourRange
-                            ? 'var(--color-neutral-100)'
-                            : hourRange !== null
-                              ? 'var(--color-primary-50, #eff6ff)'
-                              : 'var(--color-neutral-100)',
-                          border: `1px solid ${
-                            isLoadingHourRange
-                              ? 'var(--color-neutral-200)'
-                              : hourRange !== null
-                                ? 'var(--color-primary-200, #bfdbfe)'
-                                : 'var(--color-neutral-200)'
-                          }`,
-                          fontSize: 'var(--text-sm)',
-                          color: isLoadingHourRange
-                            ? 'var(--color-neutral-500)'
-                            : hourRange !== null
-                              ? 'var(--color-primary-700, #1d4ed8)'
-                              : 'var(--color-neutral-500)',
-                          fontWeight: 500,
-                        }}
-                      >
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <circle cx="12" cy="12" r="10" />
-                          <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                        {isLoadingHourRange
-                          ? language === 'en'
-                            ? 'Loading...'
-                            : 'Cargando...'
-                          : (hourRange?.split(' - ')[1] ??
-                            (language === 'en' ? 'No schedule' : 'Sin horario'))}
-                      </div>
-                    )}
+                    {bookingsT.noToursAdded}
                   </div>
-                </div>
+                )}
               </div>
-            </div>
-
-            {/* Tour Availability Display */}
-            <TourAvailabilityDisplay
-              availability={tourAvailability}
-              isLoading={isLoadingAvailability}
-              error={availabilityError}
-            />
+            )}
 
             {/* Currency */}
             <div>

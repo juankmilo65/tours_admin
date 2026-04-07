@@ -266,7 +266,7 @@ export const getUsersDropdownBusiness = async (
   language = 'es'
 ): Promise<{
   success: boolean;
-  data?: Array<{ id: string; firstName: string; email: string }>;
+  data?: Array<{ id: string; firstName: string; email: string; ownerKycVerified?: boolean }>;
 }> => {
   try {
     // Create cache key from parameters
@@ -279,11 +279,13 @@ export const getUsersDropdownBusiness = async (
     // Check cache first
     const cached = usersDropdownCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < USERS_DROPDOWN_TTL) {
+      // eslint-disable-next-line no-console
       console.log('📦 [USERS CACHE] Using cached data');
       const users = cached.data.map((user) => ({
         id: user.id,
         firstName: `${user.firstName} ${user.lastName}`,
         email: user.email,
+        ownerKycVerified: user.ownerKycVerified,
       }));
       return { success: true, data: users };
     }
@@ -300,23 +302,27 @@ export const getUsersDropdownBusiness = async (
         data: result.data,
         timestamp: Date.now(),
       });
+      // eslint-disable-next-line no-console
       console.log('💾 [USERS CACHE] Data cached');
 
       const users = result.data.map((user) => ({
         id: user.id,
         firstName: `${user.firstName} ${user.lastName}`,
         email: user.email,
+        ownerKycVerified: user.ownerKycVerified,
       }));
       return { success: true, data: users };
     }
 
     // If API call fails but we have cached data, return it even if expired
     if (cached && cached.data.length > 0) {
+      // eslint-disable-next-line no-console
       console.log('🔄 [USERS CACHE] API failed, returning stale cached data');
       const users = cached.data.map((user) => ({
         id: user.id,
         firstName: `${user.firstName} ${user.lastName}`,
         email: user.email,
+        ownerKycVerified: user.ownerKycVerified,
       }));
       return { success: true, data: users };
     }
@@ -339,11 +345,13 @@ export const getUsersDropdownBusiness = async (
       });
       const cached = usersDropdownCache.get(cacheKey);
       if (cached && cached.data.length > 0) {
+        // eslint-disable-next-line no-console
         console.log('🔄 [USERS CACHE] Rate limited, returning stale cached data');
         const users = cached.data.map((user) => ({
           id: user.id,
           firstName: `${user.firstName} ${user.lastName}`,
           email: user.email,
+          ownerKycVerified: user.ownerKycVerified,
         }));
         return { success: true, data: users };
       }

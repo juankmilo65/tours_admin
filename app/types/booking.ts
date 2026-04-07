@@ -3,6 +3,23 @@
  * Types for bookings and payments management
  */
 
+export interface BookingTour {
+  id: string;
+  name_es: string;
+  name_en: string;
+  startDate: string; // YYYY-MM-DD
+  startTime: string; // HH:MM (backend provides timezone-adjusted)
+  endTime: string; // HH:MM
+  price: number;
+  currency: string;
+  capacity: number;
+  bookedSlots: number;
+  cityId?: string;
+  cityName?: string;
+  description_es?: string;
+  description_en?: string;
+}
+
 export interface Booking {
   id: string;
   userId?: string; // No longer at booking level - now in clients
@@ -42,11 +59,25 @@ export interface Booking {
   createdAt: string;
   updatedAt: string;
   tour?: Tour;
+  tours?: BookingTour[]; // Multi-tour support
   user?: User;
   offer?: unknown;
   country?: Country;
   payments?: Payment[];
   clients?: BookingClient[];
+  // Split payment fields
+  depositAmount?: number;
+  depositPaid?: boolean;
+  depositPaidAt?: string;
+  finalPaymentAmount?: number;
+  finalPaymentPaid?: boolean;
+  finalPaymentPaidAt?: string;
+  paymentIntentId?: string;
+  // Cancellation
+  cancellationRequestedAt?: string;
+  refundAmount?: number;
+  refundStatus?: 'pending' | 'completed' | 'failed';
+  cancellationPolicyId?: string;
 }
 
 export interface BookingTourActivity {

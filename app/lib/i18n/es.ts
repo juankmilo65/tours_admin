@@ -108,6 +108,14 @@ export const es: Translation = {
     help: 'Ayuda',
     guest: 'Invitado',
     noEmail: 'Sin correo',
+    notificationBell: 'Notificaciones',
+    noNotifications: 'No tienes notificaciones pendientes',
+    kycUrgent: 'Urgente',
+    kycTitle: 'Verificación KYC requerida',
+    kycDescription:
+      'Es necesario que completes tu proceso de verificación de identidad (KYC) para poder publicar tus tours. Sin esta verificación, no podrás crear ni gestionar publicaciones.',
+    kycAction: 'Completar verificación',
+    justNow: 'Ahora mismo',
   },
   auth: {
     login: 'Iniciar Sesión',
@@ -289,6 +297,8 @@ export const es: Translation = {
     activities: 'Actividades',
     activity: 'Actividad',
     isActive: 'Activo',
+    kycActiveNote:
+      'Para habilitar la opción de activar este tour, recuerda completar tu proceso KYC.',
     userIdRequired: 'El proveedor es requerido',
     categoryIdRequired: 'La categoría es requerida',
     cityIdRequired: 'La ciudad es requerida',
@@ -319,6 +329,7 @@ export const es: Translation = {
     noActivitiesInDay: 'No hay actividades agregadas. Selecciona una actividad del menú superior.',
     timeLabel: 'Hora',
     languageRequired: 'Debe seleccionar al menos un idioma',
+    cancellationPolicyRequired: 'Se requiere al menos una política de cancelación',
     createTourSuccess: 'Tour creado exitosamente',
     createTourError: 'Error al crear el tour',
     creatingTour: 'Creando tour...',

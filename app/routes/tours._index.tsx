@@ -55,7 +55,14 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   let selectedCountryId = session.get('selectedCountryId') as string | undefined;
   const authToken = session.get('authToken') as string | undefined;
   const authUser = session.get('authUser') as
-    | { id: string; role: string; firstName?: string; lastName?: string; email?: string }
+    | {
+        id: string;
+        role: string;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        ownerKycVerified?: boolean;
+      }
     | undefined;
 
   // Get default country if not in session
@@ -124,7 +131,12 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
   }
 
   // Fetch users for dropdown
-  let users: Array<{ id: string; firstName: string; email: string }> = [];
+  let users: Array<{
+    id: string;
+    firstName: string;
+    email: string;
+    ownerKycVerified?: boolean;
+  }> = [];
   if (authToken !== undefined) {
     if (authUser?.role === 'admin') {
       const usersResult = await getUsersDropdownBusiness(['owner'], 'true', authToken, 'es');
@@ -136,7 +148,14 @@ export async function loader(args: LoaderFunctionArgs): Promise<ReturnType<typeo
       const trimmedName = (firstName + ' ' + lastName).trim();
       const email = authUser.email ?? '';
       const fullName = trimmedName !== '' ? trimmedName : (email ?? 'Usuario');
-      users = [{ id: authUser.id, firstName: fullName, email: email ?? 'usuario@ejemplo.com' }];
+      users = [
+        {
+          id: authUser.id,
+          firstName: fullName,
+          email: email ?? 'usuario@ejemplo.com',
+          ownerKycVerified: authUser.ownerKycVerified,
+        },
+      ];
     }
   }
 
@@ -350,7 +369,7 @@ function ToursClient(): JSX.Element {
   // Auto-select current user as provider for non-admin
   useEffect(() => {
     if (!isAdmin && currentUser?.id !== undefined && filters.userId !== currentUser.id) {
-      dispatch(setFilters({ userId: currentUser.id, countryId: countryId ?? '' }));
+      dispatch(setFiltersSilently({ userId: currentUser.id, countryId: countryId ?? '' }));
     }
   }, [isAdmin, currentUser, countryId, dispatch, filters.userId]);
 
@@ -608,11 +627,9 @@ function ToursClient(): JSX.Element {
     const rawData = rawTourForEdit as unknown as Record<string, unknown>;
     const fullData = fullTourData && typeof fullTourData === 'object' ? fullTourData : {};
 
-    const getOwnerIdFromArray = (): string => {
-      const owners = fullData.owners;
-      if (Array.isArray(owners) && owners.length > 0) {
-        const firstOwner = owners[0] as { id?: string };
-        return firstOwner.id ?? '';
+    const getOwnerId = (): string => {
+      if (typeof fullData.ownerId === 'string' && fullData.ownerId !== '') {
+        return fullData.ownerId;
       }
       return '';
     };
@@ -625,7 +642,7 @@ function ToursClient(): JSX.Element {
     if (!Array.isArray(fullData.days)) console.warn('fullData.days is not array', fullData.days);
 
     const initialData = {
-      userId: getOwnerIdFromArray(),
+      userId: getOwnerId(),
       categoryId: rawTourForEdit.categoryId ?? rawTourForEdit.category?.id ?? '',
       cityId: rawTourForEdit.cityId ?? rawTourForEdit.city?.id ?? '',
       titleEs: (fullData.title_es as string) ?? (rawData.title_es as string) ?? '',
@@ -717,23 +734,15 @@ function ToursClient(): JSX.Element {
         }
         return null;
       })(),
-      cancellationPolicies: (() => {
-        const rawPolicies = fullData.cancellationPolicies;
-        if (!Array.isArray(rawPolicies)) return [];
-        return rawPolicies.map((p: Record<string, unknown>) => ({
-          daysBeforeTour: typeof p.daysBeforeTour === 'number' ? p.daysBeforeTour : 0,
-          refundPercentage: typeof p.refundPercentage === 'number' ? p.refundPercentage : 0,
-          administrativeFee:
-            typeof p.administrativeFee === 'number'
-              ? p.administrativeFee
-              : parseFloat(String(p.administrativeFee ?? '0')) || 0,
-          appliesToPaymentMethods: Array.isArray(p.appliesToPaymentMethods)
-            ? (p.appliesToPaymentMethods as string[])
-            : [],
-          description_es: typeof p.description_es === 'string' ? p.description_es : '',
-          description_en: typeof p.description_en === 'string' ? p.description_en : '',
-          isActive: typeof p.isActive === 'boolean' ? p.isActive : true,
-        }));
+      cancellationPolicyId: (() => {
+        const policy = fullData.cancellationPolicy as { id?: string } | undefined | null;
+        if (policy !== undefined && policy !== null && typeof policy.id === 'string') {
+          return policy.id;
+        }
+        // Fallback: check cancellationPolicyId directly
+        const directId = fullData.cancellationPolicyId;
+        if (typeof directId === 'string') return directId;
+        return undefined;
       })(),
     };
 
@@ -1657,15 +1666,7 @@ function ToursClient(): JSX.Element {
                   terms_conditions_es: string;
                   terms_conditions_en: string;
                 } | null;
-                cancellationPolicies: Array<{
-                  daysBeforeTour: number;
-                  refundPercentage: number;
-                  administrativeFee: number;
-                  appliesToPaymentMethods: string[];
-                  description_es: string;
-                  description_en: string;
-                  isActive: boolean;
-                }>;
+                cancellationPolicyId: string;
               }>
             }
             users={loaderData.data?.users ?? []}

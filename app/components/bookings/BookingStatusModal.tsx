@@ -19,6 +19,8 @@ import { getNextBookingStatusBusiness } from '~/server/businessLogic/bookingStat
 import type { Booking } from '~/types/booking';
 import type { BookingStatusHistoryEntry } from '~/server/businessLogic/bookingsBusinessLogic';
 import type { NextBookingStatus } from '~/types/bookingStatus';
+import { PaymentTimeline } from '~/components/payments/PaymentTimeline';
+import { formatPaymentTimeline } from '~/services/paymentService';
 
 interface BookingStatusModalProps {
   isOpen: boolean;
@@ -398,6 +400,14 @@ export function BookingStatusModal({
                 );
               })}
             </div>
+          )}
+
+          {/* Payment Timeline */}
+          {!loadingData && booking && (
+            <PaymentTimeline
+              events={formatPaymentTimeline(booking)}
+              currency={booking.currency ?? 'MXN'}
+            />
           )}
         </div>
 

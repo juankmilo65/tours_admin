@@ -14,6 +14,12 @@ export { es } from './es';
 // Component-specific translations
 export { bookingEn } from './booking/en';
 export { bookingEs } from './booking/es';
+export { paymentsEn } from './payments/en';
+export { paymentsEs } from './payments/es';
+export { kycEn } from './kyc/en';
+export { kycEs } from './kyc/es';
+export { errorsEn } from './errors/en';
+export { errorsEs } from './errors/es';
 
 // Utils
 export {
