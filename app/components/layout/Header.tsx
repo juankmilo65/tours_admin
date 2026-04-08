@@ -6,7 +6,12 @@ import type { JSX } from 'react';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { translateCountries, translateCountry, type Country } from '~/store/slices/countriesSlice';
-import { selectCurrentUser, selectAuthToken, updateUser } from '~/store/slices/authSlice';
+import {
+  selectCurrentUser,
+  selectAuthToken,
+  selectOwnerKycStatus,
+  updateUser,
+} from '~/store/slices/authSlice';
 import { getUserByIdBusiness } from '~/server/businessLogic/usersBusinessLogic';
 import {
   setGlobalLoading,
@@ -109,9 +114,38 @@ export function Header({
   }, [currentUser, t]);
 
   // KYC notification check
+  const ownerKycStatus = useAppSelector(selectOwnerKycStatus);
+  const isKycInProgress = ownerKycStatus === 'in_progress';
+  const isKycCompleted = ownerKycStatus === 'completed';
   const hasKycNotification =
-    currentUser?.role === 'owner' && currentUser?.ownerKycVerified !== true;
+    currentUser?.role === 'owner' &&
+    (currentUser?.ownerKycVerified !== true || isKycInProgress || isKycCompleted);
   const notificationCount = hasKycNotification ? 1 : 0;
+
+  // KYC notification color scheme based on status
+  const kycColor = isKycCompleted
+    ? {
+        bg500: 'var(--color-success-500, #22c55e)',
+        bg100: 'var(--color-success-100, #dcfce7)',
+        bg50: 'var(--color-success-50, #f0fdf4)',
+        text700: 'var(--color-success-700, #15803d)',
+        text600: 'var(--color-success-600, #16a34a)',
+      }
+    : isKycInProgress
+      ? {
+          bg500: 'var(--color-warning-500, #f59e0b)',
+          bg100: 'var(--color-warning-100, #fef3c7)',
+          bg50: 'var(--color-warning-50, #fffbeb)',
+          text700: 'var(--color-warning-700, #b45309)',
+          text600: 'var(--color-warning-600, #d97706)',
+        }
+      : {
+          bg500: 'var(--color-error-500)',
+          bg100: 'var(--color-error-100)',
+          bg50: 'var(--color-error-50)',
+          text700: 'var(--color-error-700)',
+          text600: 'var(--color-error-600)',
+        };
 
   // Translate countries based on current language usando props
   const translatedCountries = useMemo(
@@ -428,7 +462,7 @@ export function Header({
                     right: '2px',
                     width: '18px',
                     height: '18px',
-                    backgroundColor: 'var(--color-error-500)',
+                    backgroundColor: kycColor.bg500,
                     color: 'white',
                     borderRadius: 'var(--radius-full)',
                     fontSize: '11px',
@@ -438,7 +472,7 @@ export function Header({
                     justifyContent: 'center',
                     lineHeight: 1,
                     border: '2px solid var(--color-neutral-50)',
-                    animation: 'pulse 2s infinite',
+                    animation: isKycInProgress || isKycCompleted ? undefined : 'pulse 2s infinite',
                   }}
                 >
                   {notificationCount}
@@ -486,8 +520,8 @@ export function Header({
                   {notificationCount > 0 && (
                     <span
                       style={{
-                        backgroundColor: 'var(--color-error-100)',
-                        color: 'var(--color-error-700)',
+                        backgroundColor: kycColor.bg100,
+                        color: kycColor.text700,
                         fontSize: '12px',
                         fontWeight: 'var(--font-weight-semibold)',
                         padding: '2px 8px',
@@ -514,7 +548,7 @@ export function Header({
                         display: 'flex',
                         gap: 'var(--space-3)',
                         alignItems: 'flex-start',
-                        backgroundColor: 'var(--color-error-50)',
+                        backgroundColor: kycColor.bg50,
                         border: 'none',
                         borderBottom: '1px solid var(--color-neutral-100)',
                         cursor: 'pointer',
@@ -522,10 +556,10 @@ export function Header({
                         transition: 'background-color var(--transition-base)',
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--color-error-100)';
+                        e.currentTarget.style.backgroundColor = kycColor.bg100;
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--color-error-50)';
+                        e.currentTarget.style.backgroundColor = kycColor.bg50;
                       }}
                     >
                       {/* Icon */}
@@ -535,27 +569,57 @@ export function Header({
                           height: '40px',
                           minWidth: '40px',
                           borderRadius: 'var(--radius-full)',
-                          backgroundColor: 'var(--color-error-500)',
+                          backgroundColor: kycColor.bg500,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: '18px',
                         }}
                       >
-                        <svg
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="white"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
+                        {isKycCompleted ? (
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                          </svg>
+                        ) : isKycInProgress ? (
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                          </svg>
+                        ) : (
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                        )}
                       </div>
 
                       {/* Content */}
@@ -575,12 +639,16 @@ export function Header({
                               textTransform: 'uppercase',
                               letterSpacing: '0.05em',
                               color: 'white',
-                              backgroundColor: 'var(--color-error-500)',
+                              backgroundColor: kycColor.bg500,
                               padding: '1px 6px',
                               borderRadius: 'var(--radius-sm)',
                             }}
                           >
-                            {t('header.kycUrgent')}
+                            {isKycCompleted
+                              ? t('header.kycCompletedBadge')
+                              : isKycInProgress
+                                ? t('header.kycInProgressTitle')
+                                : t('header.kycUrgent')}
                           </span>
                         </div>
                         <p
@@ -592,7 +660,11 @@ export function Header({
                             lineHeight: '1.3',
                           }}
                         >
-                          {t('header.kycTitle')}
+                          {isKycCompleted
+                            ? t('header.kycCompletedTitle')
+                            : isKycInProgress
+                              ? t('header.kycInProgressTitle')
+                              : t('header.kycTitle')}
                         </p>
                         <p
                           style={{
@@ -602,7 +674,11 @@ export function Header({
                             lineHeight: '1.4',
                           }}
                         >
-                          {t('header.kycDescription')}
+                          {isKycCompleted
+                            ? t('header.kycCompletedDescription')
+                            : isKycInProgress
+                              ? t('header.kycInProgressDescription')
+                              : t('header.kycDescription')}
                         </p>
                         <div
                           style={{
@@ -619,30 +695,32 @@ export function Header({
                           >
                             {t('header.justNow')}
                           </span>
-                          <span
-                            style={{
-                              fontSize: 'var(--text-xs)',
-                              fontWeight: 'var(--font-weight-semibold)',
-                              color: 'var(--color-error-600)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
-                            {t('header.kycAction')}
-                            <svg
-                              width="12"
-                              height="12"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
+                          {!isKycInProgress && !isKycCompleted && (
+                            <span
+                              style={{
+                                fontSize: 'var(--text-xs)',
+                                fontWeight: 'var(--font-weight-semibold)',
+                                color: 'var(--color-error-600)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
                             >
-                              <path d="M5 12h14M12 5l7 7-7 7" />
-                            </svg>
-                          </span>
+                              {t('header.kycAction')}
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M5 12h14M12 5l7 7-7 7" />
+                              </svg>
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -653,7 +731,7 @@ export function Header({
                           height: '8px',
                           minWidth: '8px',
                           borderRadius: 'var(--radius-full)',
-                          backgroundColor: 'var(--color-error-500)',
+                          backgroundColor: kycColor.bg500,
                           marginTop: '6px',
                         }}
                       />

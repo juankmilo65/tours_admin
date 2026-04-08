@@ -16,7 +16,7 @@ import {
 import { getCancellationPoliciesBusiness } from '~/server/businessLogic/cancellationPoliciesBusinessLogic';
 import type { CancellationPolicy as CancellationPolicyType } from '~/types/cancellationPolicy';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
-import { selectAuthToken, selectCurrentUser } from '~/store/slices/authSlice';
+import { selectAuthToken, selectCurrentUser, selectOwnerKycStatus } from '~/store/slices/authSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
 import { selectSelectedCurrencyCode } from '~/store/slices/countriesSlice';
@@ -133,6 +133,7 @@ export function CreateTourModal({
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectCurrentUser);
+  const ownerKycStatus = useAppSelector(selectOwnerKycStatus);
   const categories = useAppSelector(selectCategories);
   const rawCities = useAppSelector(selectCities);
   const currentLanguage = useAppSelector((state) => state.ui.language);
@@ -2482,8 +2483,11 @@ export function CreateTourModal({
             {/* Active */}
             {(() => {
               const selectedUser = users.find((u) => u.id === formData.userId);
-              const kycNotVerified =
-                selectedUser?.ownerKycVerified !== true && formData.userId !== '';
+              const isCurrentUser = formData.userId === currentUser?.id;
+              const kycVerified = isCurrentUser
+                ? currentUser?.ownerKycVerified === true || ownerKycStatus === 'completed'
+                : selectedUser?.ownerKycVerified === true;
+              const kycNotVerified = !kycVerified && formData.userId !== '';
               const isActiveDisabled =
                 formData.termsConditions === null ||
                 (!isEditMode && selectedPolicyId === '') ||

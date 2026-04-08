@@ -3,7 +3,7 @@
  * Follows exact pattern from bookingsBusinessLogic.tsx
  */
 
-import { getKycStatus, initKyc, getKycDashboardUrl } from '../kyc';
+import { getKycStatus, getUserKycStatus, initKyc, getKycDashboardUrl } from '../kyc';
 import type { KycStatus } from '~/types/kyc';
 
 export interface KycStatusResponse {
@@ -15,6 +15,12 @@ export interface KycStatusResponse {
 export interface KycInitResponse {
   success: boolean;
   onboardingUrl?: string;
+  error?: string;
+}
+
+export interface UserKycStatusResponse {
+  success: boolean;
+  kycStatus?: string;
   error?: string;
 }
 
@@ -54,10 +60,12 @@ export const getKycStatusBusiness = async (
  */
 export const initKycBusiness = async (
   token: string | undefined,
-  language = 'es'
+  language = 'es',
+  returnUrl?: string,
+  refreshUrl?: string
 ): Promise<KycInitResponse> => {
   try {
-    const result = (await initKyc(token ?? '', language)) as {
+    const result = (await initKyc(token ?? '', language, 'MX', returnUrl, refreshUrl)) as {
       success?: boolean;
       data?: { onboardingUrl?: string };
       error?: {
@@ -91,6 +99,38 @@ export const initKycBusiness = async (
     return {
       success: false,
       error: language === 'en' ? 'Error initializing KYC' : 'Error al iniciar KYC',
+    };
+  }
+};
+
+/**
+ * Get user KYC status (simple string status)
+ * GET /api/users/kyc-status
+ */
+export const getUserKycStatusBusiness = async (
+  token: string | undefined,
+  language = 'es'
+): Promise<UserKycStatusResponse> => {
+  try {
+    const result = (await getUserKycStatus(token ?? '', language)) as {
+      success?: boolean;
+      data?: { kycStatus?: string };
+      error?: unknown;
+    };
+
+    if (result.success === true && result.data?.kycStatus !== undefined) {
+      return { success: true, kycStatus: result.data.kycStatus };
+    }
+
+    return {
+      success: false,
+      error: language === 'en' ? 'Could not fetch KYC status' : 'No se pudo obtener estado KYC',
+    };
+  } catch (error) {
+    console.error('Error in getUserKycStatusBusiness:', error);
+    return {
+      success: false,
+      error: language === 'en' ? 'Error loading KYC status' : 'Error al cargar estado KYC',
     };
   }
 };

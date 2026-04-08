@@ -115,6 +115,13 @@ export const es: Translation = {
     kycDescription:
       'Es necesario que completes tu proceso de verificación de identidad (KYC) para poder publicar tus tours. Sin esta verificación, no podrás crear ni gestionar publicaciones.',
     kycAction: 'Completar verificación',
+    kycInProgressTitle: 'Verificación KYC en proceso',
+    kycInProgressDescription:
+      'Tu verificación de identidad está siendo procesada. Te notificaremos cuando se complete.',
+    kycCompletedBadge: 'Completado',
+    kycCompletedTitle: 'Verificación KYC completada',
+    kycCompletedDescription:
+      'Tu verificación de identidad ha sido completada satisfactoriamente. Ya puedes publicar tus tours y recibir pagos.',
     justNow: 'Ahora mismo',
   },
   auth: {

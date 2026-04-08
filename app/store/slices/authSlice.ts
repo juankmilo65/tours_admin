@@ -36,6 +36,8 @@ interface AuthState {
   // Store login credentials temporarily before OTP verification
   pendingToken: string | null;
   pendingUser: User | null;
+  // KYC status from GET /api/users/kyc-status
+  ownerKycStatus: string | null;
 }
 
 // Initial state - always start as not authenticated
@@ -53,6 +55,7 @@ const getInitialState = (): AuthState => {
     pendingEmail: null,
     pendingToken: null,
     pendingUser: null,
+    ownerKycStatus: null,
   };
 };
 
@@ -281,6 +284,9 @@ const authSlice = createSlice({
       state.pendingUser = null;
       state.pendingToken = null;
     },
+    setOwnerKycStatus: (state, action: PayloadAction<string>) => {
+      state.ownerKycStatus = action.payload;
+    },
   },
 });
 
@@ -299,6 +305,7 @@ export const {
   verifyOtpSuccess,
   verifyOtpFailure,
   clearOtpState,
+  setOwnerKycStatus,
 } = authSlice.actions;
 
 // Selectors
@@ -314,5 +321,6 @@ export const selectAuthError = (state: RootState): string | null => state.auth.e
 export const selectRequiresOtp = (state: RootState): boolean => state.auth.requiresOtp;
 export const selectOtpSent = (state: RootState): boolean => state.auth.otpSent;
 export const selectPendingEmail = (state: RootState): string | null => state.auth.pendingEmail;
+export const selectOwnerKycStatus = (state: RootState): string | null => state.auth.ownerKycStatus;
 
 export default authSlice.reducer;
