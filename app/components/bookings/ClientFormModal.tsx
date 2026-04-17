@@ -36,6 +36,8 @@ interface ClientFormModalProps {
   isFirstClient?: boolean;
   /** List of users with role 'user' to select from */
   users?: Array<{ id: string; name: string; email: string }>;
+  /** userId of the already-selected principal client (to exclude from non-primary dropdown) */
+  primaryUserId?: string;
   onSave: (data: ClientFormData) => void;
   onClose: () => void;
   translations: {
@@ -53,6 +55,8 @@ interface ClientFormModalProps {
     clientAgeMax: string;
     select: string;
     selectUser: string;
+    useSystemUser: string;
+    noUserSelected: string;
     clientIdLabel: string;
     enterEmail: string;
     emailLabel: string;
@@ -91,6 +95,7 @@ export function ClientFormModal({
   showPrimary = false,
   isFirstClient = false,
   users = [],
+  primaryUserId,
   onSave,
   onClose,
   translations: tr,
@@ -98,6 +103,7 @@ export function ClientFormModal({
   const [form, setForm] = useState<ClientFormData>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [useSystemUser, setUseSystemUser] = useState(false);
 
   const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
   const countries = useCachedNationalities(language);
@@ -129,12 +135,24 @@ export function ClientFormModal({
       });
     }
     setErrors({});
+    setSelectedUserId('');
+    setUseSystemUser(false);
     void loadNationalities(language);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const validate = (): boolean => {
     const errs: Partial<Record<string, string>> = {};
+
+    // For principal client: must select a user from dropdown
+    if (isFirstClient && !isEdit && users.length > 0 && selectedUserId === '') {
+      errs.selectedUserId = tr.noUserSelected;
+    }
+
+    // For non-primary using system user: must select a user
+    if (!isFirstClient && !isEdit && useSystemUser && selectedUserId === '') {
+      errs.selectedUserId = tr.noUserSelected;
+    }
 
     if (!form.clientName.trim()) {
       errs.clientName = `${tr.clientName}`;
@@ -179,7 +197,15 @@ export function ClientFormModal({
 
   const handleNationalityChange = (code: string): void => {
     setForm((p) => ({ ...p, countryCode: code, identificationTypeId: '' }));
-    if (code) void loadIdentificationTypes(code, language);
+    if (code) {
+      void loadIdentificationTypes(code, language).then((result) => {
+        console.log('🔍 [ClientFormModal] loadIdentificationTypes result for', code, ':', result);
+        console.log(
+          '🔍 [ClientFormModal] allIdTypesByCountry keys:',
+          Object.keys(allIdTypesByCountry)
+        );
+      });
+    }
     setErrors((p) => {
       const next = { ...p };
       delete next.countryCode;
@@ -191,9 +217,15 @@ export function ClientFormModal({
 
   const isEdit = initialData !== null && initialData !== undefined;
 
-  // Determine if fields should be disabled (first client, not edit, and "Seleccione" is selected)
+  // Hide name/email text inputs when auto-populated from a system user dropdown
+  const hideNameEmail =
+    !isEdit && ((isFirstClient && users.length > 0) || (!isFirstClient && useSystemUser));
+
+  // Disable age/nationality/id fields while waiting for a user to be picked
   const shouldDisableFields =
-    showPrimary && isFirstClient && !isEdit && users.length > 0 && !selectedUserId;
+    !isEdit &&
+    ((isFirstClient && users.length > 0 && selectedUserId === '') ||
+      (!isFirstClient && useSystemUser && selectedUserId === ''));
 
   return (
     <div
@@ -328,44 +360,140 @@ export function ClientFormModal({
             </label>
           )}
 
-          {/* User Select - Only show for first client in add mode when there are users */}
-          {showPrimary && isFirstClient && !isEdit && users.length > 0 && (
+          {/* ── PRINCIPAL: required user dropdown ── */}
+          {isFirstClient && !isEdit && users.length > 0 && (
             <div>
-              <label style={labelStyle}>{tr.selectUser}</label>
+              <label style={labelStyle}>
+                {tr.selectUser} <span style={{ color: 'red' }}>*</span>
+              </label>
               <Select
                 options={[
                   { value: '', label: tr.select },
-                  ...users.map((u) => ({
-                    value: u.id,
-                    label: u.name,
-                  })),
+                  ...users.map((u) => ({ value: u.id, label: u.name })),
                 ]}
                 value={selectedUserId}
                 onChange={(value) => {
                   setSelectedUserId(value);
-                  if (value) {
-                    const selectedUser = users.find((u) => u.id === value);
-                    if (selectedUser) {
-                      setForm((p) => ({
-                        ...p,
-                        clientName: selectedUser.name,
-                        clientEmail: selectedUser.email,
-                      }));
-                      if (errors.clientName !== undefined) {
-                        setErrors((p) => {
-                          const n = { ...p };
-                          delete n.clientName;
-                          return n;
-                        });
-                      }
+                  if (value !== '') {
+                    const found = users.find((u) => u.id === value);
+                    if (found !== undefined) {
+                      setForm((p) => ({ ...p, clientName: found.name, clientEmail: found.email }));
                     }
+                    setErrors((p) => {
+                      const n = { ...p };
+                      delete n.selectedUserId;
+                      return n;
+                    });
                   } else {
                     setForm((p) => ({ ...p, clientName: '', clientEmail: '' }));
                   }
                 }}
-                placeholder={tr.selectUser}
-                id="client-modal-user"
+                placeholder={tr.select}
+                id="client-modal-user-primary"
               />
+              {errors.selectedUserId !== undefined && (
+                <p
+                  style={{
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--color-error-500)',
+                    marginTop: 4,
+                  }}
+                >
+                  {errors.selectedUserId}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── NON-PRIMARY: "usar usuario del sistema" toggle ── */}
+          {!isFirstClient && !isEdit && users.length > 0 && (
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: 'pointer',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 500,
+                color: 'var(--color-neutral-700)',
+                userSelect: 'none',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: useSystemUser
+                  ? 'var(--color-success-50, #f0fdf4)'
+                  : 'var(--color-neutral-50)',
+                border: `1px solid ${useSystemUser ? 'var(--color-success-200, #bbf7d0)' : 'var(--color-neutral-200)'}`,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={useSystemUser}
+                onChange={(e) => {
+                  setUseSystemUser(e.target.checked);
+                  setSelectedUserId('');
+                  setForm((p) => ({ ...p, clientName: '', clientEmail: '' }));
+                  setErrors((p) => {
+                    const n = { ...p };
+                    delete n.clientName;
+                    delete n.selectedUserId;
+                    return n;
+                  });
+                }}
+                style={{
+                  width: 16,
+                  height: 16,
+                  cursor: 'pointer',
+                  accentColor: 'var(--color-success-500, #22c55e)',
+                }}
+              />
+              {tr.useSystemUser}
+            </label>
+          )}
+
+          {/* ── NON-PRIMARY + useSystemUser: filtered user dropdown ── */}
+          {!isFirstClient && !isEdit && useSystemUser && users.length > 0 && (
+            <div>
+              <label style={labelStyle}>
+                {tr.selectUser} <span style={{ color: 'red' }}>*</span>
+              </label>
+              <Select
+                options={[
+                  { value: '', label: tr.select },
+                  ...users
+                    .filter((u) => u.id !== primaryUserId)
+                    .map((u) => ({ value: u.id, label: u.name })),
+                ]}
+                value={selectedUserId}
+                onChange={(value) => {
+                  setSelectedUserId(value);
+                  if (value !== '') {
+                    const found = users.find((u) => u.id === value);
+                    if (found !== undefined) {
+                      setForm((p) => ({ ...p, clientName: found.name, clientEmail: found.email }));
+                    }
+                    setErrors((p) => {
+                      const n = { ...p };
+                      delete n.selectedUserId;
+                      return n;
+                    });
+                  } else {
+                    setForm((p) => ({ ...p, clientName: '', clientEmail: '' }));
+                  }
+                }}
+                placeholder={tr.select}
+                id="client-modal-user-secondary"
+              />
+              {errors.selectedUserId !== undefined && (
+                <p
+                  style={{
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--color-error-500)',
+                    marginTop: 4,
+                  }}
+                >
+                  {errors.selectedUserId}
+                </p>
+              )}
             </div>
           )}
 
@@ -377,42 +505,44 @@ export function ClientFormModal({
               gap: 'var(--space-4)',
             }}
           >
-            {/* Client Name */}
-            <div>
-              <label style={labelStyle}>
-                {tr.clientName} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <Input
-                type="text"
-                value={form.clientName}
-                onChange={(e) => {
-                  setForm((p) => ({ ...p, clientName: e.target.value }));
-                  if (errors.clientName !== undefined)
-                    setErrors((p) => {
-                      const n = { ...p };
-                      delete n.clientName;
-                      return n;
-                    });
-                }}
-                placeholder={tr.clientNamePlaceholder}
-                error={errors.clientName}
-                disabled={shouldDisableFields}
-              />
-            </div>
+            {/* Client Name — hidden when auto-filled from dropdown */}
+            {!hideNameEmail && (
+              <div>
+                <label style={labelStyle}>
+                  {tr.clientName} <span style={{ color: 'red' }}>*</span>
+                </label>
+                <Input
+                  type="text"
+                  value={form.clientName}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, clientName: e.target.value }));
+                    if (errors.clientName !== undefined)
+                      setErrors((p) => {
+                        const n = { ...p };
+                        delete n.clientName;
+                        return n;
+                      });
+                  }}
+                  placeholder={tr.clientNamePlaceholder}
+                  error={errors.clientName}
+                />
+              </div>
+            )}
 
-            {/* Client Email */}
-            <div>
-              <label style={labelStyle}>{tr.emailLabel}</label>
-              <Input
-                type="email"
-                value={form.clientEmail ?? ''}
-                onChange={(e) => {
-                  setForm((p) => ({ ...p, clientEmail: e.target.value }));
-                }}
-                placeholder={tr.enterEmail}
-                disabled={shouldDisableFields}
-              />
-            </div>
+            {/* Client Email — hidden when auto-filled from dropdown */}
+            {!hideNameEmail && (
+              <div>
+                <label style={labelStyle}>{tr.emailLabel}</label>
+                <Input
+                  type="email"
+                  value={form.clientEmail ?? ''}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, clientEmail: e.target.value }));
+                  }}
+                  placeholder={tr.enterEmail}
+                />
+              </div>
+            )}
 
             {/* Client Age */}
             <div>
@@ -544,12 +674,7 @@ export function ClientFormModal({
           <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
             {tr.cancel}
           </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="modal-btn modal-btn-primary"
-            disabled={shouldDisableFields}
-          >
+          <button type="button" onClick={handleSave} className="modal-btn modal-btn-primary">
             {isEdit ? tr.save : tr.add}
           </button>
         </div>

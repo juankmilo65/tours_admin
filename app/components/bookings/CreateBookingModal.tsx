@@ -195,12 +195,16 @@ export function CreateBookingModal({
     void fetchTours();
   }, [language]);
 
-  // Fetch users with role 'user' when modal opens (only for admin)
+  // Fetch users with role 'user' when modal opens (admin or owner can assign users)
   useEffect(() => {
     if (!isOpen) return;
 
     const fetchUsers = async () => {
-      if (currentUser?.role === 'admin' && token !== null && token !== '') {
+      if (
+        (currentUser?.role === 'admin' || currentUser?.role === 'owner') &&
+        token !== null &&
+        token !== ''
+      ) {
         try {
           const usersResult = await getUsersDropdownBusiness(['user'], 'true', token, language);
           if (usersResult.success === true && usersResult.data !== undefined) {
@@ -2299,6 +2303,9 @@ export function CreateBookingModal({
               showPrimary={true}
               isFirstClient={editingClientIndex === null && formData.clients.length === 0}
               users={users}
+              primaryUserId={
+                formData.clients.find((c) => c.isPrimary === true)?.userId ?? undefined
+              }
               onSave={handleClientModalSave}
               onClose={() => setClientModalOpen(false)}
               translations={{
@@ -2318,6 +2325,8 @@ export function CreateBookingModal({
                 clientAgeMax: t('bookings.clientAgeMax') ?? 'La edad no puede ser mayor a 120 años',
                 select: bookingsT.select,
                 selectUser: bookingsT.selectUser,
+                useSystemUser: bookingsT.useSystemUser,
+                noUserSelected: bookingsT.noUserSelected,
                 clientIdLabel: bookingsT.clientIdLabel,
                 enterEmail: bookingsT.enterEmail,
                 emailLabel: bookingsT.emailLabel,

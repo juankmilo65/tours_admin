@@ -129,6 +129,8 @@ export const bookingEs = {
   yearsOld: 'años',
   select: 'Seleccione',
   selectUser: 'Seleccionar Usuario',
+  useSystemUser: 'Usar usuario del sistema',
+  noUserSelected: 'Debes seleccionar un usuario',
   clientIdLabel: 'ID Cliente',
   enterEmail: 'Ingresar correo',
   emailLabel: 'Correo',
