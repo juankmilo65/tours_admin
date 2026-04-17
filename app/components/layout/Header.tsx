@@ -117,9 +117,28 @@ export function Header({
   const ownerKycStatus = useAppSelector(selectOwnerKycStatus);
   const isKycInProgress = ownerKycStatus === 'in_progress';
   const isKycCompleted = ownerKycStatus === 'completed';
+  const isKycRejected = ownerKycStatus === 'rejected';
+  const isKycRestrictedSoon = ownerKycStatus === 'restricted_soon';
+  const isKycPastDue = ownerKycStatus === 'requirements.past_due';
+  const isKycPendingVerification = ownerKycStatus === 'requirements.pending_verification';
+  const isKycPlatformPaused = ownerKycStatus === 'platform_paused';
+  const isKycListed = ownerKycStatus === 'listed';
+  const isKycUnderReview = ownerKycStatus === 'under_review';
+  // Terminal states: user cannot operate, no retry
+  const isKycTerminal = isKycRejected || isKycPlatformPaused || isKycListed;
+  // Info-only states: user just waits (blue)
+  const isKycInfoOnly = isKycPendingVerification || isKycUnderReview;
+  // States where button should be shown to (re)start verification
+  const isKycActionable = isKycInProgress || isKycRestrictedSoon || isKycPastDue;
+  // Any non-default status means we have a notification
   const hasKycNotification =
     currentUser?.role === 'owner' &&
-    (currentUser?.ownerKycVerified !== true || isKycInProgress || isKycCompleted);
+    (currentUser?.ownerKycVerified !== true ||
+      isKycInProgress ||
+      isKycCompleted ||
+      isKycTerminal ||
+      isKycInfoOnly ||
+      isKycActionable);
   const notificationCount = hasKycNotification ? 1 : 0;
 
   // KYC notification color scheme based on status
@@ -131,21 +150,86 @@ export function Header({
         text700: 'var(--color-success-700, #15803d)',
         text600: 'var(--color-success-600, #16a34a)',
       }
-    : isKycInProgress
+    : isKycInfoOnly
       ? {
-          bg500: 'var(--color-warning-500, #f59e0b)',
-          bg100: 'var(--color-warning-100, #fef3c7)',
-          bg50: 'var(--color-warning-50, #fffbeb)',
-          text700: 'var(--color-warning-700, #b45309)',
-          text600: 'var(--color-warning-600, #d97706)',
+          bg500: '#3b82f6',
+          bg100: '#dbeafe',
+          bg50: '#eff6ff',
+          text700: '#1e40af',
+          text600: '#2563eb',
         }
-      : {
-          bg500: 'var(--color-error-500)',
-          bg100: 'var(--color-error-100)',
-          bg50: 'var(--color-error-50)',
-          text700: 'var(--color-error-700)',
-          text600: 'var(--color-error-600)',
-        };
+      : isKycInProgress
+        ? {
+            bg500: 'var(--color-warning-500, #f59e0b)',
+            bg100: 'var(--color-warning-100, #fef3c7)',
+            bg50: 'var(--color-warning-50, #fffbeb)',
+            text700: 'var(--color-warning-700, #b45309)',
+            text600: 'var(--color-warning-600, #d97706)',
+          }
+        : isKycRestrictedSoon
+          ? {
+              bg500: '#ea580c',
+              bg100: '#ffedd5',
+              bg50: '#fff7ed',
+              text700: '#9a3412',
+              text600: '#ea580c',
+            }
+          : isKycPastDue || isKycTerminal
+            ? {
+                bg500: 'var(--color-error-500)',
+                bg100: 'var(--color-error-100)',
+                bg50: 'var(--color-error-50)',
+                text700: 'var(--color-error-700)',
+                text600: 'var(--color-error-600)',
+              }
+            : {
+                // not_started: gray
+                bg500: '#6b7280',
+                bg100: '#f3f4f6',
+                bg50: '#f9fafb',
+                text700: '#374151',
+                text600: '#4b5563',
+              };
+
+  // Helper to get the right badge/title/description per status
+  const getKycBadge = (): string => {
+    if (isKycCompleted) return t('header.kycCompletedBadge');
+    if (isKycInProgress) return t('header.kycInProgressTitle');
+    if (isKycRestrictedSoon) return t('header.kycRestrictedSoonBadge');
+    if (isKycRejected) return t('header.kycRejectedBadge');
+    if (isKycPastDue) return t('header.kycPastDueBadge');
+    if (isKycPendingVerification) return t('header.kycPendingVerificationBadge');
+    if (isKycPlatformPaused) return t('header.kycPlatformPausedBadge');
+    if (isKycListed) return t('header.kycListedBadge');
+    if (isKycUnderReview) return t('header.kycUnderReviewBadge');
+    return t('header.kycUrgent');
+  };
+  const getKycTitle = (): string => {
+    if (isKycCompleted) return t('header.kycCompletedTitle');
+    if (isKycInProgress) return t('header.kycInProgressTitle');
+    if (isKycRestrictedSoon) return t('header.kycRestrictedSoonTitle');
+    if (isKycRejected) return t('header.kycRejectedTitle');
+    if (isKycPastDue) return t('header.kycPastDueTitle');
+    if (isKycPendingVerification) return t('header.kycPendingVerificationTitle');
+    if (isKycPlatformPaused) return t('header.kycPlatformPausedTitle');
+    if (isKycListed) return t('header.kycListedTitle');
+    if (isKycUnderReview) return t('header.kycUnderReviewTitle');
+    return t('header.kycTitle');
+  };
+  const getKycDescription = (): string => {
+    if (isKycCompleted) return t('header.kycCompletedDescription');
+    if (isKycInProgress) return t('header.kycInProgressDescription');
+    if (isKycRestrictedSoon) return t('header.kycRestrictedSoonDescription');
+    if (isKycRejected) return t('header.kycRejectedDescription');
+    if (isKycPastDue) return t('header.kycPastDueDescription');
+    if (isKycPendingVerification) return t('header.kycPendingVerificationDescription');
+    if (isKycPlatformPaused) return t('header.kycPlatformPausedDescription');
+    if (isKycListed) return t('header.kycListedDescription');
+    if (isKycUnderReview) return t('header.kycUnderReviewDescription');
+    return t('header.kycDescription');
+  };
+  // Show action link for: not_started, in_progress, restricted_soon, requirements.past_due
+  const showKycAction = !isKycCompleted && !isKycInfoOnly && !isKycTerminal;
 
   // Translate countries based on current language usando props
   const translatedCountries = useMemo(
@@ -472,7 +556,7 @@ export function Header({
                     justifyContent: 'center',
                     lineHeight: 1,
                     border: '2px solid var(--color-neutral-50)',
-                    animation: isKycInProgress || isKycCompleted ? undefined : 'pulse 2s infinite',
+                    animation: isKycCompleted || isKycInfoOnly ? undefined : 'pulse 2s infinite',
                   }}
                 >
                   {notificationCount}
@@ -590,7 +674,7 @@ export function Header({
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                             <polyline points="22 4 12 14.01 9 11.01" />
                           </svg>
-                        ) : isKycInProgress ? (
+                        ) : isKycInfoOnly ? (
                           <svg
                             width="20"
                             height="20"
@@ -603,6 +687,21 @@ export function Header({
                           >
                             <circle cx="12" cy="12" r="10" />
                             <polyline points="12 6 12 12 16 14" />
+                          </svg>
+                        ) : isKycTerminal ? (
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="15" y1="9" x2="9" y2="15" />
+                            <line x1="9" y1="9" x2="15" y2="15" />
                           </svg>
                         ) : (
                           <svg
@@ -644,11 +743,7 @@ export function Header({
                               borderRadius: 'var(--radius-sm)',
                             }}
                           >
-                            {isKycCompleted
-                              ? t('header.kycCompletedBadge')
-                              : isKycInProgress
-                                ? t('header.kycInProgressTitle')
-                                : t('header.kycUrgent')}
+                            {getKycBadge()}
                           </span>
                         </div>
                         <p
@@ -660,11 +755,7 @@ export function Header({
                             lineHeight: '1.3',
                           }}
                         >
-                          {isKycCompleted
-                            ? t('header.kycCompletedTitle')
-                            : isKycInProgress
-                              ? t('header.kycInProgressTitle')
-                              : t('header.kycTitle')}
+                          {getKycTitle()}
                         </p>
                         <p
                           style={{
@@ -674,11 +765,7 @@ export function Header({
                             lineHeight: '1.4',
                           }}
                         >
-                          {isKycCompleted
-                            ? t('header.kycCompletedDescription')
-                            : isKycInProgress
-                              ? t('header.kycInProgressDescription')
-                              : t('header.kycDescription')}
+                          {getKycDescription()}
                         </p>
                         <div
                           style={{
@@ -695,7 +782,7 @@ export function Header({
                           >
                             {t('header.justNow')}
                           </span>
-                          {!isKycInProgress && !isKycCompleted && (
+                          {showKycAction && (
                             <span
                               style={{
                                 fontSize: 'var(--text-xs)',

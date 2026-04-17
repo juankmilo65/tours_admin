@@ -34,7 +34,11 @@ export function ProfileComponent(): JSX.Element {
 
     const fetchStatus = async (): Promise<void> => {
       const result = await getUserKycStatusBusiness(token, language);
+      // eslint-disable-next-line no-console
+      console.log('🔍 [PROFILE] KYC status result:', JSON.stringify(result, null, 2));
       if (result.success && result.kycStatus !== undefined) {
+        // eslint-disable-next-line no-console
+        console.log('🔍 [PROFILE] Setting ownerKycStatus to:', result.kycStatus);
         dispatch(setOwnerKycStatus(result.kycStatus));
       }
     };
@@ -42,11 +46,18 @@ export function ProfileComponent(): JSX.Element {
     void fetchStatus();
   }, [role, token, language, dispatch]);
 
-  // Poll every 30s while in_progress to detect status changes
+  // Poll every 30s while in transitional/waiting states to detect status changes
   const pollingRef = useRef<number | null>(null);
+  const shouldPoll =
+    role === 'owner' &&
+    token !== null &&
+    (ownerKycStatus === 'in_progress' ||
+      ownerKycStatus === 'restricted_soon' ||
+      ownerKycStatus === 'requirements.pending_verification' ||
+      ownerKycStatus === 'under_review');
 
   useEffect(() => {
-    if (ownerKycStatus !== 'in_progress' || role !== 'owner' || token === null) {
+    if (!shouldPoll) {
       if (pollingRef.current !== null) {
         window.clearInterval(pollingRef.current);
         pollingRef.current = null;
@@ -69,7 +80,7 @@ export function ProfileComponent(): JSX.Element {
         pollingRef.current = null;
       }
     };
-  }, [ownerKycStatus, role, token, language, dispatch]);
+  }, [shouldPoll, token, language, dispatch]);
 
   if (role !== 'owner') {
     return (

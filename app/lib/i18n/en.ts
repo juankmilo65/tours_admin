@@ -113,11 +113,36 @@ export const en: Translation = {
     kycAction: 'Complete verification',
     kycInProgressTitle: 'KYC verification in progress',
     kycInProgressDescription:
-      'Your identity verification is being processed. We will notify you when it is complete.',
+      'Your verification is being processed. You can continue the process if you have pending information.',
     kycCompletedBadge: 'Completed',
     kycCompletedTitle: 'KYC verification completed',
     kycCompletedDescription:
       'Your identity verification has been successfully completed. You can now publish your tours and receive payments.',
+    kycRejectedBadge: 'Rejected',
+    kycRejectedTitle: 'KYC verification rejected',
+    kycRejectedDescription: 'Your verification was rejected. Contact support for more information.',
+    kycRestrictedSoonBadge: 'Action required',
+    kycRestrictedSoonTitle: 'Verification required soon',
+    kycRestrictedSoonDescription:
+      'Your account is temporarily active, but additional documents are required.',
+    kycPastDueBadge: 'Past due',
+    kycPastDueTitle: 'Documents past due',
+    kycPastDueDescription:
+      'Required documents were not submitted in time. Update your information.',
+    kycPendingVerificationBadge: 'Under review',
+    kycPendingVerificationTitle: 'Documents under review',
+    kycPendingVerificationDescription:
+      'Your documents are being reviewed. No further action is required from you.',
+    kycPlatformPausedBadge: 'Paused',
+    kycPlatformPausedTitle: 'Account paused',
+    kycPlatformPausedDescription: 'Your account was paused by the platform. Contact support.',
+    kycListedBadge: 'Restricted',
+    kycListedTitle: 'Account restricted',
+    kycListedDescription: 'Your account has restrictions. Contact support.',
+    kycUnderReviewBadge: 'Under review',
+    kycUnderReviewTitle: 'Account under review',
+    kycUnderReviewDescription:
+      'Your account is under review. We will notify you when it is complete.',
     justNow: 'Just now',
   },
   auth: {

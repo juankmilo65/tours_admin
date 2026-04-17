@@ -117,11 +117,35 @@ export const es: Translation = {
     kycAction: 'Completar verificación',
     kycInProgressTitle: 'Verificación KYC en proceso',
     kycInProgressDescription:
-      'Tu verificación de identidad está siendo procesada. Te notificaremos cuando se complete.',
+      'Tu verificación está siendo procesada. Puedes continuar el proceso si tienes datos pendientes.',
     kycCompletedBadge: 'Completado',
     kycCompletedTitle: 'Verificación KYC completada',
     kycCompletedDescription:
       'Tu verificación de identidad ha sido completada satisfactoriamente. Ya puedes publicar tus tours y recibir pagos.',
+    kycRejectedBadge: 'Rechazado',
+    kycRejectedTitle: 'Verificación KYC rechazada',
+    kycRejectedDescription: 'Tu verificación fue rechazada. Contacta soporte para más información.',
+    kycRestrictedSoonBadge: 'Acción requerida',
+    kycRestrictedSoonTitle: 'Verificación requerida pronto',
+    kycRestrictedSoonDescription:
+      'Tu cuenta funciona temporalmente, pero se requieren documentos adicionales.',
+    kycPastDueBadge: 'Vencido',
+    kycPastDueTitle: 'Documentos vencidos',
+    kycPastDueDescription:
+      'Los documentos requeridos no se entregaron a tiempo. Actualiza tu información.',
+    kycPendingVerificationBadge: 'En revisión',
+    kycPendingVerificationTitle: 'Documentos en revisión',
+    kycPendingVerificationDescription:
+      'Tus documentos están siendo revisados. No es necesario realizar ninguna acción.',
+    kycPlatformPausedBadge: 'Pausada',
+    kycPlatformPausedTitle: 'Cuenta pausada',
+    kycPlatformPausedDescription: 'Tu cuenta fue pausada por la plataforma. Contacta soporte.',
+    kycListedBadge: 'Restringida',
+    kycListedTitle: 'Cuenta restringida',
+    kycListedDescription: 'Tu cuenta tiene restricciones. Contacta soporte.',
+    kycUnderReviewBadge: 'En revisión',
+    kycUnderReviewTitle: 'Cuenta bajo revisión',
+    kycUnderReviewDescription: 'Tu cuenta está bajo revisión. Te notificaremos cuando se complete.',
     justNow: 'Ahora mismo',
   },
   auth: {

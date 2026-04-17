@@ -2485,7 +2485,9 @@ export function CreateTourModal({
               const selectedUser = users.find((u) => u.id === formData.userId);
               const isCurrentUser = formData.userId === currentUser?.id;
               const kycVerified = isCurrentUser
-                ? currentUser?.ownerKycVerified === true || ownerKycStatus === 'completed'
+                ? currentUser?.ownerKycVerified === true ||
+                  ownerKycStatus === 'completed' ||
+                  ownerKycStatus === 'restricted_soon'
                 : selectedUser?.ownerKycVerified === true;
               const kycNotVerified = !kycVerified && formData.userId !== '';
               const isActiveDisabled =

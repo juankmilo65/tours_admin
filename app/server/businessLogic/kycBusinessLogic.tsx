@@ -114,11 +114,23 @@ export const getUserKycStatusBusiness = async (
   try {
     const result = (await getUserKycStatus(token ?? '', language)) as {
       success?: boolean;
-      data?: { kycStatus?: string };
+      data?: { kycStatus?: string; stripeStatus?: string; dbStatus?: string };
       error?: unknown;
     };
 
+    // eslint-disable-next-line no-console
+    console.log(
+      '🔍 [KYC] getUserKycStatusBusiness - Full backend response:',
+      JSON.stringify(result, null, 2)
+    );
+
     if (result.success === true && result.data?.kycStatus !== undefined) {
+      // eslint-disable-next-line no-console
+      console.log('🔍 [KYC] kycStatus (DB):', result.data.kycStatus);
+      // eslint-disable-next-line no-console
+      console.log('🔍 [KYC] stripeStatus:', result.data.stripeStatus ?? 'NOT PROVIDED');
+      // eslint-disable-next-line no-console
+      console.log('🔍 [KYC] Full data object:', JSON.stringify(result.data, null, 2));
       return { success: true, kycStatus: result.data.kycStatus };
     }
 

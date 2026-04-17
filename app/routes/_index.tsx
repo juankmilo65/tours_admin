@@ -133,6 +133,7 @@ export default function IndexRoute(): JSX.Element {
       const formData = new FormData();
       formData.append('email', email);
       formData.append('password', password);
+      formData.append('language', currentLang);
 
       const response = await window.fetch('/api/auth/login', {
         method: 'POST',
@@ -444,6 +445,8 @@ export default function IndexRoute(): JSX.Element {
 
   const handleLanguageChange = (value: string): void => {
     dispatch(setLanguage(value as Language));
+    setError(null);
+    setForgotError(null);
   };
 
   // Icons

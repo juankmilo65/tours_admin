@@ -97,13 +97,15 @@ const generateResetPasswordPayload = (formData: FormData): ResetPasswordPayload 
   };
 };
 
-const generateLoginData = (formData: FormData): LoginPayload => {
+const generateLoginData = (formData: FormData): LoginPayload & { language: string } => {
   const email = formData.get('email');
   const password = formData.get('password');
+  const language = formData.get('language');
 
   return {
     email: typeof email === 'string' ? email : '',
     password: typeof password === 'string' ? password : '',
+    language: typeof language === 'string' ? language : 'es',
   };
 };
 
@@ -209,12 +211,14 @@ const loginUserBusinessLogic = async (data: unknown): Promise<LoginResponse> => 
       throw new Error('Invalid login data structure');
     }
 
+    const language = typeof loginData.language === 'string' ? loginData.language : 'es';
+
     const loginDataValidated: LoginPayload = {
       email: loginData.email,
       password: loginData.password,
     };
 
-    const result = await loginService(loginDataValidated);
+    const result = await loginService(loginDataValidated, language);
     return result;
   } catch (err) {
     console.error('Error in loginUserBusiness:', err);

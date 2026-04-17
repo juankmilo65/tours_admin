@@ -37,11 +37,42 @@ export const kycEs = {
   kycInProgressTitle: 'Verificación en Proceso',
   kycInProgressDescription:
     'Tu verificación de identidad está siendo procesada por Stripe. ' +
-    'Este proceso puede tomar algunos minutos. No es necesario que realices ninguna acción adicional.',
+    'Puedes continuar el proceso si tienes datos pendientes.',
   kycInProgressBadge: 'En proceso',
+  kycContinueVerification: 'Continuar verificación',
   kycCompletedTitle: 'Verificación Completada',
   kycCompletedBadge: 'Completado',
   kycCompletedDescription:
     'Tu verificación de identidad ha sido completada satisfactoriamente. ' +
     'Ya puedes publicar tus tours y recibir pagos en tu cuenta.',
+  kycRestrictedSoonTitle: 'Verificación Requerida Pronto',
+  kycRestrictedSoonBadge: 'Acción requerida',
+  kycRestrictedSoonDescription:
+    'Tu cuenta funciona temporalmente, pero Stripe requiere documentos adicionales. ' +
+    'Si no los entregas a tiempo, tu cuenta será restringida.',
+  kycCompleteVerification: 'Completar verificación',
+  kycRejectedTitle: 'Verificación Rechazada',
+  kycRejectedBadge: 'Rechazado',
+  kycRejectedDescription: 'Tu verificación fue rechazada. Contacta soporte para más información.',
+  kycPastDueTitle: 'Documentos Vencidos',
+  kycPastDueBadge: 'Vencido',
+  kycPastDueDescription:
+    'Los documentos requeridos no se entregaron a tiempo. Tu cuenta está deshabilitada.',
+  kycUpdateDocuments: 'Actualizar documentos',
+  kycPendingVerificationTitle: 'Documentos en Revisión',
+  kycPendingVerificationBadge: 'En revisión',
+  kycPendingVerificationDescription:
+    'Stripe está revisando tus documentos. ' +
+    'No es necesario que realices ninguna acción adicional, solo espera.',
+  kycPlatformPausedTitle: 'Cuenta Pausada',
+  kycPlatformPausedBadge: 'Pausada',
+  kycPlatformPausedDescription:
+    'Tu cuenta fue pausada por la plataforma. Contacta soporte para más información.',
+  kycListedTitle: 'Cuenta Restringida',
+  kycListedBadge: 'Restringida',
+  kycListedDescription: 'Tu cuenta tiene restricciones. Contacta soporte para más información.',
+  kycUnderReviewTitle: 'Cuenta Bajo Revisión',
+  kycUnderReviewBadge: 'En revisión',
+  kycUnderReviewDescription:
+    'Tu cuenta está bajo revisión por Stripe. Te notificaremos cuando se complete.',
 };

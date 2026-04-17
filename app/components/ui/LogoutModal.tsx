@@ -37,58 +37,38 @@ export function LogoutModal(): JSX.Element | null {
     setIsLoggingOut(true);
 
     try {
-      // Step 1: Check if user is authenticated and has token
+      // Step 1: Clear Redux state first to prevent stale auth state on reload
+      dispatch(logoutAction());
+
+      // Step 2: Close modal
+      dispatch(setLogoutModal(false));
+
+      // Step 3: Call backend API to clear server session
       if (
         isAuthenticated &&
         authToken !== null &&
         authToken !== undefined &&
         authToken.trim() !== ''
       ) {
-        console.log('LogoutModal - Token found, calling /api/auth/logout');
-
-        // Step 2: Call backend API via /api/auth/logout route
         const formData = new FormData();
         formData.append('action', 'logoutUserBusinessLogic');
         formData.append('token', authToken);
 
-        const response = await fetch('/api/auth/logout', {
+        await fetch('/api/auth/logout', {
           method: 'POST',
           body: formData,
         });
-
-        console.log('LogoutModal - /api/auth/logout response status:', response.status);
-
-        // Step 3: Check if backend logout was successful
-        if (!response.ok && response.status !== 401) {
-          console.warn(
-            'LogoutModal - Backend logout failed, but continuing with local logout, status:',
-            response.status
-          );
-        }
-      } else {
-        console.log('LogoutModal - No token found, proceeding with local logout only');
       }
 
-      // Step 4: Always clear Redux state (local logout)
-      dispatch(logoutAction());
-
-      // Step 5: Close modal
-      dispatch(setLogoutModal(false));
-
-      // Step 6: Force full page reload to clear any remaining session data
+      // Step 4: Single full page navigation to clear everything
       window.location.href = '/';
     } catch (error) {
       console.error('LogoutModal - Logout error:', error);
 
-      // Even on error, clear local state
+      // Even on error, ensure state is clear and redirect
       dispatch(logoutAction());
       dispatch(setLogoutModal(false));
-
-      // Force full page reload to clear server session
       window.location.href = '/';
-    } finally {
-      // Don't set logging out to false since we're reloading the page
-      // setIsLoggingOut(false);
     }
   };
 

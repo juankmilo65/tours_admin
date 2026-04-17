@@ -116,13 +116,23 @@ export const registerUser = async (payload: {
 /**
  * Login user
  */
-export const login = async (payload: {
-  email: string;
-  password: string;
-}): Promise<LoginResponse> => {
+export const login = async (
+  payload: {
+    email: string;
+    password: string;
+  },
+  language = 'es'
+): Promise<LoginResponse> => {
   const authService = createServiceREST(BASE_URL, 'users/login', '');
 
-  const result = await authService.create(payload);
+  const result = await authService.create(payload, {
+    headers: {
+      'x-language': language,
+    },
+  });
+
+  // eslint-disable-next-line no-console
+  console.log('🔍 [LOGIN] Raw response:', JSON.stringify(result));
 
   // Check if result has error property (from createServiceREST catch)
   if (result !== null && typeof result === 'object' && 'error' in result) {

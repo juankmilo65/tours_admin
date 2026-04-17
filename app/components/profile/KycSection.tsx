@@ -52,7 +52,7 @@ export function KycSection({ kycStatus, ownerKycStatus }: KycSectionProps): JSX.
     }
   };
 
-  // completed state: green card with success message
+  // completed state: green card with success badge
   if (ownerKycStatus === 'completed') {
     return (
       <div
@@ -87,43 +87,156 @@ export function KycSection({ kycStatus, ownerKycStatus }: KycSectionProps): JSX.
     );
   }
 
-  // in_progress state: yellow card, no verification button
+  // in_progress state: yellow card WITH button "Continuar verificación"
   if (ownerKycStatus === 'in_progress') {
     return (
-      <div
-        style={{
-          padding: '16px',
-          backgroundColor: '#fffbeb',
-          borderRadius: '8px',
-          border: '1px solid #fde68a',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>
-            {kycT.kycInProgressTitle}
-          </h3>
-          <span
+      <>
+        <div
+          style={{
+            padding: '16px',
+            backgroundColor: '#fffbeb',
+            borderRadius: '8px',
+            border: '1px solid #fde68a',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '22px' }}>⏳</span>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>
+              {kycT.kycInProgressTitle}
+            </h3>
+            <span
+              style={{
+                display: 'inline-block',
+                padding: '3px 10px',
+                backgroundColor: '#fef9c3',
+                color: '#854d0e',
+                borderRadius: '999px',
+                fontSize: '12px',
+                fontWeight: 500,
+              }}
+            >
+              {kycT.kycInProgressBadge}
+            </span>
+          </div>
+          <p
             style={{
-              display: 'inline-block',
-              padding: '3px 10px',
-              backgroundColor: '#fef9c3',
-              color: '#854d0e',
-              borderRadius: '999px',
-              fontSize: '12px',
-              fontWeight: 500,
+              fontSize: '14px',
+              color: '#92400e',
+              lineHeight: '1.5',
+              margin: '0 0 12px 0',
             }}
           >
-            {kycT.kycInProgressBadge}
-          </span>
+            {kycT.kycInProgressDescription}
+          </p>
+          <button
+            onClick={() => {
+              setShowConfirmModal(true);
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#d97706',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            {kycT.kycContinueVerification}
+          </button>
         </div>
-        <p style={{ fontSize: '14px', color: '#92400e', lineHeight: '1.5', margin: 0 }}>
-          {kycT.kycInProgressDescription}
-        </p>
-      </div>
+        {showConfirmModal && (
+          <KycConfirmModal
+            kycT={kycT}
+            isLoading={isInitializing}
+            onConfirm={() => {
+              void handleConfirmKyc();
+            }}
+            onCancel={() => {
+              setShowConfirmModal(false);
+            }}
+          />
+        )}
+      </>
     );
   }
 
-  if (kycStatus === null || kycStatus === undefined) {
+  // restricted_soon state: orange card WITH button "Completar verificación"
+  if (ownerKycStatus === 'restricted_soon') {
+    return (
+      <>
+        <div
+          style={{
+            padding: '16px',
+            backgroundColor: '#fff7ed',
+            borderRadius: '8px',
+            border: '1px solid #fed7aa',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '22px' }}>⚠️</span>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>
+              {kycT.kycRestrictedSoonTitle}
+            </h3>
+            <span
+              style={{
+                display: 'inline-block',
+                padding: '3px 10px',
+                backgroundColor: '#ffedd5',
+                color: '#9a3412',
+                borderRadius: '999px',
+                fontSize: '12px',
+                fontWeight: 500,
+              }}
+            >
+              {kycT.kycRestrictedSoonBadge}
+            </span>
+          </div>
+          <p
+            style={{
+              fontSize: '14px',
+              color: '#9a3412',
+              lineHeight: '1.5',
+              margin: '0 0 12px 0',
+            }}
+          >
+            {kycT.kycRestrictedSoonDescription}
+          </p>
+          <button
+            onClick={() => {
+              setShowConfirmModal(true);
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#ea580c',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            {kycT.kycCompleteVerification}
+          </button>
+        </div>
+        {showConfirmModal && (
+          <KycConfirmModal
+            kycT={kycT}
+            isLoading={isInitializing}
+            onConfirm={() => {
+              void handleConfirmKyc();
+            }}
+            onCancel={() => {
+              setShowConfirmModal(false);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
+  // requirements.past_due state: red card WITH button "Actualizar documentos"
+  if (ownerKycStatus === 'requirements.past_due') {
     return (
       <>
         <div
@@ -134,13 +247,266 @@ export function KycSection({ kycStatus, ownerKycStatus }: KycSectionProps): JSX.
             border: '1px solid #fecaca',
           }}
         >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '22px' }}>🔴</span>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>{kycT.kycPastDueTitle}</h3>
+            <span
+              style={{
+                display: 'inline-block',
+                padding: '3px 10px',
+                backgroundColor: '#fee2e2',
+                color: '#991b1b',
+                borderRadius: '999px',
+                fontSize: '12px',
+                fontWeight: 500,
+              }}
+            >
+              {kycT.kycPastDueBadge}
+            </span>
+          </div>
+          <p
+            style={{
+              fontSize: '14px',
+              color: '#991b1b',
+              lineHeight: '1.5',
+              margin: '0 0 12px 0',
+            }}
+          >
+            {kycT.kycPastDueDescription}
+          </p>
+          <button
+            onClick={() => {
+              setShowConfirmModal(true);
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#dc2626',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            {kycT.kycUpdateDocuments}
+          </button>
+        </div>
+        {showConfirmModal && (
+          <KycConfirmModal
+            kycT={kycT}
+            isLoading={isInitializing}
+            onConfirm={() => {
+              void handleConfirmKyc();
+            }}
+            onCancel={() => {
+              setShowConfirmModal(false);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
+  // requirements.pending_verification state: blue card, info only
+  if (ownerKycStatus === 'requirements.pending_verification') {
+    return (
+      <div
+        style={{
+          padding: '16px',
+          backgroundColor: '#eff6ff',
+          borderRadius: '8px',
+          border: '1px solid #bfdbfe',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '22px' }}>🔍</span>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>
+            {kycT.kycPendingVerificationTitle}
+          </h3>
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '3px 10px',
+              backgroundColor: '#dbeafe',
+              color: '#1e40af',
+              borderRadius: '999px',
+              fontSize: '12px',
+              fontWeight: 500,
+            }}
+          >
+            {kycT.kycPendingVerificationBadge}
+          </span>
+        </div>
+        <p style={{ fontSize: '14px', color: '#1e40af', lineHeight: '1.5', margin: 0 }}>
+          {kycT.kycPendingVerificationDescription}
+        </p>
+      </div>
+    );
+  }
+
+  // under_review state: blue card, info only
+  if (ownerKycStatus === 'under_review') {
+    return (
+      <div
+        style={{
+          padding: '16px',
+          backgroundColor: '#eff6ff',
+          borderRadius: '8px',
+          border: '1px solid #bfdbfe',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '22px' }}>🔎</span>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>
+            {kycT.kycUnderReviewTitle}
+          </h3>
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '3px 10px',
+              backgroundColor: '#dbeafe',
+              color: '#1e40af',
+              borderRadius: '999px',
+              fontSize: '12px',
+              fontWeight: 500,
+            }}
+          >
+            {kycT.kycUnderReviewBadge}
+          </span>
+        </div>
+        <p style={{ fontSize: '14px', color: '#1e40af', lineHeight: '1.5', margin: 0 }}>
+          {kycT.kycUnderReviewDescription}
+        </p>
+      </div>
+    );
+  }
+
+  // rejected state: red card, terminal — no button
+  if (ownerKycStatus === 'rejected') {
+    return (
+      <div
+        style={{
+          padding: '16px',
+          backgroundColor: '#fef2f2',
+          borderRadius: '8px',
+          border: '1px solid #fecaca',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '22px' }}>❌</span>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>{kycT.kycRejectedTitle}</h3>
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '3px 10px',
+              backgroundColor: '#fee2e2',
+              color: '#991b1b',
+              borderRadius: '999px',
+              fontSize: '12px',
+              fontWeight: 500,
+            }}
+          >
+            {kycT.kycRejectedBadge}
+          </span>
+        </div>
+        <p style={{ fontSize: '14px', color: '#991b1b', lineHeight: '1.5', margin: 0 }}>
+          {kycT.kycRejectedDescription}
+        </p>
+      </div>
+    );
+  }
+
+  // platform_paused state: red card, terminal — no button
+  if (ownerKycStatus === 'platform_paused') {
+    return (
+      <div
+        style={{
+          padding: '16px',
+          backgroundColor: '#fef2f2',
+          borderRadius: '8px',
+          border: '1px solid #fecaca',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '22px' }}>⏸️</span>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>
+            {kycT.kycPlatformPausedTitle}
+          </h3>
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '3px 10px',
+              backgroundColor: '#fee2e2',
+              color: '#991b1b',
+              borderRadius: '999px',
+              fontSize: '12px',
+              fontWeight: 500,
+            }}
+          >
+            {kycT.kycPlatformPausedBadge}
+          </span>
+        </div>
+        <p style={{ fontSize: '14px', color: '#991b1b', lineHeight: '1.5', margin: 0 }}>
+          {kycT.kycPlatformPausedDescription}
+        </p>
+      </div>
+    );
+  }
+
+  // listed state: red card, terminal — no button
+  if (ownerKycStatus === 'listed') {
+    return (
+      <div
+        style={{
+          padding: '16px',
+          backgroundColor: '#fef2f2',
+          borderRadius: '8px',
+          border: '1px solid #fecaca',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '22px' }}>🚫</span>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>{kycT.kycListedTitle}</h3>
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '3px 10px',
+              backgroundColor: '#fee2e2',
+              color: '#991b1b',
+              borderRadius: '999px',
+              fontSize: '12px',
+              fontWeight: 500,
+            }}
+          >
+            {kycT.kycListedBadge}
+          </span>
+        </div>
+        <p style={{ fontSize: '14px', color: '#991b1b', lineHeight: '1.5', margin: 0 }}>
+          {kycT.kycListedDescription}
+        </p>
+      </div>
+    );
+  }
+
+  // not_started / default: gray card with "Iniciar Verificación" button
+  if (kycStatus === null || kycStatus === undefined) {
+    return (
+      <>
+        <div
+          style={{
+            padding: '16px',
+            backgroundColor: '#f9fafb',
+            borderRadius: '8px',
+            border: '1px solid #e5e7eb',
+          }}
+        >
           <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
             {kycT.kycTitle}
           </h3>
-          <p style={{ fontSize: '14px', color: '#991b1b', marginBottom: '12px' }}>
+          <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
             {kycT.kycNotInitiated}
           </p>
-          <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>
             {kycT.verificationOpensNewTab}
           </p>
           <button
@@ -287,7 +653,7 @@ function KycConfirmModal({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 1000,
+        zIndex: 10000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
