@@ -38,11 +38,6 @@ export const getAllBookings = async (params: {
   language?: string;
   currency?: string;
 }): Promise<unknown> => {
-  console.warn('🎯 [GET ALL BOOKINGS] Starting getAllBookings with params:', {
-    params,
-    BASE_URL,
-  });
-
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn('⚠️ [GET ALL BOOKINGS] BACKEND_URL is not configured, returning empty');
     return {
@@ -86,7 +81,6 @@ export const getAllBookings = async (params: {
       headers,
     });
 
-    console.warn('✅ [GET ALL BOOKINGS] Success!');
     return result;
   } catch (error) {
     console.error('❌ [GET ALL BOOKINGS] Error caught:', error);
@@ -244,14 +238,6 @@ export const updateBooking = async (
   token: string,
   language = 'es'
 ): Promise<unknown> => {
-  console.warn('🎯 [UPDATE BOOKING] Starting updateBooking with params:', {
-    id,
-    payload,
-    language,
-    hasToken: !!token,
-    BASE_URL,
-  });
-
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn('⚠️ [UPDATE BOOKING] BACKEND_URL is not configured, returning error');
     return { success: false, error: 'Backend URL not configured' };
@@ -267,7 +253,6 @@ export const updateBooking = async (
       },
     });
 
-    console.warn('✅ [UPDATE BOOKING] Success! Result:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
     console.error('❌ [UPDATE BOOKING] Error caught:', error);
@@ -347,12 +332,6 @@ export const deleteBooking = async (
  * Get booking statistics
  */
 export const getBookingStats = async (token: string, language = 'es'): Promise<unknown> => {
-  console.warn('🎯 [GET BOOKING STATS] Starting getBookingStats with params:', {
-    language,
-    hasToken: !!token,
-    BASE_URL,
-  });
-
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn('⚠️ [GET BOOKING STATS] BACKEND_URL is not configured, returning empty');
     return { success: false, data: null };
@@ -368,7 +347,6 @@ export const getBookingStats = async (token: string, language = 'es'): Promise<u
       },
     });
 
-    console.warn('✅ [GET BOOKING STATS] Success! Result:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
     console.error('❌ [GET BOOKING STATS] Error caught:', error);

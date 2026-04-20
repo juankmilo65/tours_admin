@@ -26,13 +26,6 @@ export const getIdentificationTypesDropdown = async (
   active = true,
   language = 'es'
 ): Promise<unknown> => {
-  console.warn('🎯 [GET IDENTIFICATION TYPES DROPDOWN] Starting with params:', {
-    countryCode,
-    active,
-    language,
-    BASE_URL,
-  });
-
   // Check if backend URL is configured
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn(
@@ -43,8 +36,6 @@ export const getIdentificationTypesDropdown = async (
 
   try {
     const identificationTypesEndpoint = 'identification-types/dropdown';
-    const fullUrl = `${BASE_URL}/${identificationTypesEndpoint}`;
-    console.warn('🌐 [GET IDENTIFICATION TYPES DROPDOWN] Full URL to call:', fullUrl);
 
     // Build query params
     const params: Record<string, string> = {};
@@ -63,11 +54,6 @@ export const getIdentificationTypesDropdown = async (
 
     // No token needed - public endpoint
     const identificationTypesService = createServiceREST(BASE_URL, identificationTypesEndpoint, '');
-    console.warn('📡 [GET IDENTIFICATION TYPES DROPDOWN] Calling backend with headers:', {
-      'X-Language': language,
-      params,
-    });
-
     const result = await identificationTypesService.get({
       params,
       headers: {
@@ -75,10 +61,6 @@ export const getIdentificationTypesDropdown = async (
       },
     });
 
-    console.warn(
-      '✅ [GET IDENTIFICATION TYPES DROPDOWN] Success! Result:',
-      JSON.stringify(result, null, 2)
-    );
     return result;
   } catch (error) {
     // Handle network errors gracefully (ECONNREFUSED, etc.)

@@ -72,13 +72,6 @@ export const getToursDropdown = async (
   language = 'es',
   userId: string | null = null
 ): Promise<unknown> => {
-  console.warn('🎯 [GET TOURS DROPDOWN] Starting with params:', {
-    countryId,
-    language,
-    userId,
-    BASE_URL,
-  });
-
   // Check if backend URL is configured
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn('⚠️ [GET TOURS DROPDOWN] BACKEND_URL is not configured, returning empty');
@@ -87,8 +80,6 @@ export const getToursDropdown = async (
 
   try {
     const toursEndpoint = 'tours/dropdown';
-    const fullUrl = `${BASE_URL}/${toursEndpoint}`;
-    console.warn('🌐 [GET TOURS DROPDOWN] Full URL to call:', fullUrl);
 
     // Build query params
     const params: Record<string, string> = {};
@@ -101,10 +92,6 @@ export const getToursDropdown = async (
 
     // No token needed - public endpoint
     const toursService = createServiceREST(BASE_URL, toursEndpoint, '');
-    console.warn('📡 [GET TOURS DROPDOWN] Calling backend with headers:', {
-      'X-Language': language,
-      params,
-    });
 
     const result = await toursService.get({
       params,
@@ -113,7 +100,6 @@ export const getToursDropdown = async (
       },
     });
 
-    console.warn('✅ [GET TOURS DROPDOWN] Success! Result:', JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
     // Handle network errors gracefully (ECONNREFUSED, etc.)

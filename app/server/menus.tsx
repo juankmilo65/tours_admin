@@ -242,9 +242,6 @@ export const getUserMenu = async (
       },
     });
 
-    // eslint-disable-next-line no-console
-    console.log('🔍 [GET USER MENU] Response:', JSON.stringify(result, null, 2));
-
     return result;
   } catch (error) {
     console.error('Error in getUserMenu service:', error);

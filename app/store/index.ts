@@ -27,6 +27,7 @@ import toursReducer from '~/store/slices/toursSlice';
 import paymentsReducer from '~/store/slices/paymentsSlice';
 import kycReducer from '~/store/slices/kycSlice';
 import cancellationPoliciesReducer from '~/store/slices/cancellationPoliciesSlice';
+import stripePaymentsReducer from '~/store/slices/stripePaymentsSlice';
 
 // Redux Persist configuration
 const persistConfig = {
@@ -49,6 +50,7 @@ const rootReducer = combineReducers({
   payments: paymentsReducer,
   kyc: kycReducer,
   cancellationPolicies: cancellationPoliciesReducer,
+  stripePayments: stripePaymentsReducer,
   /* offers: offersReducer, */
 });
 

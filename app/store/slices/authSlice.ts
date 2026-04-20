@@ -131,28 +131,11 @@ const authSlice = createSlice({
       action: PayloadAction<{ isAuthenticated: boolean; authToken: string | null }>
     ) => {
       const { isAuthenticated, authToken } = action.payload;
-      // eslint-disable-next-line no-console
-      console.log(
-        'authSlice.setAuthenticatedFromServer - isAuthenticated from server:',
-        isAuthenticated
-      );
-      // eslint-disable-next-line no-console
-      console.log('authSlice.setAuthenticatedFromServer - authToken from server:', authToken);
+
       // eslint-disable-next-line no-console
       console.log('authSlice.setAuthenticatedFromServer - current token:', state.token);
-      // eslint-disable-next-line no-console
-      console.log(
-        'authSlice.setAuthenticatedFromServer - current isAuthenticated:',
-        state.isAuthenticated
-      );
 
-      // Only update authentication state if server says not authenticated
-      // If server says authenticated, we keep current state (from login)
       if (!isAuthenticated) {
-        // eslint-disable-next-line no-console
-        console.log(
-          'authSlice.setAuthenticatedFromServer - Server says NOT authenticated, clearing state'
-        );
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
@@ -169,48 +152,26 @@ const authSlice = createSlice({
           window.localStorage.removeItem('isOtpVerified');
         }
       } else {
-        // Server says authenticated - use token from server if available
-        // Otherwise try to restore from localStorage
-        // eslint-disable-next-line no-console
-        console.log('authSlice.setAuthenticatedFromServer - Server says authenticated');
         if (authToken !== null && authToken.trim() !== '') {
-          // eslint-disable-next-line no-console
-          console.log('authSlice.setAuthenticatedFromServer - Using token from server session');
           state.token = authToken;
           state.isAuthenticated = true;
 
           // Save to localStorage
           if (typeof window !== 'undefined') {
             window.localStorage.setItem('authToken', authToken);
-            // eslint-disable-next-line no-console
-            console.log('authSlice.setAuthenticatedFromServer - Saved token to localStorage');
           }
         } else if (state.token === null && typeof window !== 'undefined') {
           const storedToken = window.localStorage.getItem('authToken');
           const storedUser = window.localStorage.getItem('authUser');
-          // eslint-disable-next-line no-console
-          console.log(
-            'authSlice.setAuthenticatedFromServer - Token from localStorage:',
-            storedToken
-          );
-          // eslint-disable-next-line no-console
-          console.log('authSlice.setAuthenticatedFromServer - User from localStorage:', storedUser);
 
           if (storedToken !== null) {
             state.token = storedToken;
             state.isAuthenticated = true;
-            // eslint-disable-next-line no-console
-            console.log(
-              'authSlice.setAuthenticatedFromServer - Restored token from localStorage:',
-              storedToken
-            );
           }
 
           if (storedUser !== null) {
             try {
               state.user = JSON.parse(storedUser) as User;
-              // eslint-disable-next-line no-console
-              console.log('authSlice.setAuthenticatedFromServer - Restored user from localStorage');
             } catch (error) {
               console.error(
                 'authSlice.setAuthenticatedFromServer - Error parsing user from localStorage:',
@@ -222,10 +183,6 @@ const authSlice = createSlice({
           const storedIsOtpVerified = window.localStorage.getItem('isOtpVerified');
           if (storedIsOtpVerified === 'true') {
             state.isOtpVerified = true;
-            // eslint-disable-next-line no-console
-            console.log(
-              'authSlice.setAuthenticatedFromServer - Restored isOtpVerified from localStorage'
-            );
           }
         } else {
           // eslint-disable-next-line no-console
