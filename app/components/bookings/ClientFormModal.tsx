@@ -25,6 +25,19 @@ export interface ClientFormData {
   isPrimary?: boolean;
 }
 
+/** User item shape from the dropdown API */
+interface UserOption {
+  id: string;
+  firstName: string;
+  email: string;
+  nationalityId?: string;
+  nationality?: { id: string; code: string; name_es: string; name_en: string };
+  identificationTypeId?: string;
+  identificationType?: { id: string; code: string; name_es: string; name_en: string };
+  identificationNumber?: string;
+  birthday?: string;
+}
+
 interface ClientFormModalProps {
   isOpen: boolean;
   language: 'es' | 'en' | string;
@@ -35,7 +48,7 @@ interface ClientFormModalProps {
   /** Whether this is first client (first client is always primary) */
   isFirstClient?: boolean;
   /** List of users with role 'user' to select from */
-  users?: Array<{ id: string; name: string; email: string }>;
+  users?: UserOption[];
   /** userId of the already-selected principal client (to exclude from non-primary dropdown) */
   primaryUserId?: string;
   onSave: (data: ClientFormData) => void;
@@ -104,6 +117,7 @@ export function ClientFormModal({
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [useSystemUser, setUseSystemUser] = useState(false);
+  const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false);
 
   const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
   const countries = useCachedNationalities(language);
@@ -111,6 +125,20 @@ export function ClientFormModal({
 
   // Track previous isOpen to detect open transition
   const prevOpenRef = useRef(false);
+
+  // Pending identificationTypeId — set after options load
+  const pendingIdTypeRef = useRef<string>('');
+
+  // When identification type options load, apply the pending value (match by ID)
+  useEffect(() => {
+    const pendingId = pendingIdTypeRef.current;
+    if (!pendingId || !form.countryCode) return;
+    const options = allIdTypesByCountry[form.countryCode] ?? [];
+    if (options.some((it) => it.id === pendingId)) {
+      setForm((p) => ({ ...p, identificationTypeId: pendingId }));
+      pendingIdTypeRef.current = '';
+    }
+  }, [allIdTypesByCountry, form.countryCode]);
 
   // Populate form on open (avoid setState inside effect body)
   useEffect(() => {
@@ -140,6 +168,70 @@ export function ClientFormModal({
     void loadNationalities(language);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  /** Calculate age from birthday string (YYYY-MM-DD or ISO) */
+  const calculateAge = (birthday: string | undefined): number => {
+    if (birthday === undefined || birthday === '') return isFirstClient ? 18 : 0;
+    const birth = new Date(birthday);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  /** Auto-fill all form fields from a selected user */
+  const applyUserToForm = (user: UserOption): void => {
+    const countryCode = user.nationality?.code ?? '';
+    const identificationTypeId = user.identificationType?.id ?? '';
+    const age = calculateAge(user.birthday);
+
+    // Setear datos básicos inmediatamente
+    setForm((p) => ({
+      ...p,
+      clientName: user.firstName,
+      clientEmail: user.email,
+      clientAge: age,
+      countryCode,
+      identificationTypeId: '',
+      clientId: user.identificationNumber ?? '',
+    }));
+
+    if (countryCode) {
+      // La caché fue limpiada al abrir el modal de reserva.
+      // Primer call = cache miss → API. Siguientes para mismo país = caché fresca.
+      pendingIdTypeRef.current = '';
+      setIsLoadingDropdowns(true);
+      loadIdentificationTypes(countryCode, language)
+        .then((freshOptions) => {
+          if (identificationTypeId && freshOptions.some((it) => it.id === identificationTypeId)) {
+            setForm((p) => ({ ...p, identificationTypeId }));
+          }
+        })
+        .catch(() => {
+          pendingIdTypeRef.current = identificationTypeId;
+        })
+        .finally(() => {
+          setIsLoadingDropdowns(false);
+        });
+    }
+    setErrors({});
+  };
+
+  /** Clear all user-related form fields */
+  const clearUserFromForm = (): void => {
+    setForm((p) => ({
+      ...p,
+      clientName: '',
+      clientEmail: '',
+      clientAge: isFirstClient ? 18 : 0,
+      countryCode: '',
+      identificationTypeId: '',
+      clientId: '',
+    }));
+  };
 
   const validate = (): boolean => {
     const errs: Partial<Record<string, string>> = {};
@@ -198,12 +290,9 @@ export function ClientFormModal({
   const handleNationalityChange = (code: string): void => {
     setForm((p) => ({ ...p, countryCode: code, identificationTypeId: '' }));
     if (code) {
-      void loadIdentificationTypes(code, language).then((result) => {
-        console.log('🔍 [ClientFormModal] loadIdentificationTypes result for', code, ':', result);
-        console.log(
-          '🔍 [ClientFormModal] allIdTypesByCountry keys:',
-          Object.keys(allIdTypesByCountry)
-        );
+      setIsLoadingDropdowns(true);
+      void loadIdentificationTypes(code, language).finally(() => {
+        setIsLoadingDropdowns(false);
       });
     }
     setErrors((p) => {
@@ -226,6 +315,9 @@ export function ClientFormModal({
     !isEdit &&
     ((isFirstClient && users.length > 0 && selectedUserId === '') ||
       (!isFirstClient && useSystemUser && selectedUserId === ''));
+
+  // Lock nationality/idType/idNumber when auto-filled from user profile
+  const fieldsLockedByUser = !isEdit && selectedUserId !== '' && (isFirstClient || useSystemUser);
 
   return (
     <div
@@ -369,7 +461,7 @@ export function ClientFormModal({
               <Select
                 options={[
                   { value: '', label: tr.select },
-                  ...users.map((u) => ({ value: u.id, label: u.name })),
+                  ...users.map((u) => ({ value: u.id, label: u.firstName })),
                 ]}
                 value={selectedUserId}
                 onChange={(value) => {
@@ -377,7 +469,7 @@ export function ClientFormModal({
                   if (value !== '') {
                     const found = users.find((u) => u.id === value);
                     if (found !== undefined) {
-                      setForm((p) => ({ ...p, clientName: found.name, clientEmail: found.email }));
+                      applyUserToForm(found);
                     }
                     setErrors((p) => {
                       const n = { ...p };
@@ -385,7 +477,7 @@ export function ClientFormModal({
                       return n;
                     });
                   } else {
-                    setForm((p) => ({ ...p, clientName: '', clientEmail: '' }));
+                    clearUserFromForm();
                   }
                 }}
                 placeholder={tr.select}
@@ -431,7 +523,7 @@ export function ClientFormModal({
                 onChange={(e) => {
                   setUseSystemUser(e.target.checked);
                   setSelectedUserId('');
-                  setForm((p) => ({ ...p, clientName: '', clientEmail: '' }));
+                  clearUserFromForm();
                   setErrors((p) => {
                     const n = { ...p };
                     delete n.clientName;
@@ -461,7 +553,7 @@ export function ClientFormModal({
                   { value: '', label: tr.select },
                   ...users
                     .filter((u) => u.id !== primaryUserId)
-                    .map((u) => ({ value: u.id, label: u.name })),
+                    .map((u) => ({ value: u.id, label: u.firstName })),
                 ]}
                 value={selectedUserId}
                 onChange={(value) => {
@@ -469,7 +561,7 @@ export function ClientFormModal({
                   if (value !== '') {
                     const found = users.find((u) => u.id === value);
                     if (found !== undefined) {
-                      setForm((p) => ({ ...p, clientName: found.name, clientEmail: found.email }));
+                      applyUserToForm(found);
                     }
                     setErrors((p) => {
                       const n = { ...p };
@@ -477,7 +569,7 @@ export function ClientFormModal({
                       return n;
                     });
                   } else {
-                    setForm((p) => ({ ...p, clientName: '', clientEmail: '' }));
+                    clearUserFromForm();
                   }
                 }}
                 placeholder={tr.select}
@@ -568,7 +660,7 @@ export function ClientFormModal({
                 min={isFirstClient || form.isPrimary === true ? 18 : 0}
                 max={120}
                 error={errors.clientAge}
-                disabled={shouldDisableFields}
+                disabled={shouldDisableFields || fieldsLockedByUser}
               />
             </div>
 
@@ -592,7 +684,7 @@ export function ClientFormModal({
                 onChange={handleNationalityChange}
                 placeholder={tr.selectNationality}
                 id="client-modal-nationality"
-                disabled={shouldDisableFields}
+                disabled={shouldDisableFields || fieldsLockedByUser}
               />
               {errors.countryCode !== undefined && (
                 <p
@@ -611,6 +703,21 @@ export function ClientFormModal({
             <div>
               <label style={labelStyle}>
                 {tr.idTypeLabel} <span style={{ color: 'red' }}>*</span>
+                {isLoadingDropdowns && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 14,
+                      height: 14,
+                      marginLeft: 6,
+                      border: '2px solid rgba(0,0,0,0.1)',
+                      borderTopColor: 'var(--color-primary-500, #3b82f6)',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                      verticalAlign: 'middle',
+                    }}
+                  />
+                )}
               </label>
               <Select
                 options={[
@@ -632,7 +739,12 @@ export function ClientFormModal({
                 }}
                 placeholder={tr.selectIdType}
                 id="client-modal-idtype"
-                disabled={form.countryCode === '' || shouldDisableFields}
+                disabled={
+                  form.countryCode === '' ||
+                  shouldDisableFields ||
+                  fieldsLockedByUser ||
+                  isLoadingDropdowns
+                }
               />
               {errors.identificationTypeId !== undefined && (
                 <p
@@ -655,7 +767,7 @@ export function ClientFormModal({
                 value={form.clientId}
                 onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))}
                 placeholder={tr.enterClientId}
-                disabled={shouldDisableFields}
+                disabled={shouldDisableFields || fieldsLockedByUser}
               />
             </div>
           </div>

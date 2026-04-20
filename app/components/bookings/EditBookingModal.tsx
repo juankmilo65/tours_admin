@@ -1174,6 +1174,8 @@ export function EditBookingModal({
               clientAgeMax: bookingsT.clientAgeMax,
               select: bookingsT.select,
               selectUser: bookingsT.selectUser,
+              useSystemUser: bookingsT.useSystemUser,
+              noUserSelected: bookingsT.noUserSelected,
               clientIdLabel: bookingsT.clientIdLabel,
               enterEmail: bookingsT.enterEmail,
               emailLabel: bookingsT.emailLabel,

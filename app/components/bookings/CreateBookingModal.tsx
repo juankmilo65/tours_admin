@@ -18,8 +18,13 @@ import {
   getTourHourRangeBusiness,
   getTourByIdBusiness,
 } from '~/server/businessLogic/toursBusinessLogic';
-import { getUsersDropdownBusiness } from '~/server/businessLogic/usersBusinessLogic';
+import {
+  getUsersDropdownBusiness,
+  clearUsersDropdownCache,
+  type UserDropdownItem,
+} from '~/server/businessLogic/usersBusinessLogic';
 import { useDropdownCache } from '~/hooks/useDropdownCache';
+import { clearIdentificationTypesByNationality } from '~/store/slices/cacheSlice';
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
 import type { Client } from '~/types/booking';
@@ -100,7 +105,7 @@ export function CreateBookingModal({
   const [availabilityError, setAvailabilityError] = useState<string>('');
   const [tourBasePrice, setTourBasePrice] = useState<number | null>(null);
   const [tourMinimumPayment, setTourMinimumPayment] = useState<number | null>(null);
-  const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [users, setUsers] = useState<UserDropdownItem[]>([]);
   const [tourActivities, setTourActivities] = useState<BookingTourActivity[]>([]);
   const [isTourLoading, setIsTourLoading] = useState(false);
   const [itineraryOpen, setItineraryOpen] = useState(false);
@@ -169,6 +174,8 @@ export function CreateBookingModal({
     setSelectedPaymentMethod('');
     setAvailablePaymentMethods([]);
     setSelectedTours([]);
+    // Invalidar caché de tipos de ID para que se recarguen frescos
+    dispatch(clearIdentificationTypesByNationality());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -206,15 +213,11 @@ export function CreateBookingModal({
         token !== ''
       ) {
         try {
+          // Clear in-memory cache to always get fresh data when modal opens
+          clearUsersDropdownCache();
           const usersResult = await getUsersDropdownBusiness(['user'], 'true', token, language);
           if (usersResult.success === true && usersResult.data !== undefined) {
-            setUsers(
-              usersResult.data.map((u) => ({
-                id: u.id,
-                name: u.firstName,
-                email: u.email,
-              }))
-            );
+            setUsers(usersResult.data);
           }
         } catch (error) {
           console.error('Error fetching users:', error);
@@ -863,36 +866,48 @@ export function CreateBookingModal({
       const [rangeStart, rangeEnd] =
         hourRange !== null ? hourRange.split(' - ') : ['00:00', '00:00'];
 
-      const payloadWithCountry = {
-        ...formData,
-        startDate: buildDateTime(formData.startDate, rangeStart ?? '00:00'),
-        endDate: buildDateTime(formData.endDate, rangeEnd ?? '00:00'),
-        clients: formData.clients.map((client, index) => ({
-          ...client,
-          countryCode: clientNationalities[index] ?? '',
-        })),
-        specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
-        totalPrice: isMultiTourMode ? calculateBookingTotal(selectedTours) : priceSummary.total,
-        minimumPayment: tourMinimumPayment ?? undefined,
-        countryCode: selectedCountry?.code ?? 'MX',
-        paymentMethods: [selectedPaymentMethod],
-        ...(isMultiTourMode && selectedTours.length > 0
-          ? {
-              tours: selectedTours.map((tour) => ({
-                id: tour.id,
-                name_es: tour.name_es,
-                name_en: tour.name_en,
-                startDate: tour.startDate,
-                startTime: tour.startTime,
-                endTime: tour.endTime,
-                price: tour.price,
-                currency: tour.currency,
-                capacity: tour.capacity,
-                bookedSlots: tour.bookedSlots,
-              })),
-            }
-          : {}),
-      };
+      const payloadWithCountry = isMultiTourMode
+        ? {
+            // Multi-tour: each tour carries its own id/dates/currency
+            clients: formData.clients.map((client, index) => ({
+              ...client,
+              countryCode: clientNationalities[index] ?? '',
+            })),
+            specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
+            totalPrice: calculateBookingTotal(selectedTours),
+            minimumPayment:
+              selectedTours.reduce((sum, t) => sum + (t.minimumPayment ?? 0), 0) || undefined,
+            countryCode: selectedCountry?.code ?? 'MX',
+            paymentMethods: [selectedPaymentMethod],
+            tours: selectedTours.map((tour) => ({
+              id: tour.id,
+              name_es: tour.name_es,
+              name_en: tour.name_en,
+              startDate: tour.startDate,
+              startTime: tour.startTime,
+              endTime: tour.endTime,
+              price: tour.price,
+              currency: tour.currency,
+              capacity: tour.capacity,
+              bookedSlots: tour.bookedSlots,
+              minimumPayment: tour.minimumPayment ?? 0,
+            })),
+          }
+        : {
+            // Single-tour: top-level tourId/dates/currency
+            ...formData,
+            startDate: buildDateTime(formData.startDate, rangeStart ?? '00:00'),
+            endDate: buildDateTime(formData.endDate, rangeEnd ?? '00:00'),
+            clients: formData.clients.map((client, index) => ({
+              ...client,
+              countryCode: clientNationalities[index] ?? '',
+            })),
+            specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
+            totalPrice: priceSummary.total,
+            minimumPayment: tourMinimumPayment ?? undefined,
+            countryCode: selectedCountry?.code ?? 'MX',
+            paymentMethods: [selectedPaymentMethod],
+          };
 
       const result = await createBookingBusiness(payloadWithCountry, token ?? '', language);
       if (!result.success) {
@@ -1652,6 +1667,7 @@ export function CreateBookingModal({
                                 bookedSlots: tourAvailability?.totalReservedSlots ?? 0,
                                 cityId: tourCityId,
                                 cityName: tourCityName,
+                                minimumPayment: tourMinimumPayment ?? 0,
                               };
 
                               // Check if same tour already in list
@@ -1768,16 +1784,132 @@ export function CreateBookingModal({
                       warnings={validationResult.warnings}
                       errors={validationResult.errors}
                     />
+                    {/* ── Price Breakdown ── */}
                     <div
                       style={{
-                        marginTop: '8px',
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        color: 'var(--color-neutral-700)',
+                        marginTop: '12px',
+                        padding: '16px 20px',
+                        background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                        border: '1px solid #bbf7d0',
+                        borderRadius: '8px',
                       }}
                     >
-                      {language === 'en' ? 'Total' : 'Total'}: {formData.currency}{' '}
-                      {calculateBookingTotal(selectedTours).toFixed(2)}
+                      <h4
+                        style={{
+                          margin: '0 0 12px 0',
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: '#166534',
+                        }}
+                      >
+                        {bookingsT.priceSummary}
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {selectedTours.map((tour, idx) => (
+                          <div
+                            key={tour.id + idx}
+                            style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: '0.8125rem',
+                                color: '#334155',
+                              }}
+                            >
+                              <span>{language === 'en' ? tour.name_en : tour.name_es}</span>
+                              <span style={{ fontWeight: 600 }}>
+                                {formatCurrency(tour.price, tour.currency)}
+                              </span>
+                            </div>
+                            {(tour.minimumPayment ?? 0) > 0 && (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  fontSize: '0.75rem',
+                                  color: '#0e7490',
+                                  paddingLeft: 12,
+                                }}
+                              >
+                                <span>{bookingsT.minimumPayment}</span>
+                                <span>
+                                  {formatCurrency(tour.minimumPayment ?? 0, tour.currency)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Separator */}
+                        <div style={{ borderTop: '1px solid #bbf7d0', marginTop: 4 }} />
+
+                        {/* Total */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '0.9375rem',
+                            fontWeight: 700,
+                            color: '#166534',
+                          }}
+                        >
+                          <span>Total</span>
+                          <span>
+                            {formatCurrency(
+                              calculateBookingTotal(selectedTours),
+                              formData.currency
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Pay now (sum of minimumPayments) */}
+                        {selectedTours.some((t) => (t.minimumPayment ?? 0) > 0) && (
+                          <>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                color: '#0e7490',
+                                borderTop: '1px dashed #bbf7d0',
+                                paddingTop: 8,
+                              }}
+                            >
+                              <span>{language === 'en' ? 'Pay now' : 'Pagar ahora'}</span>
+                              <span>
+                                {formatCurrency(
+                                  selectedTours.reduce((s, t) => s + (t.minimumPayment ?? 0), 0),
+                                  formData.currency
+                                )}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: '0.8125rem',
+                                color: '#64748b',
+                              }}
+                            >
+                              <span>
+                                {language === 'en'
+                                  ? 'Remaining (due by tour date)'
+                                  : 'Restante (pago máximo el día del tour)'}
+                              </span>
+                              <span>
+                                {formatCurrency(
+                                  calculateBookingTotal(selectedTours) -
+                                    selectedTours.reduce((s, t) => s + (t.minimumPayment ?? 0), 0),
+                                  formData.currency
+                                )}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </>
                 ) : (

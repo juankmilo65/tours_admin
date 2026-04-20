@@ -31,6 +31,7 @@ export interface User {
   isActive: boolean;
   emailVerified: boolean;
   identificationNumber?: string;
+  birthday?: string;
   nationality?: {
     code: string;
     nationality_es: string;
@@ -54,6 +55,7 @@ export interface CreateUserDto {
   firstName: string;
   lastName: string;
   phoneNumber?: string;
+  birthday?: string;
   role: string;
   countryCode?: string;
   identificationTypeId?: string;
@@ -65,6 +67,7 @@ export interface UpdateUserDto {
   firstName?: string;
   lastName?: string;
   phoneNumber?: string;
+  birthday?: string;
   role?: string;
   countryCode?: string;
   identificationTypeId?: string;

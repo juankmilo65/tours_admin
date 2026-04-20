@@ -18,6 +18,7 @@ export interface BookingTour {
   cityName?: string;
   description_es?: string;
   description_en?: string;
+  minimumPayment?: number;
 }
 
 export interface Booking {

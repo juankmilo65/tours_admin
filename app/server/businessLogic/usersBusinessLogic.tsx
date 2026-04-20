@@ -20,6 +20,11 @@ export type { User, CreateUserDto, UpdateUserDto, UsersResponse, GetUsersParams 
 const usersDropdownCache = new Map<string, { data: User[]; timestamp: number }>();
 const USERS_DROPDOWN_TTL = 5 * 60 * 1000; // 5 minutes
 
+/** Clear the in-memory users dropdown cache (call after user mutations) */
+export const clearUsersDropdownCache = (): void => {
+  usersDropdownCache.clear();
+};
+
 /**
  * Get all users with filters and pagination
  */
@@ -259,6 +264,49 @@ export const deleteUserAvatarBusiness = async (
  * @param token - Auth token
  * @param language - Language preference
  */
+/** Shape returned by getUsersDropdownBusiness */
+export interface UserDropdownItem {
+  id: string;
+  firstName: string;
+  email: string;
+  ownerKycVerified?: boolean;
+  nationalityId?: string;
+  nationality?: { id: string; code: string; name_es: string; name_en: string };
+  identificationTypeId?: string;
+  identificationType?: { id: string; code: string; name_es: string; name_en: string };
+  identificationNumber?: string;
+  birthday?: string;
+}
+
+/** Raw shape coming from the dropdown API (may have extra flat fields) */
+interface UserDropdownRaw {
+  id: string;
+  firstName: string;
+  lastName: string;
+  name?: string;
+  email: string;
+  ownerKycVerified?: boolean;
+  nationalityId?: string;
+  nationality?: { id: string; code: string; name_es: string; name_en: string };
+  identificationTypeId?: string;
+  identificationType?: { id: string; code: string; name_es: string; name_en: string };
+  identificationNumber?: string;
+  birthday?: string;
+}
+
+const mapUserDropdown = (user: UserDropdownRaw): UserDropdownItem => ({
+  id: user.id,
+  firstName: user.name ?? `${user.firstName} ${user.lastName}`,
+  email: user.email,
+  ownerKycVerified: user.ownerKycVerified,
+  nationalityId: user.nationalityId,
+  nationality: user.nationality,
+  identificationTypeId: user.identificationTypeId,
+  identificationType: user.identificationType,
+  identificationNumber: user.identificationNumber,
+  birthday: user.birthday,
+});
+
 export const getUsersDropdownBusiness = async (
   roles: string[] | null = null,
   isActive: string | null = null,
@@ -266,7 +314,7 @@ export const getUsersDropdownBusiness = async (
   language = 'es'
 ): Promise<{
   success: boolean;
-  data?: Array<{ id: string; firstName: string; email: string; ownerKycVerified?: boolean }>;
+  data?: UserDropdownItem[];
 }> => {
   try {
     // Create cache key from parameters
@@ -281,50 +329,32 @@ export const getUsersDropdownBusiness = async (
     if (cached && Date.now() - cached.timestamp < USERS_DROPDOWN_TTL) {
       // eslint-disable-next-line no-console
       console.log('📦 [USERS CACHE] Using cached data');
-      const users = cached.data.map((user) => ({
-        id: user.id,
-        firstName: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        ownerKycVerified: user.ownerKycVerified,
-      }));
-      return { success: true, data: users };
+      return { success: true, data: cached.data.map(mapUserDropdown) };
     }
 
     // Fetch from API if cache miss or expired
     const result = (await getUsersDropdown(roles, isActive, token, language)) as {
       success?: boolean;
-      data?: User[];
+      data?: UserDropdownRaw[];
     };
 
     if (result.success === true && result.data !== undefined) {
-      // Store in cache
+      // Store raw data in cache
       usersDropdownCache.set(cacheKey, {
-        data: result.data,
+        data: result.data as unknown as User[],
         timestamp: Date.now(),
       });
       // eslint-disable-next-line no-console
       console.log('💾 [USERS CACHE] Data cached');
 
-      const users = result.data.map((user) => ({
-        id: user.id,
-        firstName: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        ownerKycVerified: user.ownerKycVerified,
-      }));
-      return { success: true, data: users };
+      return { success: true, data: result.data.map(mapUserDropdown) };
     }
 
     // If API call fails but we have cached data, return it even if expired
     if (cached && cached.data.length > 0) {
       // eslint-disable-next-line no-console
       console.log('🔄 [USERS CACHE] API failed, returning stale cached data');
-      const users = cached.data.map((user) => ({
-        id: user.id,
-        firstName: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        ownerKycVerified: user.ownerKycVerified,
-      }));
-      return { success: true, data: users };
+      return { success: true, data: cached.data.map(mapUserDropdown) };
     }
 
     return { success: false };
@@ -347,13 +377,7 @@ export const getUsersDropdownBusiness = async (
       if (cached && cached.data.length > 0) {
         // eslint-disable-next-line no-console
         console.log('🔄 [USERS CACHE] Rate limited, returning stale cached data');
-        const users = cached.data.map((user) => ({
-          id: user.id,
-          firstName: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          ownerKycVerified: user.ownerKycVerified,
-        }));
-        return { success: true, data: users };
+        return { success: true, data: cached.data.map(mapUserDropdown) };
       }
     }
 

@@ -144,6 +144,12 @@ const cacheSlice = createSlice({
       state.identificationTypesByNationality = {};
       state.identificationTypesByNationalityTimestamp = {};
     },
+    /** Clear cached identification types for a single country code */
+    clearIdentificationTypesForCountry: (state, action: PayloadAction<string>) => {
+      const countryCode = action.payload;
+      delete state.identificationTypesByNationality[countryCode];
+      delete state.identificationTypesByNationalityTimestamp[countryCode];
+    },
   },
 });
 
@@ -159,6 +165,7 @@ export const {
   clearUsers,
   clearNationalities,
   clearIdentificationTypesByNationality,
+  clearIdentificationTypesForCountry,
 } = cacheSlice.actions;
 
 // ── Selectors ─────────────────────────────────────────────────────────────────

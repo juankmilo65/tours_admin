@@ -22,6 +22,7 @@ import {
   setNationalities,
   setIdentificationTypesByNationality,
   setUsers,
+  clearIdentificationTypesForCountry,
   isCacheValid,
   NATIONALITIES_TTL,
   ID_TYPES_TTL,
@@ -46,11 +47,19 @@ export interface UseDropdownCacheReturn {
   /**
    * Load (or reuse from cache) identification types for a given country code.
    * Dispatches to Redux on a cache miss; returns the list once ready.
+   * Pass forceRefresh=true to bypass cache and fetch fresh data from the API.
    */
   loadIdentificationTypes: (
     countryCode: string,
-    language: string
+    language: string,
+    forceRefresh?: boolean
   ) => Promise<IdentificationTypeDropdown[]>;
+
+  /**
+   * Invalidate cached identification types for a given country code.
+   * Use before loadIdentificationTypes(code, lang, true) to ensure fresh data.
+   */
+  invalidateIdentificationTypes: (countryCode: string) => void;
 
   /**
    * Load (or reuse from cache) users dropdown for admin filters.
@@ -143,13 +152,17 @@ export function useDropdownCache(): UseDropdownCacheReturn {
   // ── Load identification types ──────────────────────────────────────────────
 
   const loadIdentificationTypes = useCallback(
-    async (countryCode: string, language: string): Promise<IdentificationTypeDropdown[]> => {
+    async (
+      countryCode: string,
+      language: string,
+      forceRefresh = false
+    ): Promise<IdentificationTypeDropdown[]> => {
       if (!countryCode) return [];
 
       const cached = idRef.current[countryCode];
       const ts = idTsRef.current[countryCode];
 
-      if (cached !== undefined && isCacheValid(ts, ID_TYPES_TTL)) {
+      if (!forceRefresh && cached !== undefined && isCacheValid(ts, ID_TYPES_TTL)) {
         return cached;
       }
 
@@ -164,6 +177,15 @@ export function useDropdownCache(): UseDropdownCacheReturn {
       }
 
       return cached ?? [];
+    },
+    [dispatch]
+  );
+
+  // ── Invalidate identification types for a country ──────────────────────────
+
+  const invalidateIdentificationTypes = useCallback(
+    (countryCode: string): void => {
+      dispatch(clearIdentificationTypesForCountry(countryCode));
     },
     [dispatch]
   );
@@ -208,7 +230,7 @@ export function useDropdownCache(): UseDropdownCacheReturn {
     [dispatch]
   );
 
-  return { loadNationalities, loadIdentificationTypes, loadUsers };
+  return { loadNationalities, loadIdentificationTypes, invalidateIdentificationTypes, loadUsers };
 }
 
 // ── Selector hooks (reactive reads inside components) ────────────────────────

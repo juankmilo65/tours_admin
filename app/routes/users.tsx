@@ -19,6 +19,7 @@ import {
   toggleUserStatusBusiness,
   uploadUserAvatarBusiness,
   deleteUserAvatarBusiness,
+  clearUsersDropdownCache,
   type User,
   type CreateUserDto,
   type UpdateUserDto,
@@ -34,6 +35,7 @@ import {
   useCachedNationalities,
   useCachedIdentificationTypes,
 } from '~/hooks/useDropdownCache';
+import { clearUsers } from '~/store/slices/cacheSlice';
 
 export async function loader(args: LoaderFunctionArgs): Promise<null> {
   await requireAuth(args);
@@ -65,6 +67,7 @@ export default function Users(): JSX.Element {
     password: '',
     firstName: '',
     lastName: '',
+    birthday: '',
     role: 'user',
   });
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -216,6 +219,7 @@ export default function Users(): JSX.Element {
       password: '',
       firstName: '',
       lastName: '',
+      birthday: '',
       role: 'user',
       countryCode: '',
       identificationTypeId: '',
@@ -268,6 +272,18 @@ export default function Users(): JSX.Element {
       newErrors.role = t('users.validation.roleRequired') ?? 'Required';
     }
 
+    if (newUser.birthday === undefined || newUser.birthday === '') {
+      newErrors.birthday = t('users.validation_birthdayRequired') ?? 'Date of birth is required';
+    } else {
+      const birthDate = new Date(newUser.birthday);
+      const minDate = new Date();
+      minDate.setFullYear(minDate.getFullYear() - 18);
+      if (birthDate > minDate) {
+        newErrors.birthday =
+          t('users.validation_birthdayMinAge') ?? 'User must be at least 18 years old';
+      }
+    }
+
     if (newUser.countryCode === undefined || newUser.countryCode === '') {
       newErrors.countryCode =
         t('users.validation_nationalityRequired') ?? 'Nationality is required';
@@ -311,6 +327,7 @@ export default function Users(): JSX.Element {
           email: newUser.email,
           firstName: newUser.firstName,
           lastName: newUser.lastName,
+          birthday: newUser.birthday !== '' ? newUser.birthday : undefined,
           role: newUser.role,
           countryCode: newUser.countryCode !== '' ? newUser.countryCode : undefined,
           identificationTypeId:
@@ -385,6 +402,8 @@ export default function Users(): JSX.Element {
       });
       setIsCreateModalOpen(false);
       resetForm();
+      clearUsersDropdownCache();
+      dispatch(clearUsers());
 
       const refreshResult = await getAllUsersBusiness({
         page,
@@ -421,6 +440,7 @@ export default function Users(): JSX.Element {
       password: '',
       firstName: user.firstName,
       lastName: user.lastName,
+      birthday: user.birthday?.slice(0, 10) ?? '',
       role: user.role,
       countryCode,
       identificationTypeId: user.identificationType?.id ?? '',
@@ -457,6 +477,8 @@ export default function Users(): JSX.Element {
 
       if (result.success === true) {
         setUsers(users.map((u) => (u.id === user.id ? { ...u, isActive: newStatus } : u)));
+        clearUsersDropdownCache();
+        dispatch(clearUsers());
         dispatch(setGlobalLoading({ isLoading: false, message: '' }));
       } else {
         setErrorModal({
@@ -989,6 +1011,36 @@ export default function Users(): JSX.Element {
               }
             }}
             error={errors.lastName}
+            required
+          />
+
+          <Input
+            label={t('users.birthday')}
+            type="date"
+            value={newUser.birthday ?? ''}
+            max={(() => {
+              const d = new Date();
+              d.setFullYear(d.getFullYear() - 18);
+              return d.toISOString().slice(0, 10);
+            })()}
+            onChange={(e) => {
+              const value = e.target.value;
+              setNewUser({ ...newUser, birthday: value });
+              if (value !== '') {
+                const maxDate = new Date();
+                maxDate.setFullYear(maxDate.getFullYear() - 18);
+                if (new Date(value) > maxDate) {
+                  const msg =
+                    t('users.validation_birthdayMinAge') ?? 'User must be at least 18 years old';
+                  setErrors({ ...errors, birthday: msg });
+                  return;
+                }
+              }
+              if (errors.birthday !== undefined && errors.birthday !== '') {
+                setErrors({ ...errors, birthday: '' });
+              }
+            }}
+            error={errors.birthday}
             required
           />
 
