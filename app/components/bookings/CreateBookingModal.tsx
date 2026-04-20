@@ -337,6 +337,7 @@ export function CreateBookingModal({
           success?: boolean;
           data?: {
             city?: { id?: string; countryId?: string; name_es?: string; name_en?: string };
+            country?: { countryId?: string };
             days?: Array<{
               day: number;
               activities: BookingTourActivity[];
@@ -350,9 +351,27 @@ export function CreateBookingModal({
 
         // ✅ Validate tour result
         if (tourResult.success === true && tourResult.data !== undefined) {
-          const countryCode = tourResult.data.city?.countryId ?? '';
+          const cityCountryId: string =
+            typeof tourResult.data.city?.countryId === 'string'
+              ? tourResult.data.city.countryId
+              : '';
+          const tourCountryId: string =
+            typeof tourResult.data.country?.countryId === 'string'
+              ? tourResult.data.country.countryId
+              : '';
+          const countryCode: string = cityCountryId !== '' ? cityCountryId : tourCountryId;
+
+          console.warn('📍 Tour Country Code:', {
+            countryCode,
+            cityCountryId,
+            tourCountryId,
+            hasCity: tourResult.data.city !== null && tourResult.data.city !== undefined,
+          });
+
           setTourCountryCode(countryCode);
-          setTourCityId(tourResult.data.city?.id ?? '');
+          setTourCityId(
+            typeof tourResult.data.city?.id === 'string' ? tourResult.data.city.id : ''
+          );
           setTourCityName(
             (language === 'en' ? tourResult.data.city?.name_en : tourResult.data.city?.name_es) ??
               ''
@@ -386,8 +405,43 @@ export function CreateBookingModal({
 
           if (currentHourRange !== null) {
             const startTime = currentHourRange.split(' - ')[0] ?? '';
-            const minDate = getMinimumBookingDate(startTime, countryCode);
+
+            // Use the ISO country code from the selected country in the admin header
+            // (e.g. "MX" → America/Mexico_City). This ensures the date comparison
+            // uses the tour's local timezone, not the browser's timezone (the admin
+            // could be connecting from a different country).
+            const isoCode = selectedCountry?.code ?? '';
+            const minDate = getMinimumBookingDate(startTime, isoCode);
+
+            console.warn('📅 Minimum Booking Date Calculation:', {
+              startTime,
+              isoCode,
+              minDate,
+              now: new Date().toISOString(),
+            });
+
             setMinBookingDate(minDate);
+
+            // Set startDate directly here — daysCount is in scope from hourRangeResult.data
+            // so we avoid stale closure issues with useEffect([minBookingDate])
+            const daysCount = hourRangeResult.data?.daysCount ?? 1;
+            setFormData((prev) => {
+              if (prev.startDate !== '' && prev.startDate >= minDate) return prev;
+              if (daysCount > 0) {
+                const parts = minDate.split('-').map(Number);
+                const y = parts[0] ?? 2000;
+                const m = parts[1] ?? 1;
+                const d = parts[2] ?? 1;
+                const end = new Date(y, m - 1, d + (daysCount - 1));
+                const endDate = [
+                  end.getFullYear(),
+                  String(end.getMonth() + 1).padStart(2, '0'),
+                  String(end.getDate()).padStart(2, '0'),
+                ].join('-');
+                return { ...prev, startDate: minDate, endDate };
+              }
+              return { ...prev, startDate: minDate };
+            });
           } else {
             setMinBookingDate('');
           }
@@ -418,13 +472,34 @@ export function CreateBookingModal({
       }
     };
     void fetchTourDetails();
-  }, [formData.tourId, token, language]);
+  }, [formData.tourId, token, language, selectedCountry?.code]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
     const { name, value, type } = e.target;
 
     // Clear API error on any form change
     if (apiError !== null) setApiError(null);
+
+    // ✅ Validate startDate against minimum booking date
+    if (name === 'startDate' && value !== '') {
+      // Check if selected date is before minimum allowed date
+      if (minBookingDate !== '' && value < minBookingDate) {
+        console.warn('❌ Selected date is before minimum booking date:', {
+          selectedDate: value,
+          minimumDate: minBookingDate,
+        });
+        setErrors((prev) => ({
+          ...prev,
+          startDate: `${t('bookings.startDate') ?? 'Start Date'}: ${language === 'en' ? 'Cannot book before ' : 'No se puede reservar antes de '}${minBookingDate}`,
+        }));
+        return; // Don't update the form
+      } else if (minBookingDate !== '' && value >= minBookingDate) {
+        console.warn('✅ Selected date is valid:', {
+          selectedDate: value,
+          minimumDate: minBookingDate,
+        });
+      }
+    }
 
     if (name === 'startDate' && tourDaysCount !== null && tourDaysCount > 0 && value !== '') {
       const parts = value.split('-').map(Number);

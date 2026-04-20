@@ -4,7 +4,7 @@
  */
 
 import type { JSX, ReactNode, CSSProperties } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from '@remix-run/react';
 import type { LoaderFunctionArgs } from '@remix-run/node';
 import { requireAuth } from '~/utilities/auth.loader';
@@ -271,7 +271,13 @@ export default function Dashboard(): JSX.Element {
     },
   };
 
+  // Prevent double-rendering in Strict Mode
+  const hasLoadedRef = useRef(false);
+
   useEffect(() => {
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
+
     const loadDashboardData = async (): Promise<void> => {
       try {
         dispatch(fetchStatsStart());
