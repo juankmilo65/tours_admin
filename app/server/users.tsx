@@ -47,6 +47,7 @@ export interface User {
   updatedAt: string;
   lastLoginAt?: string;
   ownerKycVerified?: boolean;
+  acceptedTerms?: boolean;
 }
 
 export interface CreateUserDto {
@@ -72,6 +73,7 @@ export interface UpdateUserDto {
   countryCode?: string;
   identificationTypeId?: string;
   identificationNumber?: string;
+  acceptedTerms?: boolean;
 }
 
 export interface UsersResponse {

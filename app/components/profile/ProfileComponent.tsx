@@ -4,7 +4,7 @@
  */
 
 import type { JSX } from 'react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 import { kycEn, kycEs } from '~/lib/i18n';
 import { useAppSelector, useAppDispatch } from '~/store/hooks';
@@ -17,6 +17,7 @@ import {
 import { selectKycStatus } from '~/store/slices/kycSlice';
 import { getUserKycStatusBusiness } from '~/server/businessLogic/kycBusinessLogic';
 import { KycSection } from './KycSection';
+import { ProfileInfoSection } from './ProfileInfoSection';
 
 export function ProfileComponent(): JSX.Element {
   const { language } = useTranslation();
@@ -27,6 +28,7 @@ export function ProfileComponent(): JSX.Element {
   const dispatch = useAppDispatch();
   const role = auth.user?.role;
   const kycT = language === 'en' ? kycEn : kycEs;
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Fetch KYC status on mount for owners
   useEffect(() => {
@@ -117,7 +119,13 @@ export function ProfileComponent(): JSX.Element {
         {kycT.kycDescription}
       </p>
 
-      <KycSection kycStatus={kycStatus} ownerKycStatus={ownerKycStatus} />
+      <KycSection
+        kycStatus={kycStatus}
+        ownerKycStatus={ownerKycStatus}
+        termsAccepted={termsAccepted}
+      />
+
+      <ProfileInfoSection language={language} onTermsChange={setTermsAccepted} />
     </div>
   );
 }

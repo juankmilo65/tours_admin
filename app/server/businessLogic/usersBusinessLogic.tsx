@@ -13,6 +13,7 @@ import {
   deleteUserAvatar,
   getUsersDropdown,
 } from '../users';
+import { acceptTermsMaster, getTermsMasterByType } from '../termsMaster';
 
 export type { User, CreateUserDto, UpdateUserDto, UsersResponse, GetUsersParams };
 
@@ -88,6 +89,44 @@ export const getUserByIdBusiness = async (
   } catch (error) {
     console.error('Error in getUserByIdBusiness:', error);
     return null;
+  }
+};
+
+/**
+ * Accept latest registration terms for authenticated user
+ */
+export const acceptLatestTermsBusiness = async (
+  token: string,
+  language = 'es'
+): Promise<{ success: boolean; message?: string }> => {
+  try {
+    if (token === '') {
+      return { success: false, message: 'Missing authentication token' };
+    }
+
+    const termsResult = await getTermsMasterByType('registration', '1.0', language);
+    const latestTerm =
+      termsResult.data?.find((item) => item.isLastVersion) ?? termsResult.data?.[0];
+
+    if (latestTerm === undefined) {
+      return { success: false, message: 'No terms found for registration type' };
+    }
+
+    const acceptResult = await acceptTermsMaster(latestTerm.id, token, language);
+    if (acceptResult.success !== true) {
+      return {
+        success: false,
+        message: acceptResult.message ?? 'Could not register terms acceptance',
+      };
+    }
+
+    return { success: true, message: acceptResult.message };
+  } catch (error) {
+    console.error('Error in acceptLatestTermsBusiness:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Could not register terms acceptance',
+    };
   }
 };
 

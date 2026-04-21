@@ -17,9 +17,14 @@ import type { KycStatus } from '~/types/kyc';
 interface KycSectionProps {
   kycStatus: KycStatus | null;
   ownerKycStatus: string | null;
+  termsAccepted: boolean;
 }
 
-export function KycSection({ kycStatus, ownerKycStatus }: KycSectionProps): JSX.Element {
+export function KycSection({
+  kycStatus,
+  ownerKycStatus,
+  termsAccepted,
+}: KycSectionProps): JSX.Element {
   const { language } = useTranslation();
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
@@ -506,26 +511,48 @@ export function KycSection({ kycStatus, ownerKycStatus }: KycSectionProps): JSX.
           <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
             {kycT.kycNotInitiated}
           </p>
-          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '16px' }}>
             {kycT.verificationOpensNewTab}
           </p>
+
           <button
             onClick={() => {
               setShowConfirmModal(true);
             }}
+            disabled={!termsAccepted}
             style={{
               padding: '8px 16px',
-              backgroundColor: 'var(--color-primary-500, #3b82f6)',
+              backgroundColor: termsAccepted
+                ? 'var(--color-primary-500, #3b82f6)'
+                : 'var(--color-neutral-300, #d1d5db)',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
-              cursor: 'pointer',
+              cursor: termsAccepted ? 'pointer' : 'not-allowed',
               fontSize: '14px',
+              transition: 'background-color 0.2s',
             }}
           >
             {kycT.startKyc}
           </button>
+
+          {!termsAccepted && (
+            <p
+              style={{
+                marginTop: '10px',
+                marginBottom: 0,
+                color: 'var(--color-error-600, #dc2626)',
+                fontSize: '12px',
+                fontWeight: 500,
+              }}
+            >
+              {language === 'en'
+                ? 'To enable verification you must read and accept the terms and conditions.'
+                : 'Para habilitar la verificación debes leer y aceptar los términos y condiciones.'}
+            </p>
+          )}
         </div>
+
         {showConfirmModal && (
           <KycConfirmModal
             kycT={kycT}
