@@ -19,6 +19,7 @@ import {
   selectLanguage,
   setLogoutModal,
 } from '~/store/slices/uiSlice';
+import { selectHeaderUser } from '~/store/slices/headerSlice';
 import type { Option } from '~/components/ui/Select';
 import Select from '~/components/ui/Select';
 import {
@@ -64,6 +65,8 @@ export function Header({
   const currentLanguage = useAppSelector(selectLanguage);
   const currentUser = useAppSelector(selectCurrentUser);
   const authToken = useAppSelector(selectAuthToken);
+  // Header display data — kept in sync by ProfileInfoSection independently of auth
+  const headerUser = useAppSelector(selectHeaderUser);
 
   // One-time profile refresh to load avatarUrl if missing
   const profileFetchedRef = useRef(false);
@@ -86,32 +89,38 @@ export function Header({
     void refreshUserProfile();
   }, [refreshUserProfile]);
 
-  // Get user initials for avatar
+  // Get user initials — prefer headerSlice (updated by profile page in real-time)
   const userInitials = useMemo(() => {
-    if (!currentUser) return '?';
-    const firstInitial = currentUser.firstName.charAt(0).toUpperCase();
-    const lastInitial = currentUser.lastName.charAt(0).toUpperCase();
-    return firstInitial + lastInitial;
-  }, [currentUser]);
+    const first =
+      headerUser.firstName !== '' ? headerUser.firstName : (currentUser?.firstName ?? '');
+    const last = headerUser.lastName !== '' ? headerUser.lastName : (currentUser?.lastName ?? '');
+    if (first === '' && last === '') return '?';
+    return (first.charAt(0) + last.charAt(0)).toUpperCase();
+  }, [headerUser, currentUser]);
 
-  // Get user display name and email (to avoid ESLint warnings about nullable strings)
+  // Get user display name and email
   const { userDisplayName, userEmail } = useMemo(() => {
-    if (!currentUser) {
+    const first =
+      headerUser.firstName !== '' ? headerUser.firstName : (currentUser?.firstName ?? '');
+    const last = headerUser.lastName !== '' ? headerUser.lastName : (currentUser?.lastName ?? '');
+    if (first === '' && last === '') {
       return {
         userDisplayName: t('header.guest'),
         userEmail: t('header.noEmail'),
       };
     }
 
-    const displayName = `${currentUser.firstName} ${currentUser.lastName}`;
+    const displayName = `${first} ${last}`;
     const email =
-      currentUser.email && currentUser.email !== '' ? currentUser.email : t('header.noEmail');
+      currentUser?.email !== undefined && currentUser.email !== ''
+        ? currentUser.email
+        : t('header.noEmail');
 
     return {
       userDisplayName: displayName,
       userEmail: email,
     };
-  }, [currentUser, t]);
+  }, [headerUser, currentUser, t]);
 
   // KYC notification check
   const ownerKycStatus = useAppSelector(selectOwnerKycStatus);
@@ -897,11 +906,20 @@ export function Header({
                   {userEmail}
                 </p>
               </div>
-              {currentUser?.avatarUrl !== undefined &&
-              currentUser?.avatarUrl !== null &&
-              currentUser.avatarUrl !== '' ? (
+              {/* Resolve avatar: headerSlice wins once synced (profile page visit), then authSlice fallback */}
+              {(() => {
+                const resolvedAvatar =
+                  headerUser.avatarUrl !== undefined
+                    ? headerUser.avatarUrl
+                    : (currentUser?.avatarUrl ?? null);
+                return resolvedAvatar !== null && resolvedAvatar !== '';
+              })() ? (
                 <img
-                  src={currentUser.avatarUrl}
+                  src={
+                    (headerUser.avatarUrl !== undefined
+                      ? headerUser.avatarUrl
+                      : currentUser?.avatarUrl) as string
+                  }
                   alt={userDisplayName}
                   style={{
                     width: '40px',

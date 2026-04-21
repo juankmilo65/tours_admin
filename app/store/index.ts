@@ -28,13 +28,14 @@ import paymentsReducer from '~/store/slices/paymentsSlice';
 import kycReducer from '~/store/slices/kycSlice';
 import cancellationPoliciesReducer from '~/store/slices/cancellationPoliciesSlice';
 import stripePaymentsReducer from '~/store/slices/stripePaymentsSlice';
+import headerReducer from '~/store/slices/headerSlice';
 
 // Redux Persist configuration
 const persistConfig = {
   key: 'root',
   version: 1,
   storage,
-  whitelist: ['country', 'auth', 'cache'], // Persist countries, auth and dropdown cache
+  whitelist: ['country', 'auth', 'cache', 'header'], // Persist countries, auth, dropdown cache and header display data
 };
 
 const rootReducer = combineReducers({
@@ -51,6 +52,7 @@ const rootReducer = combineReducers({
   kyc: kycReducer,
   cancellationPolicies: cancellationPoliciesReducer,
   stripePayments: stripePaymentsReducer,
+  header: headerReducer,
   /* offers: offersReducer, */
 });
 

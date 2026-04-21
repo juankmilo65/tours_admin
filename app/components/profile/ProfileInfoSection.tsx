@@ -7,7 +7,9 @@
 import type { JSX, ChangeEvent, FormEvent, CSSProperties } from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppSelector } from '~/store/hooks';
+import { useAppDispatch } from '~/store/hooks';
 import { selectAuth, selectAuthToken } from '~/store/slices/authSlice';
+import { setHeaderUser, setHeaderAvatar } from '~/store/slices/headerSlice';
 import {
   getUserByIdBusiness,
   updateUserBusiness,
@@ -75,6 +77,7 @@ export function ProfileInfoSection({
 }: ProfileInfoSectionProps): JSX.Element {
   const auth = useAppSelector(selectAuth);
   const token = useAppSelector(selectAuthToken);
+  const dispatch = useAppDispatch();
   const userId = auth.user?.id ?? '';
 
   const [profile, setProfile] = useState<User | null>(null);
@@ -119,10 +122,18 @@ export function ProfileInfoSection({
       const accepted = result.acceptedTerms === true;
       setTermsAccepted(accepted);
       onTermsChange(accepted);
+      // Sync header display data in real-time
+      dispatch(
+        setHeaderUser({
+          firstName: result.firstName,
+          lastName: result.lastName,
+          avatarUrl: result.avatarUrl ?? null,
+        })
+      );
     }
     setIsLoading(false);
     return result;
-  }, [userId, token, language, onTermsChange]);
+  }, [userId, token, language, onTermsChange, dispatch]);
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
@@ -180,6 +191,7 @@ export function ProfileInfoSection({
     if (result.success && result.data !== undefined) {
       const avatarUrl = result.data.avatarUrl;
       setProfile((prev) => (prev !== null ? { ...prev, avatarUrl } : prev));
+      dispatch(setHeaderAvatar(avatarUrl ?? null));
     } else {
       setAvatarError(result.message ?? t('Error uploading photo', 'Error al subir la foto'));
     }
@@ -197,6 +209,7 @@ export function ProfileInfoSection({
 
     if (result.success) {
       setProfile((prev) => (prev !== null ? { ...prev, avatarUrl: null } : prev));
+      dispatch(setHeaderAvatar(null));
     } else {
       setAvatarError(result.message ?? t('Error removing photo', 'Error al eliminar la foto'));
     }
@@ -204,12 +217,39 @@ export function ProfileInfoSection({
 
   // ── Form handlers ───────────────────────────────────────────────────────────
 
+  const toDateInputValue = (value: string | undefined): string => {
+    if (value === undefined || value === '') return '';
+
+    // HTML date inputs only accept YYYY-MM-DD.
+    const isoLike = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoLike !== null) {
+      return isoLike[1] ?? '';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString().slice(0, 10);
+  };
+
+  const getAdultMaxDate = (): string => {
+    const today = new Date();
+    const adultDate = new Date(today);
+    adultDate.setFullYear(today.getFullYear() - 18);
+
+    const year = adultDate.getFullYear();
+    const month = String(adultDate.getMonth() + 1).padStart(2, '0');
+    const day = String(adultDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const adultMaxDate = getAdultMaxDate();
+
   const profileToForm = (user: User): EditForm => ({
     firstName: user.firstName,
     lastName: user.lastName,
     email: user.email,
     phoneNumber: user.phoneNumber ?? '',
-    birthday: user.birthday ?? '',
+    birthday: toDateInputValue(user.birthday),
     countryCode: user.nationality?.code ?? '',
     identificationTypeId: user.identificationType?.id ?? '',
     identificationNumber: user.identificationNumber ?? '',
@@ -230,12 +270,10 @@ export function ProfileInfoSection({
     );
   };
 
-  const handleEdit = async (): Promise<void> => {
-    const refreshedProfile = await fetchProfile();
-    const snapshot = refreshedProfile ?? profile;
-    if (snapshot !== null) {
-      setOriginalProfile(snapshot);
-      setForm(profileToForm(snapshot));
+  const handleEdit = (): void => {
+    if (profile !== null) {
+      setOriginalProfile(profile);
+      setForm(profileToForm(profile));
     }
     setSaveError(null);
     setSaveSuccess(false);
@@ -288,6 +326,14 @@ export function ProfileInfoSection({
       const accepted = result.data.acceptedTerms === true;
       setTermsAccepted(accepted);
       onTermsChange(accepted);
+      // Sync header with new name (avatar is unchanged on profile save)
+      dispatch(
+        setHeaderUser({
+          firstName: result.data.firstName,
+          lastName: result.data.lastName,
+          avatarUrl: result.data.avatarUrl ?? null,
+        })
+      );
       setSaveSuccess(true);
       setIsEditing(false);
     } else {
@@ -322,10 +368,17 @@ export function ProfileInfoSection({
   // ── Display helpers ─────────────────────────────────────────────────────────
 
   const getLocalityName = (user: User): string => {
-    if (user.nationality === undefined) return '—';
+    const code = user.nationality?.code;
+    if (code === undefined || code === '') return '—';
+    // Prefer the already-loaded countries list (same source as the edit dropdown)
+    const country = countries.find((c) => c.code === code);
+    if (country !== undefined) {
+      return language === 'en' ? (country.name_en ?? '—') : (country.name_es ?? '—');
+    }
+    // Fallback: use raw fields from the profile object
     return language === 'en'
-      ? (user.nationality.nationality_en ?? '')
-      : (user.nationality.nationality_es ?? '');
+      ? (user.nationality?.nationality_en ?? '—')
+      : (user.nationality?.nationality_es ?? '—');
   };
 
   const getIdTypeName = (user: User): string => {
@@ -757,6 +810,7 @@ export function ProfileInfoSection({
                 type="date"
                 name="birthday"
                 value={form.birthday}
+                max={adultMaxDate}
                 onChange={handleChange}
               />
             </div>
@@ -840,28 +894,24 @@ export function ProfileInfoSection({
             </div>
           )}
 
-          {originalProfile !== null && hasChanges(form, originalProfile) && (
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="button" style={cancelBtnStyle} onClick={handleCancel}>
-                {t('Cancel', 'Cancelar')}
-              </button>
-              <button
-                type="submit"
-                style={{ ...primaryBtnStyle, opacity: isSaving ? 0.7 : 1 }}
-                disabled={isSaving}
-              >
-                {isSaving ? t('Saving...', 'Guardando...') : t('Save Changes', 'Guardar cambios')}
-              </button>
-            </div>
-          )}
-
-          {(originalProfile === null || !hasChanges(form, originalProfile)) && (
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="button" style={cancelBtnStyle} onClick={handleCancel}>
-                {t('Cancel', 'Cancelar')}
-              </button>
-            </div>
-          )}
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="button" style={cancelBtnStyle} onClick={handleCancel}>
+              {t('Cancel', 'Cancelar')}
+            </button>
+            <button
+              type="submit"
+              style={{
+                ...primaryBtnStyle,
+                opacity:
+                  isSaving || originalProfile === null || !hasChanges(form, originalProfile)
+                    ? 0.7
+                    : 1,
+              }}
+              disabled={isSaving || originalProfile === null || !hasChanges(form, originalProfile)}
+            >
+              {isSaving ? t('Saving...', 'Guardando...') : t('Save Changes', 'Guardar cambios')}
+            </button>
+          </div>
         </form>
       </div>
     );
@@ -883,7 +933,7 @@ export function ProfileInfoSection({
           onClick={
             termsAccepted
               ? () => {
-                  void handleEdit();
+                  handleEdit();
                 }
               : undefined
           }
