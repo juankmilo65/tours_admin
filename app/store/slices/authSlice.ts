@@ -80,6 +80,7 @@ const authSlice = createSlice({
       state.isLoading = false;
       state.error = null;
       state.requiresOtp = true;
+      state.ownerKycStatus = null;
 
       // DON'T persist to localStorage yet
     },
@@ -107,6 +108,7 @@ const authSlice = createSlice({
       state.otpSent = false;
       state.pendingEmail = null;
       state.error = null;
+      state.ownerKycStatus = null;
 
       // Clear localStorage
       if (typeof window !== 'undefined') {
