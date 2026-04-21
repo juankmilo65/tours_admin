@@ -3,6 +3,7 @@
  */
 
 import type { Translation } from './types';
+import { profileEn } from './profile/en';
 
 export const en: Translation = {
   common: {
@@ -233,6 +234,7 @@ export const en: Translation = {
     linkExpiresSoon: 'This link will expire soon',
     linkExpiredAt: 'Link expired at',
   },
+  profile: profileEn,
   dashboard: {
     title: 'Dashboard',
     welcome: 'Welcome back',

@@ -5,10 +5,13 @@
  */
 
 import type { JSX, ChangeEvent, FormEvent, CSSProperties } from 'react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import type { Language } from '~/lib/i18n';
 import { useAppSelector } from '~/store/hooks';
 import { useAppDispatch } from '~/store/hooks';
 import { selectAuth, selectAuthToken } from '~/store/slices/authSlice';
+import { selectSelectedCountry } from '~/store/slices/countriesSlice';
+import { selectLanguage } from '~/store/slices/uiSlice';
 import { setHeaderUser, setHeaderAvatar } from '~/store/slices/headerSlice';
 import {
   getUserByIdBusiness,
@@ -19,8 +22,12 @@ import {
 } from '~/server/businessLogic/usersBusinessLogic';
 import type { User, UpdateUserDto } from '~/server/businessLogic/usersBusinessLogic';
 import { useDropdownCache } from '~/hooks/useDropdownCache';
+import { t as translate } from '~/lib/i18n';
 import type { CountryDropdown } from '~/types/country';
 import type { IdentificationTypeDropdown } from '~/types/identificationType';
+import { formatPhoneForCountry, getPhonePlaceholderForCountry } from '~/utilities/phoneFormatting';
+import type { ProfileFieldErrors } from '../../utilities/profileValidation';
+import { validateProfileForm } from '../../utilities/profileValidation';
 import { TermsModal } from './TermsModal';
 
 interface ViteImportMetaEnv {
@@ -77,6 +84,9 @@ export function ProfileInfoSection({
 }: ProfileInfoSectionProps): JSX.Element {
   const auth = useAppSelector(selectAuth);
   const token = useAppSelector(selectAuthToken);
+  const uiLanguage = useAppSelector(selectLanguage) as Language;
+  const currentLanguage = uiLanguage ?? (language as Language);
+  const selectedHeaderCountry = useAppSelector(selectSelectedCountry);
   const dispatch = useAppDispatch();
   const userId = auth.user?.id ?? '';
 
@@ -88,6 +98,7 @@ export function ProfileInfoSection({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [formErrors, setFormErrors] = useState<ProfileFieldErrors>({});
   const [form, setForm] = useState<EditForm>(EMPTY_FORM);
 
   const [countries, setCountries] = useState<CountryDropdown[]>([]);
@@ -108,7 +119,10 @@ export function ProfileInfoSection({
 
   const { loadNationalities, loadIdentificationTypes } = useDropdownCache();
 
-  const t = useCallback((en: string, es: string) => (language === 'en' ? en : es), [language]);
+  const t = useCallback(
+    (en: string, es: string) => (currentLanguage === 'en' ? en : es),
+    [currentLanguage]
+  );
 
   // ── Fetch profile ───────────────────────────────────────────────────────────
 
@@ -116,7 +130,7 @@ export function ProfileInfoSection({
     if (userId === '' || token === null) return null;
 
     setIsLoading(true);
-    const result = await getUserByIdBusiness(userId, token, language);
+    const result = await getUserByIdBusiness(userId, token, currentLanguage);
     setProfile(result);
     if (result !== null) {
       const accepted = result.acceptedTerms === true;
@@ -133,7 +147,7 @@ export function ProfileInfoSection({
     }
     setIsLoading(false);
     return result;
-  }, [userId, token, language, onTermsChange, dispatch]);
+  }, [userId, token, currentLanguage, onTermsChange, dispatch]);
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
@@ -149,10 +163,10 @@ export function ProfileInfoSection({
 
   useEffect(() => {
     void (async () => {
-      const result = await loadNationalities(language);
+      const result = await loadNationalities(currentLanguage);
       setCountries(result);
     })();
-  }, [language, loadNationalities]);
+  }, [currentLanguage, loadNationalities]);
 
   // ── Load id types when country changes in edit mode ─────────────────────────
 
@@ -163,10 +177,10 @@ export function ProfileInfoSection({
       return;
     }
     void (async () => {
-      const result = await loadIdentificationTypes(form.countryCode, language);
+      const result = await loadIdentificationTypes(form.countryCode, currentLanguage);
       setIdTypes(result);
     })();
-  }, [form.countryCode, isEditing, language, loadIdentificationTypes]);
+  }, [form.countryCode, isEditing, currentLanguage, loadIdentificationTypes]);
 
   // ── Avatar handlers ─────────────────────────────────────────────────────────
 
@@ -184,7 +198,7 @@ export function ProfileInfoSection({
     setAvatarError(null);
     setIsUploadingAvatar(true);
 
-    const result = await uploadUserAvatarBusiness(userId, file, token, language);
+    const result = await uploadUserAvatarBusiness(userId, file, token, currentLanguage);
 
     setIsUploadingAvatar(false);
 
@@ -203,7 +217,7 @@ export function ProfileInfoSection({
     setAvatarError(null);
     setIsDeletingAvatar(true);
 
-    const result = await deleteUserAvatarBusiness(userId, token, language);
+    const result = await deleteUserAvatarBusiness(userId, token, currentLanguage);
 
     setIsDeletingAvatar(false);
 
@@ -243,12 +257,22 @@ export function ProfileInfoSection({
   };
 
   const adultMaxDate = getAdultMaxDate();
+  const phonePlaceholder = getPhonePlaceholderForCountry(selectedHeaderCountry?.code);
+  const translatedFormErrors = useMemo<ProfileFieldErrors>(() => {
+    if (Object.keys(formErrors).length === 0) return formErrors;
+    return validateProfileForm(form, currentLanguage, countries, selectedHeaderCountry).errors;
+  }, [formErrors, form, currentLanguage, countries, selectedHeaderCountry]);
+
+  const resolvedSaveError =
+    Object.keys(formErrors).length > 0
+      ? translate('profile.validation.correctHighlightedFields', currentLanguage)
+      : saveError;
 
   const profileToForm = (user: User): EditForm => ({
     firstName: user.firstName,
     lastName: user.lastName,
     email: user.email,
-    phoneNumber: user.phoneNumber ?? '',
+    phoneNumber: formatPhoneForCountry(user.phoneNumber ?? '', selectedHeaderCountry?.code),
     birthday: toDateInputValue(user.birthday),
     countryCode: user.nationality?.code ?? '',
     identificationTypeId: user.identificationType?.id ?? '',
@@ -277,6 +301,7 @@ export function ProfileInfoSection({
     }
     setSaveError(null);
     setSaveSuccess(false);
+    setFormErrors({});
     setIsEditing(true);
   };
 
@@ -285,12 +310,21 @@ export function ProfileInfoSection({
     setOriginalProfile(null);
     setSaveError(null);
     setSaveSuccess(false);
+    setFormErrors({});
   };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
     const { name, value } = e.target;
+    setFormErrors((prev: ProfileFieldErrors) => {
+      if (prev[name as keyof EditForm] === undefined) return prev;
+      const next = { ...prev };
+      delete next[name as keyof EditForm];
+      return next;
+    });
     setForm((prev) => {
-      const next = { ...prev, [name]: value };
+      const nextValue =
+        name === 'phoneNumber' ? formatPhoneForCountry(value, selectedHeaderCountry?.code) : value;
+      const next = { ...prev, [name]: nextValue };
       if (name === 'countryCode') next.identificationTypeId = '';
       return next;
     });
@@ -299,7 +333,15 @@ export function ProfileInfoSection({
   const handleSave = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
     if (userId === '' || token === null) return;
+    const validation = validateProfileForm(form, currentLanguage, countries, selectedHeaderCountry);
+    if (!validation.isValid) {
+      setFormErrors(validation.errors);
+      setSaveError(translate('profile.validation.correctHighlightedFields', currentLanguage));
+      setSaveSuccess(false);
+      return;
+    }
 
+    setFormErrors({});
     setSaveError(null);
     setSaveSuccess(false);
     setIsSaving(true);
@@ -317,7 +359,7 @@ export function ProfileInfoSection({
         form.identificationNumber !== '' ? form.identificationNumber : undefined,
     };
 
-    const result = await updateUserBusiness(userId, payload, token, language);
+    const result = await updateUserBusiness(userId, payload, token, currentLanguage);
     setIsSaving(false);
 
     if (result.success && result.data !== undefined) {
@@ -337,7 +379,7 @@ export function ProfileInfoSection({
       setSaveSuccess(true);
       setIsEditing(false);
     } else {
-      setSaveError(result.message ?? t('Error saving changes', 'Error al guardar los cambios'));
+      setSaveError(result.message ?? translate('profile.validation.saveError', currentLanguage));
     }
   };
 
@@ -347,7 +389,7 @@ export function ProfileInfoSection({
     setTermsModalError(null);
     setIsAcceptingTerms(true);
 
-    const result = await acceptLatestTermsBusiness(token, language);
+    const result = await acceptLatestTermsBusiness(token, currentLanguage);
     setIsAcceptingTerms(false);
 
     if (result.success) {
@@ -373,17 +415,17 @@ export function ProfileInfoSection({
     // Prefer the already-loaded countries list (same source as the edit dropdown)
     const country = countries.find((c) => c.code === code);
     if (country !== undefined) {
-      return language === 'en' ? (country.name_en ?? '—') : (country.name_es ?? '—');
+      return currentLanguage === 'en' ? (country.name_en ?? '—') : (country.name_es ?? '—');
     }
     // Fallback: use raw fields from the profile object
-    return language === 'en'
+    return currentLanguage === 'en'
       ? (user.nationality?.nationality_en ?? '—')
       : (user.nationality?.nationality_es ?? '—');
   };
 
   const getIdTypeName = (user: User): string => {
     if (user.identificationType === undefined) return '—';
-    return language === 'en'
+    return currentLanguage === 'en'
       ? (user.identificationType.name_en ?? user.identificationType.code)
       : (user.identificationType.name_es ?? user.identificationType.code);
   };
@@ -392,7 +434,7 @@ export function ProfileInfoSection({
     if (dateStr === undefined || dateStr === '') return '—';
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString(language === 'en' ? 'en-US' : 'es-CO', {
+    return d.toLocaleDateString(currentLanguage === 'en' ? 'en-US' : 'es-CO', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -487,6 +529,12 @@ export function ProfileInfoSection({
   const dividerStyle: CSSProperties = {
     borderTop: '1px solid var(--color-neutral-100, #f3f4f6)',
     margin: '20px 0',
+  };
+
+  const fieldErrorStyle: CSSProperties = {
+    color: 'var(--color-error-600, #dc2626)',
+    fontSize: '12px',
+    lineHeight: 1.35,
   };
 
   // ── Loading / error states ──────────────────────────────────────────────────
@@ -743,14 +791,22 @@ export function ProfileInfoSection({
               </label>
               <input
                 id="pi-firstName"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  border:
+                    translatedFormErrors.firstName !== undefined
+                      ? '1px solid var(--color-error-500, #ef4444)'
+                      : inputStyle.border,
+                }}
                 type="text"
                 name="firstName"
                 value={form.firstName}
                 onChange={handleChange}
-                required
                 autoComplete="given-name"
               />
+              {translatedFormErrors.firstName !== undefined && (
+                <span style={fieldErrorStyle}>* {translatedFormErrors.firstName}</span>
+              )}
             </div>
 
             <div style={fieldGroupStyle}>
@@ -759,14 +815,22 @@ export function ProfileInfoSection({
               </label>
               <input
                 id="pi-lastName"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  border:
+                    translatedFormErrors.lastName !== undefined
+                      ? '1px solid var(--color-error-500, #ef4444)'
+                      : inputStyle.border,
+                }}
                 type="text"
                 name="lastName"
                 value={form.lastName}
                 onChange={handleChange}
-                required
                 autoComplete="family-name"
               />
+              {translatedFormErrors.lastName !== undefined && (
+                <span style={fieldErrorStyle}>* {translatedFormErrors.lastName}</span>
+              )}
             </div>
 
             <div style={fieldGroupStyle}>
@@ -775,14 +839,22 @@ export function ProfileInfoSection({
               </label>
               <input
                 id="pi-email"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  border:
+                    translatedFormErrors.email !== undefined
+                      ? '1px solid var(--color-error-500, #ef4444)'
+                      : inputStyle.border,
+                }}
                 type="email"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                required
                 autoComplete="email"
               />
+              {translatedFormErrors.email !== undefined && (
+                <span style={fieldErrorStyle}>* {translatedFormErrors.email}</span>
+              )}
             </div>
 
             <div style={fieldGroupStyle}>
@@ -791,13 +863,23 @@ export function ProfileInfoSection({
               </label>
               <input
                 id="pi-phone"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  border:
+                    translatedFormErrors.phoneNumber !== undefined
+                      ? '1px solid var(--color-error-500, #ef4444)'
+                      : inputStyle.border,
+                }}
                 type="tel"
                 name="phoneNumber"
                 value={form.phoneNumber}
+                placeholder={phonePlaceholder}
                 onChange={handleChange}
                 autoComplete="tel"
               />
+              {translatedFormErrors.phoneNumber !== undefined && (
+                <span style={fieldErrorStyle}>* {translatedFormErrors.phoneNumber}</span>
+              )}
             </div>
 
             <div style={fieldGroupStyle}>
@@ -806,13 +888,22 @@ export function ProfileInfoSection({
               </label>
               <input
                 id="pi-birthday"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  border:
+                    translatedFormErrors.birthday !== undefined
+                      ? '1px solid var(--color-error-500, #ef4444)'
+                      : inputStyle.border,
+                }}
                 type="date"
                 name="birthday"
                 value={form.birthday}
                 max={adultMaxDate}
                 onChange={handleChange}
               />
+              {translatedFormErrors.birthday !== undefined && (
+                <span style={fieldErrorStyle}>* {translatedFormErrors.birthday}</span>
+              )}
             </div>
 
             <div style={fieldGroupStyle}>
@@ -821,7 +912,13 @@ export function ProfileInfoSection({
               </label>
               <select
                 id="pi-country"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  border:
+                    translatedFormErrors.countryCode !== undefined
+                      ? '1px solid var(--color-error-500, #ef4444)'
+                      : inputStyle.border,
+                }}
                 name="countryCode"
                 value={form.countryCode}
                 onChange={handleChange}
@@ -829,10 +926,13 @@ export function ProfileInfoSection({
                 <option value="">{t('Select...', 'Seleccionar...')}</option>
                 {countries.map((c) => (
                   <option key={c.code} value={c.code}>
-                    {language === 'en' ? c.name_en : c.name_es}
+                    {currentLanguage === 'en' ? c.name_en : c.name_es}
                   </option>
                 ))}
               </select>
+              {translatedFormErrors.countryCode !== undefined && (
+                <span style={fieldErrorStyle}>* {translatedFormErrors.countryCode}</span>
+              )}
             </div>
 
             <div style={fieldGroupStyle}>
@@ -854,10 +954,13 @@ export function ProfileInfoSection({
                 </option>
                 {idTypes.map((idType) => (
                   <option key={idType.id} value={idType.id}>
-                    {language === 'en' ? idType.name_en : idType.name_es}
+                    {currentLanguage === 'en' ? idType.name_en : idType.name_es}
                   </option>
                 ))}
               </select>
+              {translatedFormErrors.identificationTypeId !== undefined && (
+                <span style={fieldErrorStyle}>* {translatedFormErrors.identificationTypeId}</span>
+              )}
             </div>
 
             <div style={fieldGroupStyle}>
@@ -866,19 +969,28 @@ export function ProfileInfoSection({
               </label>
               <input
                 id="pi-idNumber"
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  border:
+                    translatedFormErrors.identificationNumber !== undefined
+                      ? '1px solid var(--color-error-500, #ef4444)'
+                      : inputStyle.border,
+                }}
                 type="text"
                 name="identificationNumber"
                 value={form.identificationNumber}
                 onChange={handleChange}
                 autoComplete="off"
               />
+              {translatedFormErrors.identificationNumber !== undefined && (
+                <span style={fieldErrorStyle}>* {translatedFormErrors.identificationNumber}</span>
+              )}
             </div>
           </div>
 
           <div style={dividerStyle} />
 
-          {saveError !== null && (
+          {resolvedSaveError !== null && (
             <div
               style={{
                 marginTop: '16px',
@@ -890,7 +1002,7 @@ export function ProfileInfoSection({
                 fontSize: '13px',
               }}
             >
-              {saveError}
+              {resolvedSaveError}
             </div>
           )}
 
@@ -1055,7 +1167,7 @@ export function ProfileInfoSection({
 
       {showTermsModal && (
         <TermsModal
-          language={language}
+          language={currentLanguage}
           onAccept={() => {
             void handleAcceptTermsFromModal();
           }}

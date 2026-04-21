@@ -20,6 +20,8 @@ export { kycEn } from './kyc/en';
 export { kycEs } from './kyc/es';
 export { errorsEn } from './errors/en';
 export { errorsEs } from './errors/es';
+export { profileEn } from './profile/en';
+export { profileEs } from './profile/es';
 
 // Utils
 export {

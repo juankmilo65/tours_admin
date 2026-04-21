@@ -3,6 +3,7 @@
  */
 
 import type { Translation } from './types';
+import { profileEs } from './profile/es';
 
 export const es: Translation = {
   common: {
@@ -237,6 +238,7 @@ export const es: Translation = {
     linkExpiresSoon: 'Este enlace expirará pronto',
     linkExpiredAt: 'El enlace expiró en',
   },
+  profile: profileEs,
   dashboard: {
     title: 'Panel de Control',
     welcome: 'Bienvenido de nuevo',

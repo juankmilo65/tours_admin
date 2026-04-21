@@ -21,6 +21,7 @@ export type TranslationKey =
   | 'sidebar'
   | 'header'
   | 'auth'
+  | 'profile'
   | 'dashboard'
   | 'tours'
   | 'cities'
