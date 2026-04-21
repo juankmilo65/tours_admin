@@ -309,9 +309,25 @@ export const uploadUserAvatar = async (
       headers: {
         Authorization: token !== undefined && token !== '' ? `Bearer ${token}` : '',
         'Content-Type': 'multipart/form-data',
-        'X-Language': language,
+        'x-language': language,
       },
     });
+
+    // Normalise the server response: avatarUrl can appear at the top level
+    // or nested inside a `data` key depending on the API version.
+    const body = response.data as Record<string, unknown>;
+    const nestedUrl =
+      body['data'] !== undefined &&
+      typeof (body['data'] as Record<string, unknown>)['avatarUrl'] === 'string'
+        ? (body['data'] as Record<string, unknown>)['avatarUrl']
+        : undefined;
+    const topLevelUrl = typeof body['avatarUrl'] === 'string' ? body['avatarUrl'] : undefined;
+    const avatarUrl = (nestedUrl ?? topLevelUrl) as string | undefined;
+
+    if (avatarUrl !== undefined) {
+      return { success: true, data: { avatarUrl } };
+    }
+
     return response.data;
   } catch (error) {
     // Return error object consistent with other services
@@ -337,8 +353,8 @@ export const deleteUserAvatar = async (
   try {
     const response = await axios.delete(`${BASE_URL}/api/users/${userId}/avatar`, {
       headers: {
-        Authorization: token !== undefined && token !== '' ? token : '',
-        'X-Language': language,
+        Authorization: token !== undefined && token !== '' ? `Bearer ${token}` : '',
+        'x-language': language,
       },
     });
     return response.data;
