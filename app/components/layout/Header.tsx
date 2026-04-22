@@ -17,6 +17,7 @@ import {
   setGlobalLoading,
   setLanguage,
   selectLanguage,
+  selectNotificationCount,
   setLogoutModal,
 } from '~/store/slices/uiSlice';
 import { selectHeaderUser } from '~/store/slices/headerSlice';
@@ -63,6 +64,7 @@ export function Header({
   // Redux state
   const dispatch = useAppDispatch();
   const currentLanguage = useAppSelector(selectLanguage);
+  const sliceNotificationCount = useAppSelector(selectNotificationCount);
   const currentUser = useAppSelector(selectCurrentUser);
   const authToken = useAppSelector(selectAuthToken);
   // Header display data — kept in sync by ProfileInfoSection independently of auth
@@ -148,7 +150,11 @@ export function Header({
       isKycTerminal ||
       isKycInfoOnly ||
       isKycActionable);
-  const notificationCount = hasKycNotification ? 1 : 0;
+
+  // Keep completed KYC in the dropdown list, but do not count it in the badge.
+  const shouldCountKycNotification = hasKycNotification && !isKycCompleted;
+  const kycBadgeCount = shouldCountKycNotification ? 1 : 0;
+  const notificationCount = sliceNotificationCount + kycBadgeCount;
 
   // KYC notification color scheme based on status
   const kycColor = isKycCompleted

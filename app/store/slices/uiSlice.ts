@@ -25,6 +25,8 @@ export interface Modal {
 interface UIState {
   sidebarCollapsed: boolean;
   notifications: Notification[];
+  // Future-ready counter for realtime notifications
+  notificationCount: number;
   modals: Modal[];
   isLoading: boolean;
   // Global transversal state
@@ -39,6 +41,7 @@ interface UIState {
 const initialState: UIState = {
   sidebarCollapsed: false,
   notifications: [],
+  notificationCount: 0,
   modals: [],
   isLoading: false,
   // Global transversal state
@@ -62,6 +65,9 @@ const uiSlice = createSlice({
     },
     addNotification: (state, action: PayloadAction<Notification>) => {
       state.notifications.push(action.payload);
+    },
+    setNotificationCount: (state, action: PayloadAction<number>) => {
+      state.notificationCount = Math.max(0, action.payload);
     },
     removeNotification: (state, action: PayloadAction<string>) => {
       state.notifications = state.notifications.filter((n) => n.id !== action.payload);
@@ -105,6 +111,7 @@ export const {
   toggleSidebar,
   setSidebarCollapsed,
   addNotification,
+  setNotificationCount,
   removeNotification,
   clearNotifications,
   openModal,
@@ -128,5 +135,7 @@ export const selectLanguage = (state: RootState): string => state.ui.language;
 export const selectCurrency = (state: RootState): string => state.ui.currency;
 export const selectSidebarCollapsed = (state: RootState): boolean => state.ui.sidebarCollapsed;
 export const selectModals = (state: RootState): Modal[] => state.ui.modals;
+export const selectNotificationCount = (state: RootState): number => state.ui.notificationCount;
+export const selectNotifications = (state: RootState): Notification[] => state.ui.notifications;
 
 export default uiSlice.reducer;

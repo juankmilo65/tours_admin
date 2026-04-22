@@ -33,6 +33,8 @@ import { useAppDispatch } from '~/store/hooks';
 import { fetchCitiesSuccess } from './store/slices/citiesSlice';
 import { fetchCountriesSuccess, setSelectedCountryByCode } from './store/slices/countriesSlice';
 import { setAuthenticatedFromServer } from './store/slices/authSlice';
+import { setNotificationCount } from './store/slices/uiSlice';
+import { notificationsRealtimeService } from './services/notificationsRealtime.service';
 
 // Context for sharing cities and countries globally
 export const CitiesContext = createContext<{
@@ -496,6 +498,8 @@ export default function App(): React.JSX.Element {
   const countries = useMemo(() => dataOrLoader?.countries ?? [], [dataOrLoader]);
   const selectedCountryCode = dataOrLoader?.selectedCountryCode ?? '';
   const isAuthenticated = dataOrLoader?.isAuthenticated ?? false;
+  const authToken = dataOrLoader?.authToken ?? null;
+  const dispatch = useAppDispatch();
 
   // Check if we're on client
   useEffect(() => {
@@ -517,6 +521,26 @@ export default function App(): React.JSX.Element {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Realtime notifications bootstrap (ready for WebSocket/SSE transport injection)
+  useEffect(() => {
+    if (!isClient) return;
+
+    if (!isAuthenticated || authToken === null || authToken.trim() === '') {
+      notificationsRealtimeService.stop();
+      dispatch(setNotificationCount(0));
+      return;
+    }
+
+    notificationsRealtimeService.start({
+      token: authToken,
+      dispatch,
+    });
+
+    return () => {
+      notificationsRealtimeService.stop();
+    };
+  }, [isClient, isAuthenticated, authToken, dispatch]);
 
   // Toggle sidebar (mobile)
   function toggleSidebar() {
