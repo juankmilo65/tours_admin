@@ -32,7 +32,10 @@ export interface Booking {
   bookingDate?: string; // UTC
   numberOfPeople: number;
   totalPrice: number | string;
-  minimumPayment?: number;
+  minimumPayment?: number | string;
+  remainingAfterDeposit?: number | string;
+  paidAmountTotal?: number | string;
+  remainingAmountTotal?: number | string;
   currency: string;
   totalPriceConverted?: number;
   convertedCurrency?: string;
@@ -67,7 +70,7 @@ export interface Booking {
   payments?: Payment[];
   clients?: BookingClient[];
   // Split payment fields
-  depositAmount?: number;
+  depositAmount?: number | string;
   depositPaid?: boolean;
   depositPaidAt?: string;
   finalPaymentAmount?: number;
@@ -229,19 +232,46 @@ export interface BookingStatsResponse {
   error?: string;
 }
 
-export interface CreateBookingDto {
+export interface CreateBookingItemDto {
   tourId: string;
-  offerId?: string | null;
-  startDate: string;
-  endDate: string;
-  clients: Client[];
-  specialRequests?: string | null;
-  totalPrice?: number | null;
-  minimumPayment?: number | null;
-  // 🆕 Nuevos campos agregados
-  source?: string; // e.g., 'admin', 'web', 'mobile'
-  countryCode?: string; // e.g., 'MX', 'US', 'CO'
-  paymentMethods?: string[]; // e.g., ['card', 'oxxo', 'paypal']
+  startAt: string; // UTC ISO 8601 (Z)
+  endAt: string; // UTC ISO 8601 (Z)
+  qty: number;
+  unitPrice: number;
+  lineTotal: number;
+  unitMinimumPayment: number;
+  lineMinimumPayment: number;
+}
+
+export interface CreateBookingTotalsDto {
+  subtotal: number;
+  minimumPayment: number;
+  tax: number;
+  total: number;
+}
+
+export interface CreateBookingPayloadDto {
+  countryCode: string;
+  currency: string;
+  startAt: string; // UTC ISO 8601 (Z)
+  endAt: string; // UTC ISO 8601 (Z)
+  specialRequests?: string;
+  paymentMethods?: string[]; // e.g., ['card'], ['oxxo']
+  clients: Array<{
+    clientName: string;
+    clientAge: number;
+    email?: string;
+    identificationTypeId: string;
+    clientId?: string;
+    userId?: string;
+    isPrimary: boolean;
+  }>;
+  items: CreateBookingItemDto[];
+  totals: CreateBookingTotalsDto;
+}
+
+export interface CreateBookingDto {
+  booking: CreateBookingPayloadDto;
 }
 
 export interface Client {

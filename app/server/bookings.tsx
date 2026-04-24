@@ -3,8 +3,7 @@
  */
 
 import { createServiceREST } from './_index';
-import { logCurlPost } from './curlHelper';
-import type { Booking, Payment } from '~/types/booking';
+import type { Booking, Payment, CreateBookingDto } from '~/types/booking';
 
 // Type declaration for Vite environment variables
 interface ViteImportMetaEnv {
@@ -182,17 +181,11 @@ function extractApiError(error: unknown): string {
  * Create new booking
  */
 export const createBooking = async (
-  payload: Partial<Booking>,
+  payload: CreateBookingDto,
   token: string,
   language = 'es'
 ): Promise<unknown> => {
-  logCurlPost({
-    url: `${BASE_URL}/bookings`,
-    body: payload,
-    token,
-    headers: { 'X-Language': language },
-    label: 'CREATE BOOKING',
-  });
+  const bookingsEndpoint = 'bookings/multi-tour';
 
   if (BASE_URL === '' || BASE_URL === undefined) {
     console.warn('⚠️ [CREATE BOOKING] BACKEND_URL is not configured, returning error');
@@ -200,7 +193,6 @@ export const createBooking = async (
   }
 
   try {
-    const bookingsEndpoint = 'bookings';
     const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, token);
 
     const result = await bookingsService.create(payload, {

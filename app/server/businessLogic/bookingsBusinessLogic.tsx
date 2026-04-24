@@ -8,6 +8,7 @@ import type {
   BookingStats,
   BookingStatusHistory,
   BookingStatusHistoryEntry,
+  CreateBookingDto,
 } from '~/types/booking';
 import {
   getAllBookings,
@@ -144,24 +145,12 @@ export const getBookingByIdBusiness = async (
  * Create new booking
  */
 export const createBookingBusiness = async (
-  bookingData: Partial<Booking>,
+  bookingData: CreateBookingDto,
   token: string | undefined,
   language = 'es'
 ): Promise<{ success: boolean; message?: string; data?: Booking }> => {
   try {
-    // 🔥 Agregar parámetros nuevos
-    const countryCodeFromPayload = bookingData.countryCode ?? '';
-    const payloadWithNewParams = {
-      ...bookingData,
-      source: 'admin', // Hardcoded: indica que viene del admin
-      countryCode: countryCodeFromPayload !== '' ? countryCodeFromPayload : 'MX', // Usa el código del país del payload o 'MX' por defecto
-      paymentMethods: bookingData.paymentMethods ?? ['card'], // Usa el método seleccionado en el admin
-      minimumPayment: bookingData.minimumPayment ?? 0,
-    };
-
-    console.warn('📦 [createBookingBusiness] Payload with new params:', payloadWithNewParams);
-
-    const result = (await createBooking(payloadWithNewParams, token ?? '', language)) as {
+    const result = (await createBooking(bookingData, token ?? '', language)) as {
       success?: boolean;
       message?: string;
       data?: Booking;

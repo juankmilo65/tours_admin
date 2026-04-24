@@ -38,6 +38,22 @@ interface CurlPostOptions {
   label?: string;
 }
 
+export const buildCurlPostCommand = (options: CurlPostOptions): string => {
+  const { url, method = 'POST', body, headers = {}, token } = options;
+
+  const headerLines: string[] = [`  -H "Content-Type: application/json"`];
+  if (token !== undefined && token !== '') {
+    headerLines.push(`  -H "Authorization: Bearer ${token}"`);
+  }
+  Object.entries(headers).forEach(([k, v]) => {
+    headerLines.push(`  -H "${k}: ${v}"`);
+  });
+
+  const bodyLine = body !== undefined ? [`  -d '${JSON.stringify(body, null, 2)}'`] : [];
+
+  return [`curl -X ${method} "${url}" \\`, ...headerLines, ...bodyLine].join(' \\\n');
+};
+
 /**
  * Logs a cURL command for a GET request
  */
@@ -74,20 +90,8 @@ export const logCurlGet = (options: CurlGetOptions): void => {
 export const logCurlPost = (options: CurlPostOptions): void => {
   if (!isDebugEnabled()) return;
 
-  const { url, method = 'POST', body, headers = {}, token, label = 'REQUEST' } = options;
-
-  // Build header flags
-  const headerLines: string[] = [`  -H "Content-Type: application/json"`];
-  if (token !== undefined && token !== '') {
-    headerLines.push(`  -H "Authorization: Bearer ${token}"`);
-  }
-  Object.entries(headers).forEach(([k, v]) => {
-    headerLines.push(`  -H "${k}: ${v}"`);
-  });
-
-  const bodyLine = body !== undefined ? [`  -d '${JSON.stringify(body, null, 2)}'`] : [];
-
-  const curl = [`curl -X ${method} "${url}" \\`, ...headerLines, ...bodyLine].join(' \\\n');
+  const { label = 'REQUEST' } = options;
+  const curl = buildCurlPostCommand(options);
 
   console.warn(`\n📋 [CURL DEBUG] ${label}\n${curl}\n`);
 };

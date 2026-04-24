@@ -35,6 +35,36 @@ interface EditFormData {
   clients: BookingClient[];
 }
 
+interface BookingDetailItineraryDay {
+  day: number;
+  activities: Array<
+    BookingTourActivity & {
+      tourId?: string;
+      tourOrder?: number;
+      tourTitle?: string;
+      tourName?: string;
+      tourNameEs?: string;
+      tourNameEn?: string;
+    }
+  >;
+}
+
+interface BookingDetailTour {
+  id: string;
+  order?: number;
+  title?: string;
+  title_es?: string;
+  title_en?: string;
+  priceForThisTour?: string | number;
+  basePrice?: string | number;
+  activities?: BookingTourActivity[];
+}
+
+interface BookingDetailsShape {
+  itineraryByDay?: BookingDetailItineraryDay[];
+  tours?: BookingDetailTour[];
+}
+
 // Convert ISO to date-only value (YYYY-MM-DD in local time)
 function toDateLocal(iso: string): string {
   if (!iso) return '';
@@ -90,57 +120,94 @@ export function EditBookingModal({
   // Client modal state
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [editingClientIndex, setEditingClientIndex] = useState<number | null>(null);
+  const bookingDetails = booking as BookingDetailsShape | null;
 
   // Populate form when booking changes
   useEffect(() => {
-    if (!booking) return;
+    const currentBooking = booking;
+    if (!currentBooking) return;
 
-    const clients: BookingClient[] = (booking.clients ?? []).map((c) => ({ ...c }));
+    const clients: BookingClient[] = (currentBooking.clients ?? []).map((c) => ({ ...c }));
     if (clients.length === 0) {
       clients.push({ clientName: '', clientAge: 0 });
     }
 
     setFormData({
-      startDate: toDateLocal(booking.startDate),
-      endDate: toDateLocal(booking.endDate),
-      specialRequests: booking.specialRequests ?? '',
+      startDate: toDateLocal(currentBooking.startDate),
+      endDate: toDateLocal(currentBooking.endDate),
+      specialRequests: currentBooking.specialRequests ?? '',
       clients,
     });
-    setHasSpecialRequests((booking.specialRequests ?? '') !== '');
+    setHasSpecialRequests((currentBooking.specialRequests ?? '') !== '');
     setErrors({});
     setApiError(null);
   }, [booking]);
 
   // On modal open: load nationality dropdown + init per-client nationalities + preload ID types + set tour data
   useEffect(() => {
-    if (!isOpen) return;
+    const currentBooking = booking;
+    if (!isOpen || !currentBooking) return;
 
     void loadNationalities(language);
 
-    if (booking?.clients) {
+    if (currentBooking.clients) {
       // Initialise clientNationalities from the existing booking data
       const initNat: Record<number, string> = {};
-      booking.clients.forEach((c, i) => {
+      currentBooking.clients.forEach((c, i) => {
         if (c.countryCode !== undefined && c.countryCode !== '') initNat[i] = c.countryCode;
       });
       setClientNationalities(initNat);
 
       // Preload identification types for every unique country in the booking
-      const uniqueCodes = [...new Set(booking.clients.map((c) => c.countryCode).filter(Boolean))];
+      const uniqueCodes = [
+        ...new Set(currentBooking.clients.map((c) => c.countryCode).filter(Boolean)),
+      ];
       uniqueCodes.forEach((code) => {
         if (code !== undefined && code !== '') void loadIdentificationTypes(code, language);
       });
     }
 
-    // Use tour data directly from the booking response (no extra API calls)
-    if (booking?.tour) {
-      setHourRange(booking.tour.hourRange ?? null);
-      setTourDaysCount(booking.tour.daysCount ?? null);
-      setTourCountryCode(booking.tour.city?.countryId ?? '');
+    // Use booking response data directly (new and legacy shapes)
+    if (currentBooking.tour) {
+      const startTimeFormatted = new Intl.DateTimeFormat('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).format(new Date(currentBooking.startDate));
+      const endTimeFormatted = new Intl.DateTimeFormat('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).format(new Date(currentBooking.endDate));
+
+      setHourRange(currentBooking.tour.hourRange ?? `${startTimeFormatted} - ${endTimeFormatted}`);
+      setTourDaysCount(
+        bookingDetails?.itineraryByDay?.length ?? currentBooking.tour.daysCount ?? null
+      );
+      setTourCountryCode(currentBooking.countryCode ?? currentBooking.tour.city?.countryId ?? '');
     } else {
-      setHourRange(null);
-      setTourDaysCount(null);
-      setTourCountryCode('');
+      const startTimeFormatted = currentBooking.startDate
+        ? new Intl.DateTimeFormat('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }).format(new Date(currentBooking.startDate))
+        : '';
+      const endTimeFormatted = currentBooking.endDate
+        ? new Intl.DateTimeFormat('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }).format(new Date(currentBooking.endDate))
+        : '';
+
+      setHourRange(
+        startTimeFormatted !== '' && endTimeFormatted !== ''
+          ? `${startTimeFormatted} - ${endTimeFormatted}`
+          : null
+      );
+      setTourDaysCount(bookingDetails?.itineraryByDay?.length ?? null);
+      setTourCountryCode(currentBooking.countryCode ?? '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, booking]);
@@ -250,6 +317,168 @@ export function EditBookingModal({
       return `${currency} ${amount.toFixed(2)}`;
     }
   };
+
+  const detailTours = useMemo(() => {
+    if (bookingDetails?.tours === undefined) return [];
+    return [...bookingDetails.tours].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [bookingDetails?.tours]);
+
+  const toursDisplayLabel = useMemo(() => {
+    if (detailTours.length === 0) return booking?.tourTitle ?? booking?.tour?.title ?? '—';
+    return detailTours
+      .map((tour) =>
+        language === 'en'
+          ? (tour.title_en ?? tour.title ?? tour.title_es ?? '')
+          : (tour.title_es ?? tour.title ?? tour.title_en ?? '')
+      )
+      .filter((title) => title !== '')
+      .join(' • ');
+  }, [detailTours, booking?.tourTitle, booking?.tour?.title, language]);
+
+  const toursPriceBreakdown = useMemo(() => {
+    return detailTours.map((tour) => {
+      const raw = tour.priceForThisTour ?? tour.basePrice ?? 0;
+      const parsed = typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw);
+      return {
+        id: tour.id,
+        title:
+          language === 'en'
+            ? (tour.title_en ?? tour.title ?? tour.title_es ?? 'Tour')
+            : (tour.title_es ?? tour.title ?? tour.title_en ?? 'Tour'),
+        amount: Number.isFinite(parsed) ? parsed : 0,
+      };
+    });
+  }, [detailTours, language]);
+
+  const itineraryDays = useMemo(() => {
+    if (bookingDetails?.itineraryByDay !== undefined && bookingDetails.itineraryByDay.length > 0) {
+      return [...bookingDetails.itineraryByDay]
+        .sort((a, b) => a.day - b.day)
+        .map((dayData) => ({
+          day: dayData.day,
+          // Preserve backend-provided order as-is. For multi-tour itineraries,
+          // sortOrder can restart per tour and re-sorting here breaks chronology.
+          activities: [...dayData.activities],
+        }));
+    }
+
+    const activities: BookingTourActivity[] = booking?.tour?.activities ?? [];
+    if (activities.length === 0) return [];
+
+    const dayMap = new Map<number, BookingTourActivity[]>();
+    activities.forEach((act) => {
+      const d = act.day ?? 1;
+      if (!dayMap.has(d)) dayMap.set(d, []);
+      const group = dayMap.get(d);
+      if (group) group.push(act);
+    });
+
+    return [...dayMap.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([day, acts]) => ({ day, activities: acts.sort((a, b) => a.sortOrder - b.sortOrder) }));
+  }, [bookingDetails?.itineraryByDay, booking?.tour?.activities]);
+
+  // Tour-grouped itinerary: one entry per unique tour, activities in backend order
+  const itineraryByTour = useMemo(() => {
+    if (!bookingDetails?.itineraryByDay || bookingDetails.itineraryByDay.length === 0) return null;
+
+    type ActivityWithDay = BookingDetailItineraryDay['activities'][number] & { day: number };
+    const flat: ActivityWithDay[] = [...bookingDetails.itineraryByDay]
+      .sort((a, b) => a.day - b.day)
+      .flatMap((dayData) =>
+        dayData.activities.map((act) => ({ ...act, day: act.day ?? dayData.day }))
+      );
+
+    const tourMap = new Map<
+      string,
+      { tourId: string; tourTitle: string; tourOrder: number; activities: ActivityWithDay[] }
+    >();
+
+    for (const act of flat) {
+      const key = act.tourId ?? '__single__';
+      if (!tourMap.has(key)) {
+        const title =
+          language === 'en'
+            ? (act.tourNameEn ?? act.tourTitle ?? act.tourName ?? 'Tour')
+            : (act.tourNameEs ?? act.tourTitle ?? act.tourName ?? 'Tour');
+        tourMap.set(key, {
+          tourId: key,
+          tourTitle: title,
+          tourOrder: act.tourOrder ?? 0,
+          activities: [],
+        });
+      }
+      tourMap.get(key)?.activities.push(act);
+    }
+
+    return [...tourMap.values()].sort((a, b) => a.tourOrder - b.tourOrder);
+  }, [bookingDetails?.itineraryByDay, language]);
+
+  const parsedTotalPrice = useMemo(() => {
+    const raw = booking?.totalPrice ?? 0;
+    return typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw);
+  }, [booking?.totalPrice]);
+
+  const parsedMinimumPayment = useMemo(() => {
+    const raw = booking?.minimumPayment ?? 0;
+    return typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw);
+  }, [booking?.minimumPayment]);
+
+  const parsedDepositAmount = useMemo(() => {
+    const raw = booking?.depositAmount ?? parsedMinimumPayment;
+    return typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw);
+  }, [booking?.depositAmount, parsedMinimumPayment]);
+
+  const parsedRemainingAfterDeposit = useMemo(() => {
+    const raw = booking?.remainingAfterDeposit;
+    if (raw === undefined || raw === null) return parsedTotalPrice - parsedDepositAmount;
+    return typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw);
+  }, [booking?.remainingAfterDeposit, parsedTotalPrice, parsedDepositAmount]);
+
+  const parsedPaidAmountTotal = useMemo(() => {
+    const raw = booking?.paidAmountTotal ?? 0;
+    return typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw);
+  }, [booking?.paidAmountTotal]);
+
+  const parsedRemainingAmountTotal = useMemo(() => {
+    const raw = booking?.remainingAmountTotal;
+    if (raw === undefined || raw === null) return parsedTotalPrice - parsedPaidAmountTotal;
+    return typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw);
+  }, [booking?.remainingAmountTotal, parsedTotalPrice, parsedPaidAmountTotal]);
+
+  const paymentProgress = useMemo(() => {
+    const safeTotal = Math.max(0, parsedTotalPrice);
+    const safePaid = Math.max(0, parsedPaidAmountTotal);
+    if (safeTotal <= 0) {
+      return booking?.status === 'paid' ? 100 : 0;
+    }
+    return Math.min(100, Math.max(0, Math.round((safePaid / safeTotal) * 100)));
+  }, [parsedTotalPrice, parsedPaidAmountTotal, booking?.status]);
+
+  const paymentMeta = useMemo(() => {
+    if (paymentProgress >= 100) {
+      return {
+        accent: '#15803d',
+        chipBg: '#dcfce7',
+        chipColor: '#166534',
+        label: language === 'en' ? 'Paid in full' : 'Pagado completo',
+      };
+    }
+    if (paymentProgress > 0) {
+      return {
+        accent: '#c2410c',
+        chipBg: '#ffedd5',
+        chipColor: '#9a3412',
+        label: language === 'en' ? 'Partially paid' : 'Pago parcial',
+      };
+    }
+    return {
+      accent: '#a16207',
+      chipBg: '#fef9c3',
+      chipColor: '#854d0e',
+      label: language === 'en' ? 'Pending payment' : 'Pago pendiente',
+    };
+  }, [paymentProgress, language]);
 
   const getClientModalInitialData = (): ClientFormData | null => {
     if (editingClientIndex === null) return null;
@@ -491,9 +720,10 @@ export function EditBookingModal({
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             padding: '20px 24px 16px',
             borderBottom: '1px solid #e5e7eb',
+            gap: '16px',
           }}
         >
           <div>
@@ -552,22 +782,139 @@ export function EditBookingModal({
               );
             })()}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
+          <div
             style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '1.25rem',
-              color: '#9ca3af',
-              padding: 4,
-              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              marginLeft: 'auto',
             }}
           >
-            ✕
-          </button>
+            <div
+              style={{
+                minWidth: 240,
+                maxWidth: 320,
+                width: '100%',
+                borderRadius: 12,
+                border: '1px solid #e5e7eb',
+                background:
+                  'linear-gradient(135deg, rgba(248,250,252,1) 0%, rgba(241,245,249,1) 100%)',
+                padding: '12px 14px',
+                boxShadow: '0 4px 14px rgba(15,23,42,0.08)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 8,
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.03em',
+                    textTransform: 'uppercase',
+                    color: '#475569',
+                  }}
+                >
+                  {language === 'en' ? 'Payment Overview' : 'Resumen de pago'}
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: 9999,
+                    background: paymentMeta.chipBg,
+                    color: paymentMeta.chipColor,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {paymentMeta.label}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  height: 8,
+                  borderRadius: 999,
+                  background: '#e2e8f0',
+                  overflow: 'hidden',
+                  marginBottom: 8,
+                }}
+              >
+                <div
+                  style={{
+                    width: `${paymentProgress}%`,
+                    height: '100%',
+                    background: paymentMeta.accent,
+                    transition: 'width .25s ease',
+                  }}
+                />
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '0.75rem',
+                  color: '#475569',
+                  marginBottom: 8,
+                }}
+              >
+                <span>{language === 'en' ? 'Progress' : 'Progreso'}</span>
+                <strong style={{ color: paymentMeta.accent }}>{paymentProgress}%</strong>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '6px 10px',
+                  fontSize: '0.75rem',
+                }}
+              >
+                <span style={{ color: '#64748b' }}>{language === 'en' ? 'Total' : 'Total'}</span>
+                <strong style={{ textAlign: 'right', color: '#0f172a' }}>
+                  {formatCurrency(parsedTotalPrice, booking.currency ?? 'MXN')}
+                </strong>
+                <span style={{ color: '#64748b' }}>{language === 'en' ? 'Paid' : 'Pagado'}</span>
+                <strong style={{ textAlign: 'right', color: '#0f766e' }}>
+                  {formatCurrency(parsedPaidAmountTotal, booking.currency ?? 'MXN')}
+                </strong>
+                <span style={{ color: '#64748b' }}>
+                  {language === 'en' ? 'Remaining' : 'Restante'}
+                </span>
+                <strong style={{ textAlign: 'right', color: '#334155' }}>
+                  {formatCurrency(
+                    Math.max(0, parsedRemainingAmountTotal),
+                    booking.currency ?? 'MXN'
+                  )}
+                </strong>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1.25rem',
+                color: '#9ca3af',
+                padding: 4,
+                borderRadius: 6,
+              }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <form
@@ -583,7 +930,7 @@ export function EditBookingModal({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <div>
               <span style={labelStyle}>{bookingsT.tour}</span>
-              <div style={readonlyStyle}>{booking.tourTitle ?? booking.tour?.title ?? '—'}</div>
+              <div style={readonlyStyle}>{toursDisplayLabel}</div>
             </div>
             <div>
               <span style={labelStyle}>{bookingsT.currency}</span>
@@ -631,19 +978,274 @@ export function EditBookingModal({
 
           {/* Read-only: Tour Activities / Itinerary */}
           {(() => {
-            const activities: BookingTourActivity[] = booking.tour?.activities ?? [];
-            if (activities.length === 0) return null;
+            const DEFAULT_PALETTE = {
+              headerBg: '#eff6ff',
+              headerBorder: '#bfdbfe',
+              headerText: '#1e40af',
+              badgeBg: '#1d4ed8',
+              badgeText: '#fff',
+              timeBg: '#f0f9ff',
+              timeBorder: '#bae6fd',
+              timeText: '#0369a1',
+            };
+            const TOUR_PALETTE = [
+              DEFAULT_PALETTE,
+              {
+                headerBg: '#f5f3ff',
+                headerBorder: '#ddd6fe',
+                headerText: '#5b21b6',
+                badgeBg: '#7c3aed',
+                badgeText: '#fff',
+                timeBg: '#faf5ff',
+                timeBorder: '#ddd6fe',
+                timeText: '#6d28d9',
+              },
+              {
+                headerBg: '#ecfdf5',
+                headerBorder: '#a7f3d0',
+                headerText: '#065f46',
+                badgeBg: '#059669',
+                badgeText: '#fff',
+                timeBg: '#f0fdf4',
+                timeBorder: '#bbf7d0',
+                timeText: '#15803d',
+              },
+              {
+                headerBg: '#fff7ed',
+                headerBorder: '#fed7aa',
+                headerText: '#9a3412',
+                badgeBg: '#ea580c',
+                badgeText: '#fff',
+                timeBg: '#fff7ed',
+                timeBorder: '#fdba74',
+                timeText: '#c2410c',
+              },
+            ];
 
-            // Group by day
-            const dayMap = new Map<number, BookingTourActivity[]>();
-            activities.forEach((act) => {
-              const d = act.day ?? 1;
-              if (!dayMap.has(d)) dayMap.set(d, []);
-              const group = dayMap.get(d);
-              if (group) group.push(act);
-            });
-            const sortedDays = [...dayMap.entries()].sort(([a], [b]) => a - b);
-            sortedDays.forEach(([, acts]) => acts.sort((a, b) => a.sortOrder - b.sortOrder));
+            // --- Tour-grouped path (new API with tourId on activities) ---
+            if (itineraryByTour && itineraryByTour.length > 0) {
+              return (
+                <div>
+                  <h3
+                    style={{
+                      margin: '0 0 var(--space-3) 0',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      color: '#111827',
+                    }}
+                  >
+                    {bookingsT.tourItinerary}
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {itineraryByTour.map((tourGroup, tourIdx) => {
+                      const fallbackPalette = DEFAULT_PALETTE;
+                      const palette =
+                        TOUR_PALETTE[tourIdx % TOUR_PALETTE.length] ?? fallbackPalette;
+                      const multiTour = itineraryByTour.length > 1;
+
+                      // Detect day changes to render subtle day dividers within a tour
+                      let lastDay: number | null = null;
+
+                      return (
+                        <div
+                          key={tourGroup.tourId}
+                          style={{
+                            border: `1px solid ${palette.headerBorder}`,
+                            borderRadius: 'var(--radius-lg, 10px)',
+                            overflow: 'hidden',
+                            boxShadow: '0 1px 3px 0 rgba(0,0,0,0.06)',
+                          }}
+                        >
+                          {/* Tour header */}
+                          <div
+                            style={{
+                              padding: '10px 14px',
+                              background: palette.headerBg,
+                              borderBottom: `1px solid ${palette.headerBorder}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                            }}
+                          >
+                            {multiTour && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: '50%',
+                                  background: palette.badgeBg,
+                                  color: palette.badgeText,
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {tourGroup.tourOrder || tourIdx + 1}
+                              </span>
+                            )}
+                            {/* Map pin icon */}
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke={palette.headerText}
+                              strokeWidth="2"
+                              style={{ flexShrink: 0 }}
+                            >
+                              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                              <circle cx="12" cy="10" r="3" />
+                            </svg>
+                            <span
+                              style={{
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                color: palette.headerText,
+                                lineHeight: 1.3,
+                              }}
+                            >
+                              {tourGroup.tourTitle}
+                            </span>
+                            <span
+                              style={{
+                                marginLeft: 'auto',
+                                fontSize: '0.7rem',
+                                color: palette.headerText,
+                                opacity: 0.65,
+                                fontWeight: 500,
+                              }}
+                            >
+                              {tourGroup.activities.length}{' '}
+                              {language === 'en'
+                                ? tourGroup.activities.length === 1
+                                  ? 'activity'
+                                  : 'activities'
+                                : tourGroup.activities.length === 1
+                                  ? 'actividad'
+                                  : 'actividades'}
+                            </span>
+                          </div>
+
+                          {/* Activities list */}
+                          <div style={{ background: 'white' }}>
+                            {tourGroup.activities.map((act, idx) => {
+                              const showDayDivider = act.day !== lastDay;
+                              lastDay = act.day;
+                              const isLast = idx === tourGroup.activities.length - 1;
+
+                              return (
+                                <div key={act.id ?? `${tourGroup.tourId}-${idx}`}>
+                                  {showDayDivider && (
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '6px 14px',
+                                        background: '#f9fafb',
+                                        borderTop: idx > 0 ? '1px solid #f3f4f6' : undefined,
+                                        borderBottom: '1px solid #f3f4f6',
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          width: 18,
+                                          height: 18,
+                                          borderRadius: '50%',
+                                          background: '#e5e7eb',
+                                          color: '#6b7280',
+                                          fontSize: '0.65rem',
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        {act.day}
+                                      </span>
+                                      <span
+                                        style={{
+                                          fontSize: '0.72rem',
+                                          color: '#6b7280',
+                                          fontWeight: 600,
+                                          textTransform: 'uppercase',
+                                          letterSpacing: '0.04em',
+                                        }}
+                                      >
+                                        {language === 'en' ? `Day ${act.day}` : `Día ${act.day}`}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '12px',
+                                      padding: '9px 14px',
+                                      borderBottom: isLast ? 'none' : '1px solid #f3f4f6',
+                                      background: idx % 2 === 0 ? 'white' : '#fafbfc',
+                                    }}
+                                  >
+                                    {/* Time chip */}
+                                    <div
+                                      style={{
+                                        flexShrink: 0,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '2px 8px',
+                                        borderRadius: 9999,
+                                        background: palette.timeBg,
+                                        border: `1px solid ${palette.timeBorder}`,
+                                        fontSize: '0.7rem',
+                                        fontWeight: 600,
+                                        color: palette.timeText,
+                                        minWidth: 68,
+                                        justifyContent: 'center',
+                                      }}
+                                    >
+                                      <svg
+                                        width="10"
+                                        height="10"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.5"
+                                      >
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                      </svg>
+                                      {act.hora}
+                                    </div>
+                                    {/* Activity name */}
+                                    <span
+                                      style={{
+                                        fontSize: '0.8rem',
+                                        color: '#374151',
+                                        fontWeight: 500,
+                                        lineHeight: 1.4,
+                                      }}
+                                    >
+                                      {language === 'en' ? act.activity_en : act.activity_es}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
+            // --- Fallback: day-based rendering (legacy API without tourId) ---
+            if (itineraryDays.length === 0) return null;
 
             return (
               <div>
@@ -658,9 +1260,9 @@ export function EditBookingModal({
                   {bookingsT.tourItinerary}
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {sortedDays.map(([dayNum, acts]) => (
+                  {itineraryDays.map((dayData) => (
                     <div
-                      key={`day-${dayNum}`}
+                      key={`day-${dayData.day}`}
                       style={{
                         border: '1px solid #e5e7eb',
                         borderRadius: 'var(--radius-lg, 10px)',
@@ -691,14 +1293,14 @@ export function EditBookingModal({
                             fontWeight: 700,
                           }}
                         >
-                          {dayNum}
+                          {dayData.day}
                         </span>
                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
-                          {bookingsT.dayLabel} {dayNum}
+                          {bookingsT.dayLabel} {dayData.day}
                         </span>
                       </div>
                       <div>
-                        {acts.map((act, idx) => (
+                        {dayData.activities.map((act, idx) => (
                           <div
                             key={act.id}
                             style={{
@@ -706,7 +1308,8 @@ export function EditBookingModal({
                               alignItems: 'center',
                               gap: '12px',
                               padding: '10px 14px',
-                              borderBottom: idx < acts.length - 1 ? '1px solid #f3f4f6' : 'none',
+                              borderBottom:
+                                idx < dayData.activities.length - 1 ? '1px solid #f3f4f6' : 'none',
                               background: idx % 2 === 0 ? 'white' : '#fafbfc',
                             }}
                           >
@@ -1075,7 +1678,7 @@ export function EditBookingModal({
           </div>
 
           {/* Price Summary */}
-          {priceSummary.validClients > 0 && (
+          {(priceSummary.validClients > 0 || toursPriceBreakdown.length > 0) && (
             <div
               style={{
                 marginTop: 12,
@@ -1096,24 +1699,41 @@ export function EditBookingModal({
                 {bookingsT.priceSummary}
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '0.8125rem',
-                    color: '#374151',
-                  }}
-                >
-                  <span>
-                    {bookingsT.basePricePerPerson}:{' '}
-                    <strong>
-                      {formatCurrency(priceSummary.basePrice, booking?.currency ?? 'MXN')}
-                    </strong>{' '}
-                    × {priceSummary.validClients}
-                  </span>
-                  <span>{formatCurrency(priceSummary.subtotal, booking?.currency ?? 'MXN')}</span>
-                </div>
-                {priceSummary.minorDiscount > 0 && (
+                {toursPriceBreakdown.length > 0 ? (
+                  toursPriceBreakdown.map((tour) => (
+                    <div
+                      key={tour.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '0.8125rem',
+                        color: '#374151',
+                      }}
+                    >
+                      <span>{tour.title}</span>
+                      <span>{formatCurrency(tour.amount, booking?.currency ?? 'MXN')}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '0.8125rem',
+                      color: '#374151',
+                    }}
+                  >
+                    <span>
+                      {bookingsT.basePricePerPerson}:{' '}
+                      <strong>
+                        {formatCurrency(priceSummary.basePrice, booking?.currency ?? 'MXN')}
+                      </strong>{' '}
+                      × {priceSummary.validClients}
+                    </span>
+                    <span>{formatCurrency(priceSummary.subtotal, booking?.currency ?? 'MXN')}</span>
+                  </div>
+                )}
+                {toursPriceBreakdown.length === 0 && priceSummary.minorDiscount > 0 && (
                   <div
                     style={{
                       display: 'flex',
@@ -1143,7 +1763,88 @@ export function EditBookingModal({
                   }}
                 >
                   <span>{bookingsT.totalPrice}</span>
-                  <span>{formatCurrency(priceSummary.total, booking?.currency ?? 'MXN')}</span>
+                  <span>
+                    {formatCurrency(
+                      toursPriceBreakdown.length > 0 ? parsedTotalPrice : priceSummary.total,
+                      booking?.currency ?? 'MXN'
+                    )}
+                  </span>
+                </div>
+                {parsedMinimumPayment > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '0.8125rem',
+                      color: '#0f766e',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span>{language === 'en' ? 'Pay now' : 'Pagar ahora'}</span>
+                    <span>{formatCurrency(parsedMinimumPayment, booking?.currency ?? 'MXN')}</span>
+                  </div>
+                )}
+                {parsedDepositAmount > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '0.8125rem',
+                      color: '#047857',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span>{language === 'en' ? 'Deposit amount' : 'Monto de anticipo'}</span>
+                    <span>{formatCurrency(parsedDepositAmount, booking?.currency ?? 'MXN')}</span>
+                  </div>
+                )}
+                {parsedRemainingAfterDeposit >= 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '0.8125rem',
+                      color: '#6b7280',
+                    }}
+                  >
+                    <span>
+                      {language === 'en'
+                        ? 'Remaining after deposit'
+                        : 'Restante despues del anticipo'}
+                    </span>
+                    <span>
+                      {formatCurrency(parsedRemainingAfterDeposit, booking?.currency ?? 'MXN')}
+                    </span>
+                  </div>
+                )}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '0.8125rem',
+                    color: '#0f766e',
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>{language === 'en' ? 'Paid amount' : 'Monto pagado'}</span>
+                  <span>{formatCurrency(parsedPaidAmountTotal, booking?.currency ?? 'MXN')}</span>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '0.8125rem',
+                    color: '#334155',
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>{language === 'en' ? 'Total remaining' : 'Total restante'}</span>
+                  <span>
+                    {formatCurrency(
+                      Math.max(0, parsedRemainingAmountTotal),
+                      booking?.currency ?? 'MXN'
+                    )}
+                  </span>
                 </div>
               </div>
             </div>

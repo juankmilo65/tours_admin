@@ -27,13 +27,14 @@ import { useDropdownCache } from '~/hooks/useDropdownCache';
 import { clearIdentificationTypesByNationality } from '~/store/slices/cacheSlice';
 import { Input } from '~/components/ui/Input';
 import Select from '~/components/ui/Select';
-import type { Client } from '~/types/booking';
+import type { Client, CreateBookingDto } from '~/types/booking';
 import { ClientFormModal } from '~/components/bookings/ClientFormModal';
 import type { ClientFormData } from '~/components/bookings/ClientFormModal';
 import {
+  buildDateTimeInTimezone,
   getMinimumBookingDate,
   getTimezoneForCountry,
-  buildDateTimeInTimezone,
+  parseTimeToHoursMinutes,
 } from '~/utilities/timezoneValidation';
 import {
   checkTimeOverlap,
@@ -90,6 +91,14 @@ export function CreateBookingModal({
   const currentUser = useAppSelector(selectAuth).user;
   const selectedCountryCurrency = useAppSelector(selectSelectedCurrencyCode);
   const selectedCountry = useAppSelector(selectSelectedCountry);
+  const headerCountryCode = (selectedCountry?.code ?? 'MX').toUpperCase();
+
+  // Today's date in local browser time (YYYY-MM-DD) — used as hard floor for date inputs
+  const todayLocal = useMemo(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }, []);
 
   const [isBookingForMe, setIsBookingForMe] = useState(false);
 
@@ -99,7 +108,6 @@ export function CreateBookingModal({
   const [isLoadingHourRange, setIsLoadingHourRange] = useState(false);
   const [tourDaysCount, setTourDaysCount] = useState<number | null>(null);
   const [minBookingDate, setMinBookingDate] = useState<string>('');
-  const [tourCountryCode, setTourCountryCode] = useState<string>('');
   const [tourAvailability, setTourAvailability] = useState<TourAvailabilityData | null>(null);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string>('');
@@ -115,7 +123,6 @@ export function CreateBookingModal({
 
   // Multi-tour state
   const [selectedTours, setSelectedTours] = useState<BookingTour[]>([]);
-  const isMultiTourMode = true;
   const { validationResult, validate: validateMultiTour } = useMultiTourValidation();
   const [addTourAlert, setAddTourAlert] = useState<{
     type: 'error' | 'warning';
@@ -166,7 +173,6 @@ export function CreateBookingModal({
     setHourRange(null);
     setTourDaysCount(null);
     setMinBookingDate('');
-    setTourCountryCode('');
     setTourAvailability(null);
     setAvailabilityError('');
     setTourBasePrice(null);
@@ -368,7 +374,6 @@ export function CreateBookingModal({
             hasCity: tourResult.data.city !== null && tourResult.data.city !== undefined,
           });
 
-          setTourCountryCode(countryCode);
           setTourCityId(
             typeof tourResult.data.city?.id === 'string' ? tourResult.data.city.id : ''
           );
@@ -410,7 +415,7 @@ export function CreateBookingModal({
             // (e.g. "MX" → America/Mexico_City). This ensures the date comparison
             // uses the tour's local timezone, not the browser's timezone (the admin
             // could be connecting from a different country).
-            const isoCode = selectedCountry?.code ?? '';
+            const isoCode = headerCountryCode;
             const minDate = getMinimumBookingDate(startTime, isoCode);
 
             console.warn('📅 Minimum Booking Date Calculation:', {
@@ -446,7 +451,6 @@ export function CreateBookingModal({
             setMinBookingDate('');
           }
         } else {
-          setTourCountryCode('');
           setMinBookingDate('');
           setTourActivities([]);
           setTourCityId('');
@@ -459,7 +463,6 @@ export function CreateBookingModal({
 
         setHourRange(null);
         setMinBookingDate('');
-        setTourCountryCode('');
         setTourDaysCount(null);
         setTourBasePrice(null);
         setTourMinimumPayment(null);
@@ -472,7 +475,7 @@ export function CreateBookingModal({
       }
     };
     void fetchTourDetails();
-  }, [formData.tourId, token, language, selectedCountry?.code]);
+  }, [formData.tourId, token, language, headerCountryCode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
     const { name, value, type } = e.target;
@@ -602,7 +605,7 @@ export function CreateBookingModal({
   // Fetch available Stripe payment methods when the form is ready (has clients)
   useEffect(() => {
     const hasClients = formData.clients.length > 0;
-    const countryCode = selectedCountry?.code ?? '';
+    const countryCode = headerCountryCode;
     if (!hasClients || countryCode === '') {
       setAvailablePaymentMethods([]);
       setSelectedPaymentMethod('');
@@ -631,7 +634,7 @@ export function CreateBookingModal({
       }
     };
     void fetchPaymentMethods();
-  }, [formData.clients.length, selectedCountry?.code]);
+  }, [formData.clients.length, headerCountryCode]);
 
   // Price calculation
   const priceSummary = useMemo(() => {
@@ -651,59 +654,31 @@ export function CreateBookingModal({
   }, [formData.tourId, isLoadingHourRange]);
 
   const canAddClients = useMemo(() => {
-    // In multi-tour mode, clients can be added once at least 1 tour is in the list
-    if (isMultiTourMode) {
-      return selectedTours.length > 0;
-    }
-    // Otherwise, clients can be added after dates are selected and availability is checked
-    const datesSet = formData.startDate !== '' && formData.endDate !== '';
-    const hasAvailability = tourAvailability !== null && (tourAvailability.availableSlots ?? 0) > 0;
-    return datesSet && hasAvailability && !isLoadingAvailability;
-  }, [
-    formData.startDate,
-    formData.endDate,
-    tourAvailability,
-    isLoadingAvailability,
-    isMultiTourMode,
-    selectedTours.length,
-  ]);
+    return selectedTours.length > 0;
+  }, [selectedTours.length]);
 
   const canAddSpecialRequests = useMemo(() => {
     return formData.clients.length > 0;
   }, [formData.clients.length]);
 
   const canSubmit = useMemo(() => {
-    // All components must have data, including a chosen payment method
-    const hasTour = isMultiTourMode ? selectedTours.length > 0 : formData.tourId !== '';
-    const hasDates = isMultiTourMode ? true : formData.startDate !== '' && formData.endDate !== '';
+    const hasTours = selectedTours.length > 0;
     const hasCurrency = formData.currency !== '';
     const hasClients = formData.clients.length > 0;
-    const hasAvailability = isMultiTourMode
-      ? true
-      : tourAvailability !== null && (tourAvailability.availableSlots ?? 0) > 0;
     const hasPaymentMethod = selectedPaymentMethod !== '';
 
-    return (
-      hasTour &&
-      hasDates &&
-      hasCurrency &&
-      hasClients &&
-      hasAvailability &&
-      hasPaymentMethod &&
-      !isSubmitting
-    );
+    return hasTours && hasCurrency && hasClients && hasPaymentMethod && !isSubmitting;
   }, [
-    formData.tourId,
-    formData.startDate,
-    formData.endDate,
     formData.currency,
     formData.clients.length,
-    tourAvailability,
     selectedPaymentMethod,
     isSubmitting,
-    isMultiTourMode,
     selectedTours.length,
   ]);
+
+  const sortToursLatestFirst = (tours: BookingTour[]): BookingTour[] => {
+    return sortToursChronologically([...tours]).reverse();
+  };
 
   // 🛡️ Don't render if modal is not open (after all hooks for React rules)
   if (!isOpen) {
@@ -764,31 +739,8 @@ export function CreateBookingModal({
         t('bookings.noPrimaryClient') ?? 'Debes marcar un cliente como principal';
     }
 
-    if (!formData.tourId && !isMultiTourMode) {
-      newErrors.tourId = t('bookings.tours.tourRequired') ?? 'Tour is required';
-    }
-
-    if (isMultiTourMode && selectedTours.length === 0) {
+    if (selectedTours.length === 0) {
       newErrors.tourId = bookingsT.multiTourMinRequired;
-    }
-
-    if (!formData.startDate && !isMultiTourMode) {
-      newErrors.startDate = `${t('bookings.startDate') ?? 'Start Date'}: ${t('validation.required') ?? 'Required'}`;
-    }
-
-    if (!formData.endDate && !isMultiTourMode) {
-      newErrors.endDate = `${t('bookings.endDate') ?? 'End Date'}: ${t('validation.required') ?? 'Required'}`;
-    }
-
-    // Validate dates: end date must be after or equal to start date
-    if (formData.startDate && formData.endDate) {
-      const start = new Date(formData.startDate);
-      const end = new Date(formData.endDate);
-      if (end < start) {
-        newErrors.endDate =
-          t('bookings.endDateAfterStartDate') ??
-          'La fecha de fin debe ser posterior a la fecha de inicio';
-      }
     }
 
     // Validate currency
@@ -919,70 +871,110 @@ export function CreateBookingModal({
     );
 
     try {
-      // Combine date-only values with hour-range times, then build the payload
-      const to24h = (time: string): string => {
-        const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-        if (!match) return time;
-        let h = parseInt(match[1] ?? '0', 10);
-        const m = match[2] ?? '00';
-        const period = (match[3] ?? '').toUpperCase();
-        if (period === 'PM' && h !== 12) h += 12;
-        if (period === 'AM' && h === 12) h = 0;
-        return `${String(h).padStart(2, '0')}:${m}`;
+      const addDaysToDateStr = (dateStr: string, days: number): string => {
+        const [yearRaw, monthRaw, dayRaw] = dateStr.split('-');
+        const year = Number.parseInt(yearRaw ?? '1970', 10) || 1970;
+        const month = Number.parseInt(monthRaw ?? '1', 10) || 1;
+        const day = Number.parseInt(dayRaw ?? '1', 10) || 1;
+        const date = new Date(year, month - 1, day + days);
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
       };
 
-      const buildDateTime = (date: string, time: string): string => {
-        if (!date) return '';
-        const t24 = to24h(time);
-        const tz = tourCountryCode ? getTimezoneForCountry(tourCountryCode) : 'UTC';
-        return buildDateTimeInTimezone(date, t24, tz);
+      const roundTo2 = (value: number): number => Math.round(value * 100) / 100;
+      const to24Hour = (time: string): string => {
+        const { hours, minutes } = parseTimeToHoursMinutes(time);
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
       };
+      const qty = formData.clients.length;
+      const countryCode = headerCountryCode;
+      const timezone = getTimezoneForCountry(countryCode);
+      const chronologicalTours = sortToursLatestFirst(selectedTours);
+      const items = chronologicalTours.map((tour) => {
+        const unitPrice = Number(tour.price ?? 0);
+        const unitMinimumPayment = Number(tour.minimumPayment ?? 0);
+        const startParts = parseTimeToHoursMinutes(tour.startTime);
+        const endParts = parseTimeToHoursMinutes(tour.endTime);
+        const startTime24 = to24Hour(tour.startTime);
+        const endTime24 = to24Hour(tour.endTime);
+        const startMinutes = startParts.hours * 60 + startParts.minutes;
+        const endMinutes = endParts.hours * 60 + endParts.minutes;
+        const endDate =
+          endMinutes < startMinutes ? addDaysToDateStr(tour.startDate, 1) : tour.startDate;
 
-      const [rangeStart, rangeEnd] =
-        hourRange !== null ? hourRange.split(' - ') : ['00:00', '00:00'];
+        return {
+          tourId: tour.id,
+          startAt: buildDateTimeInTimezone(tour.startDate, startTime24, timezone),
+          endAt: buildDateTimeInTimezone(endDate, endTime24, timezone),
+          qty,
+          unitPrice,
+          lineTotal: roundTo2(unitPrice * qty),
+          unitMinimumPayment,
+          lineMinimumPayment: roundTo2(unitMinimumPayment * qty),
+        };
+      });
 
-      const payloadWithCountry = isMultiTourMode
-        ? {
-            // Multi-tour: each tour carries its own id/dates/currency
-            clients: formData.clients.map((client, index) => ({
-              ...client,
-              countryCode: clientNationalities[index] ?? '',
-            })),
-            specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
-            totalPrice: calculateBookingTotal(selectedTours),
-            minimumPayment:
-              selectedTours.reduce((sum, t) => sum + (t.minimumPayment ?? 0), 0) || undefined,
-            countryCode: selectedCountry?.code ?? 'MX',
-            paymentMethods: [selectedPaymentMethod],
-            tours: selectedTours.map((tour) => ({
-              id: tour.id,
-              name_es: tour.name_es,
-              name_en: tour.name_en,
-              startDate: tour.startDate,
-              startTime: tour.startTime,
-              endTime: tour.endTime,
-              price: tour.price,
-              currency: tour.currency,
-              capacity: tour.capacity,
-              bookedSlots: tour.bookedSlots,
-              minimumPayment: tour.minimumPayment ?? 0,
-            })),
-          }
-        : {
-            // Single-tour: top-level tourId/dates/currency
-            ...formData,
-            startDate: buildDateTime(formData.startDate, rangeStart ?? '00:00'),
-            endDate: buildDateTime(formData.endDate, rangeEnd ?? '00:00'),
-            clients: formData.clients.map((client, index) => ({
-              ...client,
-              countryCode: clientNationalities[index] ?? '',
-            })),
-            specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
-            totalPrice: priceSummary.total,
-            minimumPayment: tourMinimumPayment ?? undefined,
-            countryCode: selectedCountry?.code ?? 'MX',
-            paymentMethods: [selectedPaymentMethod],
-          };
+      if (items.some((item) => item.endAt < item.startAt)) {
+        dispatch(setGlobalLoading({ isLoading: false }));
+        setApiError(
+          language === 'en'
+            ? 'One tour has an invalid schedule: end time cannot be before start time.'
+            : 'Un tour tiene horario invalido: la hora de fin no puede ser menor que la de inicio.'
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      const subtotal = roundTo2(items.reduce((sum, item) => sum + item.lineTotal, 0));
+      const minimumPayment = roundTo2(
+        items.reduce((sum, item) => sum + item.lineMinimumPayment, 0)
+      );
+      const tax = roundTo2(subtotal * 0.16);
+      const total = roundTo2(subtotal + tax);
+      const sortedByStart = [...items].sort((a, b) => a.startAt.localeCompare(b.startAt));
+      const sortedByEnd = [...items].sort((a, b) => a.endAt.localeCompare(b.endAt));
+      const bookingStartAt = sortedByStart[0]?.startAt ?? new Date().toISOString();
+      const bookingEndAt = sortedByEnd[sortedByEnd.length - 1]?.endAt ?? bookingStartAt;
+
+      if (new Date(bookingStartAt).getTime() <= Date.now()) {
+        dispatch(setGlobalLoading({ isLoading: false }));
+        setApiError(
+          language === 'en'
+            ? 'Booking start date/time must be in the future for the selected country.'
+            : 'La fecha/hora de inicio de la reserva debe estar en el futuro para el pais seleccionado.'
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      const payloadWithCountry: CreateBookingDto = {
+        booking: {
+          countryCode,
+          currency: formData.currency,
+          startAt: bookingStartAt,
+          endAt: bookingEndAt,
+          specialRequests: hasSpecialRequests ? (formData.specialRequests ?? '') : undefined,
+          paymentMethods: selectedPaymentMethod !== '' ? [selectedPaymentMethod] : undefined,
+          clients: formData.clients.map((client) => ({
+            clientName: client.clientName,
+            clientAge: client.clientAge,
+            email: client.email ?? undefined,
+            identificationTypeId: client.identificationTypeId,
+            clientId: client.clientId ?? undefined,
+            userId: client.userId ?? undefined,
+            isPrimary: client.isPrimary,
+          })),
+          items,
+          totals: {
+            subtotal,
+            minimumPayment,
+            tax,
+            total,
+          },
+        },
+      };
 
       const result = await createBookingBusiness(payloadWithCountry, token ?? '', language);
       if (!result.success) {
@@ -1515,7 +1507,7 @@ export function CreateBookingModal({
                           value={formData.startDate}
                           onChange={handleInputChange}
                           error={errors.startDate}
-                          min={minBookingDate}
+                          min={minBookingDate !== '' ? minBookingDate : todayLocal}
                           disabled={!canEnableDates}
                         />
                         {formData.tourId !== '' && (
@@ -1589,7 +1581,7 @@ export function CreateBookingModal({
                           value={formData.endDate}
                           onChange={handleInputChange}
                           error={errors.endDate}
-                          min={minBookingDate}
+                          min={minBookingDate !== '' ? minBookingDate : todayLocal}
                           disabled={
                             !canEnableDates || (tourDaysCount !== null && tourDaysCount > 0)
                           }
@@ -1771,8 +1763,8 @@ export function CreateBookingModal({
                                 setAddTourAlert({ type: 'warning', message: cityWarning });
                               }
 
-                              // Add and sort chronologically
-                              const updated = sortToursChronologically([...selectedTours, newTour]);
+                              // Add and keep latest tours first (as requested by UX)
+                              const updated = sortToursLatestFirst([...selectedTours, newTour]);
                               setSelectedTours(updated);
 
                               // Reset form and hide fields
@@ -1830,179 +1822,179 @@ export function CreateBookingModal({
             )}
 
             {/* Multi-Tour: Selected Tours List — always visible */}
-            {isMultiTourMode && (
-              <div style={{ marginTop: '8px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: 'var(--space-2)',
-                    fontWeight: 'var(--font-weight-medium)',
-                    color: 'var(--color-neutral-700)',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  {bookingsT.selectedTours} ({selectedTours.length})
-                </label>
-                {selectedTours.length > 0 ? (
-                  <>
-                    <MultiTourSelector
-                      tours={selectedTours}
-                      onRemoveTour={(tourId) => {
-                        const updated = selectedTours.filter((t) => t.id !== tourId);
-                        setSelectedTours(updated);
-                        void validateMultiTour(updated);
-                      }}
-                      onReorderTours={(reorderedTours) => {
-                        setSelectedTours(reorderedTours);
-                        void validateMultiTour(reorderedTours);
-                      }}
-                      warnings={validationResult.warnings}
-                      errors={validationResult.errors}
-                    />
-                    {/* ── Price Breakdown ── */}
-                    <div
+            <div style={{ marginTop: '8px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: 'var(--space-2)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-neutral-700)',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {bookingsT.selectedTours} ({selectedTours.length})
+              </label>
+              {selectedTours.length > 0 ? (
+                <>
+                  <MultiTourSelector
+                    tours={selectedTours}
+                    onRemoveTour={(tourId) => {
+                      const updated = selectedTours.filter((t) => t.id !== tourId);
+                      setSelectedTours(updated);
+                      void validateMultiTour(updated);
+                    }}
+                    onReorderTours={(reorderedTours) => {
+                      const sorted = sortToursLatestFirst(reorderedTours);
+                      setSelectedTours(sorted);
+                      void validateMultiTour(sorted);
+                    }}
+                    warnings={validationResult.warnings}
+                    errors={validationResult.errors}
+                  />
+                  {/* ── Price Breakdown ── */}
+                  <div
+                    style={{
+                      marginTop: '12px',
+                      padding: '16px 20px',
+                      background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <h4
                       style={{
-                        marginTop: '12px',
-                        padding: '16px 20px',
-                        background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                        border: '1px solid #bbf7d0',
-                        borderRadius: '8px',
+                        margin: '0 0 12px 0',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: '#166534',
                       }}
                     >
-                      <h4
+                      {bookingsT.priceSummary}
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {selectedTours.map((tour, idx) => (
+                        <div
+                          key={tour.id + idx}
+                          style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '0.8125rem',
+                              color: '#334155',
+                            }}
+                          >
+                            <span>{language === 'en' ? tour.name_en : tour.name_es}</span>
+                            <span style={{ fontWeight: 600 }}>
+                              {formatCurrency(tour.price, tour.currency)}
+                            </span>
+                          </div>
+                          {(tour.minimumPayment ?? 0) > 0 && (
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: '0.75rem',
+                                color: '#0e7490',
+                                paddingLeft: 12,
+                              }}
+                            >
+                              <span>{bookingsT.minimumPayment}</span>
+                              <span>{formatCurrency(tour.minimumPayment ?? 0, tour.currency)}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Separator */}
+                      <div style={{ borderTop: '1px solid #bbf7d0', marginTop: 4 }} />
+
+                      {/* Total */}
+                      <div
                         style={{
-                          margin: '0 0 12px 0',
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.9375rem',
+                          fontWeight: 700,
                           color: '#166534',
                         }}
                       >
-                        {bookingsT.priceSummary}
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {selectedTours.map((tour, idx) => (
-                          <div
-                            key={tour.id + idx}
-                            style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
-                          >
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: '0.8125rem',
-                                color: '#334155',
-                              }}
-                            >
-                              <span>{language === 'en' ? tour.name_en : tour.name_es}</span>
-                              <span style={{ fontWeight: 600 }}>
-                                {formatCurrency(tour.price, tour.currency)}
-                              </span>
-                            </div>
-                            {(tour.minimumPayment ?? 0) > 0 && (
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  fontSize: '0.75rem',
-                                  color: '#0e7490',
-                                  paddingLeft: 12,
-                                }}
-                              >
-                                <span>{bookingsT.minimumPayment}</span>
-                                <span>
-                                  {formatCurrency(tour.minimumPayment ?? 0, tour.currency)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-
-                        {/* Separator */}
-                        <div style={{ borderTop: '1px solid #bbf7d0', marginTop: 4 }} />
-
-                        {/* Total */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            fontSize: '0.9375rem',
-                            fontWeight: 700,
-                            color: '#166534',
-                          }}
-                        >
-                          <span>Total</span>
-                          <span>
-                            {formatCurrency(
-                              calculateBookingTotal(selectedTours),
-                              formData.currency
-                            )}
-                          </span>
-                        </div>
-
-                        {/* Pay now (sum of minimumPayments) */}
-                        {selectedTours.some((t) => (t.minimumPayment ?? 0) > 0) && (
-                          <>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: '0.875rem',
-                                fontWeight: 600,
-                                color: '#0e7490',
-                                borderTop: '1px dashed #bbf7d0',
-                                paddingTop: 8,
-                              }}
-                            >
-                              <span>{language === 'en' ? 'Pay now' : 'Pagar ahora'}</span>
-                              <span>
-                                {formatCurrency(
-                                  selectedTours.reduce((s, t) => s + (t.minimumPayment ?? 0), 0),
-                                  formData.currency
-                                )}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: '0.8125rem',
-                                color: '#64748b',
-                              }}
-                            >
-                              <span>
-                                {language === 'en'
-                                  ? 'Remaining (due by tour date)'
-                                  : 'Restante (pago máximo el día del tour)'}
-                              </span>
-                              <span>
-                                {formatCurrency(
-                                  calculateBookingTotal(selectedTours) -
-                                    selectedTours.reduce((s, t) => s + (t.minimumPayment ?? 0), 0),
-                                  formData.currency
-                                )}
-                              </span>
-                            </div>
-                          </>
-                        )}
+                        <span>Total</span>
+                        <span>
+                          {formatCurrency(calculateBookingTotal(selectedTours), formData.currency)}
+                        </span>
                       </div>
+
+                      {/* Pay now (sum of minimumPayments) */}
+                      {selectedTours.some((t) => (t.minimumPayment ?? 0) > 0) && (
+                        <>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              color: '#0e7490',
+                              borderTop: '1px dashed #bbf7d0',
+                              paddingTop: 8,
+                            }}
+                          >
+                            <span>{language === 'en' ? 'Pay now' : 'Pagar ahora'}</span>
+                            <span>
+                              {formatCurrency(
+                                selectedTours.reduce(
+                                  (sum, tour) => sum + (tour.minimumPayment ?? 0),
+                                  0
+                                ),
+                                formData.currency
+                              )}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '0.8125rem',
+                              color: '#64748b',
+                            }}
+                          >
+                            <span>
+                              {language === 'en'
+                                ? 'Remaining (due by tour date)'
+                                : 'Restante (pago máximo el día del tour)'}
+                            </span>
+                            <span>
+                              {formatCurrency(
+                                calculateBookingTotal(selectedTours) -
+                                  selectedTours.reduce(
+                                    (sum, tour) => sum + (tour.minimumPayment ?? 0),
+                                    0
+                                  ),
+                                formData.currency
+                              )}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  </>
-                ) : (
-                  <div
-                    style={{
-                      padding: '24px',
-                      borderRadius: '8px',
-                      border: '2px dashed var(--color-neutral-200, #e5e7eb)',
-                      textAlign: 'center',
-                      color: 'var(--color-neutral-400, #9ca3af)',
-                      fontSize: '14px',
-                    }}
-                  >
-                    {bookingsT.noToursAdded}
                   </div>
-                )}
-              </div>
-            )}
+                </>
+              ) : (
+                <div
+                  style={{
+                    padding: '24px',
+                    borderRadius: '8px',
+                    border: '2px dashed var(--color-neutral-200, #e5e7eb)',
+                    textAlign: 'center',
+                    color: 'var(--color-neutral-400, #9ca3af)',
+                    fontSize: '14px',
+                  }}
+                >
+                  {bookingsT.noToursAdded}
+                </div>
+              )}
+            </div>
 
             {/* Currency */}
             <div>

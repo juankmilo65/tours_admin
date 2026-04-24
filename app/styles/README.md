@@ -61,11 +61,11 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 </div>
 
 // ✅ GOOD
-<div style={{ 
-  display: 'var(--display-flex)', 
-  flexDirection: 'var(--flex-direction-col)', 
-  alignItems: 'var(--align-items-center)', 
-  gap: 'var(--gap-4)' 
+<div style={{
+  display: 'var(--display-flex)',
+  flexDirection: 'var(--flex-direction-col)',
+  alignItems: 'var(--align-items-center)',
+  gap: 'var(--gap-4)'
 }}>
   ...
 </div>
@@ -80,9 +80,9 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 </div>
 
 // ✅ GOOD
-<div style={{ 
-  display: 'var(--display-grid)', 
-  gridTemplateColumns: 'var(--grid-template-columns-auto)' 
+<div style={{
+  display: 'var(--display-grid)',
+  gridTemplateColumns: 'var(--grid-template-columns-auto)'
 }}>
   ...
 </div>
@@ -94,25 +94,26 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 
 ```tsx
 <div style={{ position: 'var(--position-relative)' }}>
-  <div style={{ 
-    position: 'var(--position-absolute)', 
-    top: 0, 
-    bottom: 0, 
-    left: 0, 
-    paddingLeft: 'var(--search-input-icon-padding)',
-    display: 'var(--display-flex)',
-    alignItems: 'var(--align-items-center)',
-    pointerEvents: 'var(--pointer-events-none)'
-  }}>
-    <svg style={{ 
-      height: 'var(--search-input-icon-size)', 
-      width: 'var(--search-input-icon-size)' 
-    }} />
+  <div
+    style={{
+      position: 'var(--position-absolute)',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      paddingLeft: 'var(--search-input-icon-padding)',
+      display: 'var(--display-flex)',
+      alignItems: 'var(--align-items-center)',
+      pointerEvents: 'var(--pointer-events-none)',
+    }}
+  >
+    <svg
+      style={{
+        height: 'var(--search-input-icon-size)',
+        width: 'var(--search-input-icon-size)',
+      }}
+    />
   </div>
-  <input 
-    type="search" 
-    style={{ paddingLeft: 'var(--search-input-text-padding)' }} 
-  />
+  <input type="search" style={{ paddingLeft: 'var(--search-input-text-padding)' }} />
 </div>
 ```
 
@@ -127,14 +128,16 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 ### Empty State
 
 ```tsx
-<div style={{ 
-  display: 'var(--display-flex)', 
-  flexDirection: 'var(--flex-direction-col)', 
-  alignItems: 'var(--align-items-center)', 
-  justifyContent: 'var(--justify-content-center)',
-  padding: 'var(--empty-state-padding)',
-  color: 'var(--color-neutral-500)'
-}}>
+<div
+  style={{
+    display: 'var(--display-flex)',
+    flexDirection: 'var(--flex-direction-col)',
+    alignItems: 'var(--align-items-center)',
+    justifyContent: 'var(--justify-content-center)',
+    padding: 'var(--empty-state-padding)',
+    color: 'var(--color-neutral-500)',
+  }}
+>
   <svg style={{ width: 'var(--empty-state-icon-size)', height: 'var(--empty-state-icon-size)' }} />
   <p>...</p>
 </div>
@@ -143,11 +146,13 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 ### Pagination
 
 ```tsx
-<button style={{ 
-  padding: 'var(--pagination-padding)', 
-  borderRadius: 'var(--pagination-radius)', 
-  fontSize: 'var(--pagination-font-size)' 
-}}>
+<button
+  style={{
+    padding: 'var(--pagination-padding)',
+    borderRadius: 'var(--pagination-radius)',
+    fontSize: 'var(--pagination-font-size)',
+  }}
+>
   1
 </button>
 ```
@@ -155,29 +160,31 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 ### Image Thumbnail
 
 ```tsx
-<img 
-  style={{ 
-    width: 'var(--thumb-size-md)', 
-    height: 'var(--thumb-size-md)', 
-    borderRadius: 'var(--thumb-radius)', 
+<img
+  style={{
+    width: 'var(--thumb-size-md)',
+    height: 'var(--thumb-size-md)',
+    borderRadius: 'var(--thumb-radius)',
     boxShadow: 'var(--thumb-shadow)',
-    background: 'var(--thumb-bg)'
-  }} 
+    background: 'var(--thumb-bg)',
+  }}
 />
 ```
 
 ### File Upload Zone
 
 ```tsx
-<div style={{ 
-  border: 'var(--upload-zone-border-width) var(--upload-zone-border-style)', 
-  borderColor: 'var(--color-neutral-300)',
-  borderRadius: 'var(--upload-zone-radius)', 
-  padding: 'var(--upload-zone-padding)', 
-  textAlign: 'var(--text-align-center)', 
-  cursor: 'var(--cursor-pointer)', 
-  transition: 'all var(--upload-zone-transition)' 
-}}>
+<div
+  style={{
+    border: 'var(--upload-zone-border-width) var(--upload-zone-border-style)',
+    borderColor: 'var(--color-neutral-300)',
+    borderRadius: 'var(--upload-zone-radius)',
+    padding: 'var(--upload-zone-padding)',
+    textAlign: 'var(--text-align-center)',
+    cursor: 'var(--cursor-pointer)',
+    transition: 'all var(--upload-zone-transition)',
+  }}
+>
   ...
 </div>
 ```
@@ -186,12 +193,14 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 
 ```tsx
 <div style={{ padding: 'var(--modal-padding)' }}>
-  <p style={{ 
-    margin: 0, 
-    fontWeight: 'var(--font-weight-medium)', 
-    color: 'var(--color-neutral-900)', 
-    marginBottom: 'var(--modal-title-margin-bottom)' 
-  }}>
+  <p
+    style={{
+      margin: 0,
+      fontWeight: 'var(--font-weight-medium)',
+      color: 'var(--color-neutral-900)',
+      marginBottom: 'var(--modal-title-margin-bottom)',
+    }}
+  >
     Title
   </p>
 </div>
@@ -200,26 +209,28 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 ### Checkbox
 
 ```tsx
-<input 
-  type="checkbox" 
-  style={{ 
-    width: 'var(--checkbox-size)', 
-    height: 'var(--checkbox-size)', 
-    cursor: 'var(--checkbox-cursor)', 
-    accentColor: 'var(--checkbox-accent)' 
-  }} 
+<input
+  type="checkbox"
+  style={{
+    width: 'var(--checkbox-size)',
+    height: 'var(--checkbox-size)',
+    cursor: 'var(--checkbox-cursor)',
+    accentColor: 'var(--checkbox-accent)',
+  }}
 />
 ```
 
 ### Label
 
 ```tsx
-<label style={{ 
-  cursor: 'var(--label-cursor)', 
-  fontSize: 'var(--label-font-size)', 
-  fontWeight: 'var(--label-font-weight)', 
-  color: 'var(--label-color)' 
-}}>
+<label
+  style={{
+    cursor: 'var(--label-cursor)',
+    fontSize: 'var(--label-font-size)',
+    fontWeight: 'var(--label-font-weight)',
+    color: 'var(--label-color)',
+  }}
+>
   Label Text
 </label>
 ```
@@ -227,9 +238,7 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 ### Grid Span
 
 ```tsx
-<div style={{ gridColumn: 'var(--grid-span-full)' }}>
-  ...
-</div>
+<div style={{ gridColumn: 'var(--grid-span-full)' }}>...</div>
 ```
 
 ## Transitions
@@ -247,11 +256,13 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 ### Center Content
 
 ```tsx
-<div style={{ 
-  display: 'var(--display-flex)', 
-  alignItems: 'var(--align-items-center)', 
-  justifyContent: 'var(--justify-content-center)' 
-}}>
+<div
+  style={{
+    display: 'var(--display-flex)',
+    alignItems: 'var(--align-items-center)',
+    justifyContent: 'var(--justify-content-center)',
+  }}
+>
   ...
 </div>
 ```
@@ -259,25 +270,19 @@ All design tokens are defined as CSS custom properties (variables) in `app/style
 ### Responsive Gap
 
 ```tsx
-<div style={{ gap: 'var(--gap-4)' }}>
-  ...
-</div>
+<div style={{ gap: 'var(--gap-4)' }}>...</div>
 ```
 
 ### Container with Full Width
 
 ```tsx
-<div style={{ width: 'var(--w-full)' }}>
-  ...
-</div>
+<div style={{ width: 'var(--w-full)' }}>...</div>
 ```
 
 ### Max Width Container
 
 ```tsx
-<div style={{ maxWidth: 'var(--max-w-7xl)' }}>
-  ...
-</div>
+<div style={{ maxWidth: 'var(--max-w-7xl)' }}>...</div>
 ```
 
 ## Best Practices

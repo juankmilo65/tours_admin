@@ -427,10 +427,17 @@ export function ActivitiesByDay({
       const oldIndex = activeDay.activities.findIndex((a) => a.id === activeId);
       const newIndex = overDay.activities.findIndex((a) => a.id === overId);
 
+      const reorderedActivities = arrayMove(activeDay.activities, oldIndex, newIndex).map(
+        (activity, index) => ({
+          ...activity,
+          sortOrder: index,
+        })
+      );
+
       const newDays = [...days];
       newDays[activeDayIndex] = {
         ...activeDay,
-        activities: arrayMove(activeDay.activities, oldIndex, newIndex),
+        activities: reorderedActivities,
       };
       onDaysChange(newDays);
     }
@@ -443,14 +450,12 @@ export function ActivitiesByDay({
 
     newDays[dayIndex] = {
       ...currentDay,
-      activities: [
-        ...currentDay.activities,
-        {
-          ...activity,
-          sortOrder: currentDay.activities.length + 1,
-          day: dayIndex + 1,
-        },
-      ],
+      activities: [...currentDay.activities, { ...activity, day: dayIndex + 1 }].map(
+        (act, index) => ({
+          ...act,
+          sortOrder: index,
+        })
+      ),
     };
     onDaysChange(newDays);
   };
@@ -462,7 +467,12 @@ export function ActivitiesByDay({
 
     newDays[dayIndex] = {
       ...currentDay,
-      activities: currentDay.activities.filter((a) => a.id !== activityId),
+      activities: currentDay.activities
+        .filter((a) => a.id !== activityId)
+        .map((activity, index) => ({
+          ...activity,
+          sortOrder: index,
+        })),
     };
     onDaysChange(newDays);
   };

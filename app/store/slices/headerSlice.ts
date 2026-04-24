@@ -7,6 +7,7 @@
 
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import { logout, setAuthenticatedFromServer } from './authSlice';
 import type { RootState } from '~/store';
 
 export interface HeaderUserState {
@@ -45,10 +46,31 @@ const headerSlice = createSlice({
     setHeaderAvatar: (state, action: PayloadAction<string | null>) => {
       state.avatarUrl = action.payload;
     },
+
+    clearHeaderUser: (state) => {
+      state.firstName = '';
+      state.lastName = '';
+      state.avatarUrl = undefined;
+    },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(logout, (state) => {
+      state.firstName = '';
+      state.lastName = '';
+      state.avatarUrl = undefined;
+    });
+
+    builder.addCase(setAuthenticatedFromServer, (state, action) => {
+      if (!action.payload.isAuthenticated) {
+        state.firstName = '';
+        state.lastName = '';
+        state.avatarUrl = undefined;
+      }
+    });
   },
 });
 
-export const { setHeaderUser, setHeaderAvatar } = headerSlice.actions;
+export const { setHeaderUser, setHeaderAvatar, clearHeaderUser } = headerSlice.actions;
 
 // Selectors
 export const selectHeaderUser = (state: RootState): HeaderUserState => state.header;

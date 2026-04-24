@@ -118,12 +118,24 @@ export const checkDifferentCitySameDay = (
  * Sort tours chronologically by date, then by start time
  */
 export const sortToursChronologically = (tours: BookingTour[]): BookingTour[] => {
+  const parseDateToNumber = (dateStr: string): number => {
+    const [yearRaw, monthRaw, dayRaw] = dateStr.trim().split('-');
+    const year = Number.parseInt(yearRaw ?? '0', 10) || 0;
+    const month = Number.parseInt(monthRaw ?? '1', 10) || 1;
+    const day = Number.parseInt(dayRaw ?? '1', 10) || 1;
+    return Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+  };
+
   return [...tours].sort((a, b) => {
-    // Compare dates first
-    const dateCompare = a.startDate.localeCompare(b.startDate);
-    if (dateCompare !== 0) return dateCompare;
-    // Same date: compare start times
-    return parseTime(a.startTime) - parseTime(b.startTime);
+    const aDate = parseDateToNumber(a.startDate);
+    const bDate = parseDateToNumber(b.startDate);
+    if (aDate !== bDate) return aDate - bDate;
+
+    const timeCompare = parseTime(a.startTime) - parseTime(b.startTime);
+    if (timeCompare !== 0) return timeCompare;
+
+    // Stable tie-breaker for identical date/time tours
+    return a.id.localeCompare(b.id);
   });
 };
 

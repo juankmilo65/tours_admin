@@ -703,10 +703,10 @@ export function CreateTourModal({
         }),
         activities: formData.days.map((day) => ({
           day: day.day,
-          activities: day.activities.map((activity) => ({
+          activities: day.activities.map((activity, index) => ({
             activityId: activity.activityId,
             hora: activity.hora,
-            sortOrder: activity.sortOrder,
+            sortOrder: index,
           })),
         })),
       };
