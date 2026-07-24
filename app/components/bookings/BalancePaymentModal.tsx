@@ -15,7 +15,8 @@ import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { openModal } from '~/store/slices/uiSlice';
 import { selectAuthToken } from '~/store/slices/authSlice';
 import { completePaymentBusiness } from '~/server/businessLogic/bookingsBusinessLogic';
-import { computeStripeChargeBreakdown, stripeFeeRate } from '~/services/bookingService';
+import { computeStripeChargeBreakdown, resolveMethodFee } from '~/services/bookingService';
+import { useCurrencyConfig } from '~/hooks/useCurrencyConfig';
 import type { Booking } from '~/types/booking';
 
 const TAX_RATE = 0.16;
@@ -39,8 +40,11 @@ export function BalancePaymentModal({
   const token = useAppSelector(selectAuthToken);
   const [selected, setSelected] = useState<MethodKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { currencies: currencyConfigs } = useCurrencyConfig();
 
   if (!isOpen || booking === null) return null;
+
+  const currencyConfig = currencyConfigs.find((c) => c.code === booking.currency);
 
   const parse = (v: number | string | undefined): number =>
     typeof v === 'number' ? v : parseFloat(String(v ?? '0')) || 0;
@@ -50,12 +54,13 @@ export function BalancePaymentModal({
       ? parse(booking.remainingAfterDeposit)
       : parse(booking.totalPrice) - parse(booking.depositAmount);
 
-  const feeRateFor = (m: MethodKey): number =>
+  const methodFeeFor = (m: MethodKey) =>
     m === 'oxxo'
-      ? stripeFeeRate('oxxo', 'local')
-      : stripeFeeRate('card', m === 'card-foreign' ? 'foreign' : 'local');
+      ? resolveMethodFee(currencyConfig, 'oxxo', 'local')
+      : resolveMethodFee(currencyConfig, 'card', m === 'card-foreign' ? 'foreign' : 'local');
 
-  const money = (v: number): string => `${booking.currency} ${v.toFixed(2)}`;
+  const decimals = currencyConfig?.decimals ?? 2;
+  const money = (v: number): string => `${booking.currency} ${v.toFixed(decimals)}`;
 
   const methods: Array<{ key: MethodKey; label: string }> = [
     { key: 'card-local', label: bookingsT.balancePayment.methodLocal },
@@ -67,7 +72,49 @@ export function BalancePaymentModal({
     if (selected === null) return;
     setSubmitting(true);
     try {
-      const feeBreakdown = computeStripeChargeBreakdown(net, TAX_RATE, feeRateFor(selected));
+      const methodFee = methodFeeFor(selected);
+      if (currencyConfig === undefined || methodFee === undefined) {
+        dispatch(
+          openModal({
+            id: 'balance-payment-error',
+            type: 'confirm',
+            title: t('common.error') ?? 'Error',
+            isOpen: true,
+            data: {
+              message:
+                language === 'en'
+                  ? 'Payment configuration is not available yet. Please try again.'
+                  : 'La configuración de pago aún no está disponible. Intenta de nuevo.',
+              icon: 'alert',
+            },
+          } as Parameters<typeof openModal>[0])
+        );
+        return;
+      }
+      const feeBreakdown = computeStripeChargeBreakdown(
+        net,
+        TAX_RATE,
+        methodFee.rate,
+        methodFee.fixedFee
+      );
+      if (feeBreakdown.totalAmount < currencyConfig.minCharge) {
+        dispatch(
+          openModal({
+            id: 'balance-payment-error',
+            type: 'confirm',
+            title: t('common.error') ?? 'Error',
+            isOpen: true,
+            data: {
+              message:
+                language === 'en'
+                  ? `The amount to charge is below the minimum for ${currencyConfig.code} (${currencyConfig.minCharge.toFixed(decimals)}).`
+                  : `El monto a cobrar es menor al mínimo para ${currencyConfig.code} (${currencyConfig.minCharge.toFixed(decimals)}).`,
+              icon: 'alert',
+            },
+          } as Parameters<typeof openModal>[0])
+        );
+        return;
+      }
       const result = await completePaymentBusiness(
         booking.id,
         feeBreakdown,
@@ -168,7 +215,11 @@ export function BalancePaymentModal({
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {methods.map((m) => {
-              const breakdown = computeStripeChargeBreakdown(net, TAX_RATE, feeRateFor(m.key));
+              const mf = methodFeeFor(m.key);
+              const breakdown =
+                mf !== undefined
+                  ? computeStripeChargeBreakdown(net, TAX_RATE, mf.rate, mf.fixedFee)
+                  : undefined;
               const active = selected === m.key;
               return (
                 <button
@@ -200,10 +251,12 @@ export function BalancePaymentModal({
                         color: '#166534',
                       }}
                     >
-                      {money(breakdown.totalAmount)}
+                      {breakdown !== undefined ? money(breakdown.totalAmount) : '—'}
                     </span>
                     <span style={{ display: 'block', fontSize: '0.7rem', color: '#9ca3af' }}>
-                      {bookingsT.stripeFee.comision} {money(breakdown.feeAmount)}
+                      {breakdown !== undefined
+                        ? `${bookingsT.stripeFee.comision} ${money(breakdown.feeAmount)}`
+                        : ''}
                     </span>
                   </span>
                 </button>

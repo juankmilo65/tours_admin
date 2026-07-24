@@ -51,8 +51,9 @@ import { useMultiTourValidation } from '~/hooks/useMultiTourValidation';
 import {
   calculateBookingTotal,
   computeStripeChargeBreakdown,
-  stripeFeeRate,
+  resolveMethodFee,
 } from '~/services/bookingService';
+import { useCurrencyConfig } from '~/hooks/useCurrencyConfig';
 
 // Payment method option returned by /api/stripe/payment-methods
 interface PaymentMethodOption {
@@ -90,6 +91,7 @@ export function CreateBookingModal({
   onClose,
 }: CreateBookingModalProps): JSX.Element | null {
   const { t, language } = useTranslation();
+  const { currencies: currencyConfigs } = useCurrencyConfig();
   const bookingsT = language === 'en' ? bookingEn : bookingEs;
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
@@ -672,6 +674,12 @@ export function CreateBookingModal({
     return { displaySubtotal, displayTax, displayTotal, displayAnticipo, displayRemaining };
   }, [selectedTours, formData.clients.length]);
 
+  // Currency config (rates, fixed fees, min charge, decimals) from the backend — the
+  // single source of truth for fee math. Undefined until it loads.
+  const currencyConfig = currencyConfigs.find((c) => c.code === formData.currency);
+  const selectedMethodFee = resolveMethodFee(currencyConfig, selectedPaymentMethod, cardType);
+  const currencyDecimals = currencyConfig?.decimals ?? 2;
+
   // Determine when each section should be enabled
   const canEnableDates = useMemo(() => {
     return formData.tourId !== '' && !isLoadingHourRange;
@@ -963,11 +971,35 @@ export function CreateBookingModal({
       // Online charge breakdown for the deposit (anticipo): net + IVA + gross-up fee.
       // The backend recomputes net/IVA from the reservation and trusts only feeAmount;
       // net/IVA must match its calculation or it responds 422.
+      // Fee and minimum come from the backend currency config (no hardcoding). Block if
+      // the config is not loaded, the method is unavailable, or the charge is below the
+      // currency's Stripe minimum — instead of letting the backend 400/422.
+      if (currencyConfig === undefined || selectedMethodFee === undefined) {
+        dispatch(setGlobalLoading({ isLoading: false }));
+        setApiError(
+          language === 'en'
+            ? 'Payment configuration is not available yet. Please try again.'
+            : 'La configuración de pago aún no está disponible. Intenta de nuevo.'
+        );
+        setIsSubmitting(false);
+        return;
+      }
       const feeBreakdown = computeStripeChargeBreakdown(
         minimumPayment,
         0.16,
-        stripeFeeRate(selectedPaymentMethod, cardType)
+        selectedMethodFee.rate,
+        selectedMethodFee.fixedFee
       );
+      if (feeBreakdown.totalAmount < currencyConfig.minCharge) {
+        dispatch(setGlobalLoading({ isLoading: false }));
+        setApiError(
+          language === 'en'
+            ? `The amount to charge (${currencyConfig.code} ${feeBreakdown.totalAmount.toFixed(currencyConfig.decimals)}) is below the minimum for ${currencyConfig.code} (${currencyConfig.minCharge.toFixed(currencyConfig.decimals)}). Raise the deposit.`
+            : `El monto a cobrar (${currencyConfig.code} ${feeBreakdown.totalAmount.toFixed(currencyConfig.decimals)}) es menor al mínimo para ${currencyConfig.code} (${currencyConfig.minCharge.toFixed(currencyConfig.decimals)}). Sube el anticipo.`
+        );
+        setIsSubmitting(false);
+        return;
+      }
       const sortedByStart = [...items].sort((a, b) => a.startAt.localeCompare(b.startAt));
       const sortedByEnd = [...items].sort((a, b) => a.endAt.localeCompare(b.endAt));
       const bookingStartAt = sortedByStart[0]?.startAt ?? new Date().toISOString();
@@ -2038,8 +2070,8 @@ export function CreateBookingModal({
                           multiTourSummary.displaySubtotal - multiTourSummary.displayAnticipo
                         }
                         currency={formData.currency}
-                        method={selectedPaymentMethod}
-                        cardType={cardType}
+                        methodFee={selectedMethodFee}
+                        decimals={currencyDecimals}
                       />
                     </div>
                   </div>
@@ -2073,16 +2105,11 @@ export function CreateBookingModal({
                 {t('bookings.currency')} <span style={{ color: 'red' }}>*</span>
               </label>
               <Select
-                options={[
-                  { value: 'MXN', label: 'MXN - Mexican Peso' },
-                  { value: 'COP', label: 'COP - Colombian Peso' },
-                  { value: 'USD', label: 'USD - US Dollar' },
-                  { value: 'EUR', label: 'EUR - Euro' },
-                  { value: 'PEN', label: 'PEN - Peruvian Sol' },
-                  { value: 'CLP', label: 'CLP - Chilean Peso' },
-                  { value: 'ARS', label: 'ARS - Argentine Peso' },
-                  { value: 'BRL', label: 'BRL - Brazilian Real' },
-                ]}
+                options={
+                  currencyConfigs.length > 0
+                    ? currencyConfigs.map((c) => ({ value: c.code, label: c.code }))
+                    : [{ value: formData.currency, label: formData.currency }]
+                }
                 value={formData.currency}
                 onChange={(value: string) => {
                   setFormData((prev) => ({ ...prev, currency: value }));
@@ -2571,8 +2598,8 @@ export function CreateBookingModal({
                     anticipo={tourMinimumPayment ?? 0}
                     excedente={priceSummary.subtotal - (tourMinimumPayment ?? 0)}
                     currency={formData.currency}
-                    method={selectedPaymentMethod}
-                    cardType={cardType}
+                    methodFee={selectedMethodFee}
+                    decimals={currencyDecimals}
                   />
                 </div>
               </div>

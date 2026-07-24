@@ -1,22 +1,22 @@
 /**
  * StripeFeeNotice
- * Informational, unobtrusive payment breakdown split into two sections:
+ * Informational payment breakdown split into two sections:
  *  - Anticipo (deposit): always paid online via Stripe, so it carries IVA + the
- *    processing fee the customer covers. The estimate reacts to the selected
- *    payment method (card local/foreign vs. OXXO).
+ *    processing fee the customer covers.
  *  - Excedente (balance): defaults to cash at the meeting point (no fee), but can
  *    be toggled to card, which surfaces the same net + IVA + fee breakdown.
- * The fee is grossed up over (net + IVA) so that amount arrives intact. Display-only:
- * it estimates amounts for disclosure and never alters any payment sent to the
- * backend. The backend is the source of truth and reconciles with the real
- * balance_transaction. See PROMPT_BACKEND_STRIPE_FEE.md.
+ * Rates, fixed fees and decimals come from the backend currency config (passed in
+ * via `methodFee`/`decimals`) — never hardcoded. The fee is grossed up over
+ * (net + IVA) so that amount arrives intact. Display-only; the backend is the source
+ * of truth and reconciles with the real balance_transaction.
  */
 
 import type { CSSProperties, JSX } from 'react';
 import { useState } from 'react';
 import { useTranslation } from '~/lib/i18n/utils';
 import { bookingEn, bookingEs } from '~/lib/i18n';
-import { computeStripeChargeBreakdown, stripeFeeRate } from '~/services/bookingService';
+import { computeStripeChargeBreakdown } from '~/services/bookingService';
+import type { CurrencyMethodConfig } from '~/types/currencyConfig';
 
 interface StripeFeeNoticeProps {
   /** Net (pre-IVA) online-charged deposit the estimate is built on. */
@@ -25,10 +25,10 @@ interface StripeFeeNoticeProps {
   excedente: number;
   /** ISO currency code of the booking (e.g. 'MXN'). */
   currency: string;
-  /** Selected payment method id ('card' | 'oxxo' | '' for none selected). */
-  method: string;
-  /** Card origin used to pick which fee assumption to disclose. */
-  cardType?: 'local' | 'foreign';
+  /** Decimal places for this currency (from config); defaults to 2. */
+  decimals?: number;
+  /** Resolved method fee (rate + fixedFee + label) from the backend config; null when unavailable. */
+  methodFee?: CurrencyMethodConfig | null;
   /** Optional style overrides for spacing tweaks from the parent layout. */
   style?: CSSProperties;
 }
@@ -39,8 +39,8 @@ export function StripeFeeNotice({
   anticipo,
   excedente,
   currency,
-  method,
-  cardType = 'local',
+  decimals = 2,
+  methodFee,
   style,
 }: StripeFeeNoticeProps): JSX.Element | null {
   const { language } = useTranslation();
@@ -56,14 +56,11 @@ export function StripeFeeNotice({
     return null;
   }
 
-  const money = (value: number): string => `${currency} ${value.toFixed(2)}`;
+  const money = (value: number): string => `${currency} ${value.toFixed(decimals)}`;
 
   const {
     anticipoLabel,
     feeHeader,
-    localLabel,
-    foreignLabel,
-    oxxoLabel,
     excedenteLabel,
     meetingPointNote,
     selectMethodHint,
@@ -89,16 +86,12 @@ export function StripeFeeNotice({
     transition: 'all 0.15s',
   });
 
-  // Itemized net + IVA + fee + total for one online charge (card or OXXO).
-  const renderBreakdown = (
-    net: number,
-    feeRate: number,
-    methodLabel: string
-  ): JSX.Element | null => {
+  // Itemized net + IVA + fee + total for one online charge, using the config method.
+  const renderBreakdown = (net: number, fee: CurrencyMethodConfig): JSX.Element | null => {
     if (!Number.isFinite(net) || net <= 0) {
       return null;
     }
-    const b = computeStripeChargeBreakdown(net, TAX_RATE, feeRate);
+    const b = computeStripeChargeBreakdown(net, TAX_RATE, fee.rate, fee.fixedFee);
     return (
       <>
         <div style={feeRowStyle}>
@@ -111,7 +104,7 @@ export function StripeFeeNotice({
         </div>
         <div style={feeRowStyle}>
           <span>
-            {comision} ({methodLabel})
+            {comision} ({fee.label})
           </span>
           <span>{money(b.feeAmount)}</span>
         </div>
@@ -122,9 +115,6 @@ export function StripeFeeNotice({
       </>
     );
   };
-
-  const cardFeeRate = stripeFeeRate('card', cardType);
-  const cardLabel = cardType === 'foreign' ? foreignLabel : localLabel;
 
   return (
     <div
@@ -151,19 +141,14 @@ export function StripeFeeNotice({
               <span style={{ fontWeight: 600 }}>{anticipoLabel}</span>
             </span>
           </div>
-          {method === 'card' && (
+          {methodFee ? (
             <>
               <span>{feeHeader}</span>
-              {renderBreakdown(anticipo, cardFeeRate, cardLabel)}
+              {renderBreakdown(anticipo, methodFee)}
             </>
+          ) : (
+            <span style={{ fontStyle: 'italic' }}>{selectMethodHint}</span>
           )}
-          {method === 'oxxo' && (
-            <>
-              <span>{feeHeader}</span>
-              {renderBreakdown(anticipo, stripeFeeRate('oxxo', 'local'), oxxoLabel)}
-            </>
-          )}
-          {method === '' && <span style={{ fontStyle: 'italic' }}>{selectMethodHint}</span>}
         </div>
       )}
       {hasExcedente && (
@@ -195,12 +180,15 @@ export function StripeFeeNotice({
             </div>
           </div>
           {balanceMethod === 'cash' && <span>{meetingPointNote}</span>}
-          {balanceMethod === 'card' && (
-            <>
-              <span>{feeHeader}</span>
-              {renderBreakdown(excedente, cardFeeRate, cardLabel)}
-            </>
-          )}
+          {balanceMethod === 'card' &&
+            (methodFee ? (
+              <>
+                <span>{feeHeader}</span>
+                {renderBreakdown(excedente, methodFee)}
+              </>
+            ) : (
+              <span style={{ fontStyle: 'italic' }}>{selectMethodHint}</span>
+            ))}
         </div>
       )}
     </div>

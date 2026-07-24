@@ -4,6 +4,7 @@
  */
 
 import type { BookingTour } from '~/types/booking';
+import type { CurrencyConfig, CurrencyMethodConfig } from '~/types/currencyConfig';
 import { validateSameDayMargin } from '~/utilities/validationHelpers';
 
 export interface MultiTourValidationResult {
@@ -117,12 +118,22 @@ export const computeStripeChargeBreakdown = (
 };
 
 /**
- * Maps the selected payment method (+ card origin) to the Stripe MX processing rate.
- * Official rates (backend-aligned): domestic card 3.6%, international card 6.1%
- * (3.6% + 0.5% + 2% conversion, treated flat), OXXO 4.0% — all with a $3 fixed fee.
+ * Maps the UI selection (payment method + card origin) to the matching method in the
+ * backend currency config, to read its rate and fixedFee. The backend config is the
+ * single source of truth — the front no longer hardcodes rates. Returns undefined when
+ * the config is not loaded or has no matching method; callers must block on that.
  */
-export const stripeFeeRate = (method: string, cardType: 'local' | 'foreign'): number => {
-  if (method === 'oxxo') return 0.04;
-  if (method === 'card') return cardType === 'foreign' ? 0.061 : 0.036;
-  return 0;
+export const resolveMethodFee = (
+  config: CurrencyConfig | undefined,
+  method: string,
+  cardType: 'local' | 'foreign'
+): CurrencyMethodConfig | undefined => {
+  if (config === undefined || method === '') return undefined;
+  const wantKey =
+    method === 'oxxo' ? 'oxxo' : cardType === 'foreign' ? 'card_international' : 'card_national';
+  return (
+    config.methods.find((m) => m.key === wantKey) ??
+    config.methods.find((m) => m.key === 'card') ??
+    config.methods[0]
+  );
 };

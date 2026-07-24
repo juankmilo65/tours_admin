@@ -16,6 +16,7 @@ import {
 import { getCancellationPoliciesBusiness } from '~/server/businessLogic/cancellationPoliciesBusinessLogic';
 import type { CancellationPolicy as CancellationPolicyType } from '~/types/cancellationPolicy';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
+import { useCurrencyConfig } from '~/hooks/useCurrencyConfig';
 import { selectAuthToken, selectCurrentUser, selectOwnerKycStatus } from '~/store/slices/authSlice';
 import { selectCategories, type Category } from '~/store/slices/categoriesSlice';
 import { selectCities, translateCities, type TranslatedCity } from '~/store/slices/citiesSlice';
@@ -131,10 +132,8 @@ export function CreateTourModal({
 }: CreateTourModalProps): JSX.Element | null {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  // Stripe's minimum charge per currency. The deposit's total charge (net + IVA +
-  // fee) is always more than the deposit itself, so requiring the deposit to meet
-  // this floor guarantees any booking clears Stripe's minimum charge.
-  const stripeMinChargeByCurrency: Record<string, number> = { MXN: 10, USD: 0.5, EUR: 0.5 };
+  // Per-currency minimum charge comes from the backend config (single source of truth).
+  const { currencies: currencyConfigs } = useCurrencyConfig();
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectCurrentUser);
   const ownerKycStatus = useAppSelector(selectOwnerKycStatus);
@@ -616,7 +615,8 @@ export function CreateTourModal({
     }
     if (formData.basePrice <= 0)
       newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
-    const minPaymentFloor = stripeMinChargeByCurrency[formData.currency] ?? 0;
+    const minPaymentFloor =
+      currencyConfigs.find((c) => c.code === formData.currency)?.minCharge ?? 0;
     if (
       formData.minimumPayment === undefined ||
       formData.minimumPayment === null ||
@@ -1963,7 +1963,7 @@ export function CreateTourModal({
                   name="minimumPayment"
                   value={formData.minimumPayment}
                   onChange={handleInputChange}
-                  min={stripeMinChargeByCurrency[formData.currency] ?? 0}
+                  min={currencyConfigs.find((c) => c.code === formData.currency)?.minCharge ?? 0}
                   step={0.01}
                   style={{
                     width: '100%',
