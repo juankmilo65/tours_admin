@@ -12,8 +12,7 @@ import { data, redirect, type LinksFunction, type LoaderFunctionArgs } from '@re
 import { useMemo, useState, useEffect, createContext, type ReactNode } from 'react';
 import React from 'react';
 import { Provider } from 'react-redux';
-import { PersistGate } from 'redux-persist/integration/react';
-import { makeStore, makePersistor } from './store';
+import { makeStore, makePersistor, selectIsRehydrated } from './store';
 
 import './styles/global.css';
 import { Header } from './components/layout/Header';
@@ -87,6 +86,7 @@ function DataSyncDispatcher({
 function AuthGuard({ children }: { children: ReactNode }): ReactNode {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isOtpVerified = useAppSelector(selectIsOtpVerified);
+  const isRehydrated = useAppSelector(selectIsRehydrated);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -97,7 +97,9 @@ function AuthGuard({ children }: { children: ReactNode }): ReactNode {
     location.pathname === '/forgot-password' ||
     location.pathname === '/verify-email';
 
-  const needsRedirect = (!isAuthenticated || !isOtpVerified) && !isPublicRoute;
+  // Auth lives in a persisted slice, so it reads as logged-out until redux-persist
+  // rehydrates. Redirecting before then would bounce authenticated users to login.
+  const needsRedirect = isRehydrated && (!isAuthenticated || !isOtpVerified) && !isPublicRoute;
 
   useEffect(() => {
     if (needsRedirect) {
@@ -218,10 +220,11 @@ function ClientOnlyGlobalLoader(): ReactNode {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
+  // Must match what GlobalLoader renders while idle. An opaque full-screen
+  // placeholder here would cover the whole app if this component ever failed to
+  // reach the client.
   if (!isClient) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'white', zIndex: 9999 }}></div>
-    );
+    return null;
   }
 
   return <GlobalLoader />;
@@ -256,33 +259,10 @@ function ClientOnlyModal(): ReactNode {
       setIsClient(true);
     }, 0);
     return () => window.clearTimeout(timeoutId);
-  });
+  }, []);
 
   if (!isClient) return null;
   return <ModalRoot />;
-}
-
-// Wrapper to handle PersistGate only when persistor is available
-function PersistGateWrapper({ children }: { children: ReactNode }): ReactNode {
-  if (persistor === null) {
-    return (
-      <>
-        {children}
-        <ClientOnlyGlobalLoader />
-        <ScrollRestoration />
-        <Scripts />
-      </>
-    );
-  }
-
-  return (
-    <PersistGate loading={null} persistor={persistor}>
-      {children}
-      <ClientOnlyGlobalLoader />
-      <ScrollRestoration />
-      <Scripts />
-    </PersistGate>
-  );
 }
 
 export const links: LinksFunction = () => [
@@ -297,7 +277,13 @@ export const links: LinksFunction = () => [
 
 // Redux store para cliente
 const store = makeStore();
-const persistor = typeof window !== 'undefined' ? makePersistor(store) : null;
+
+// Start redux-persist on the client only. The persistor must never gate the render
+// tree: PersistGate renders `null` until rehydration completes, which makes the
+// client's first render differ from the server's and breaks hydration of `document`.
+if (typeof window !== 'undefined') {
+  makePersistor(store);
+}
 
 export function Layout({ children }: { children: ReactNode }): ReactNode {
   return (
@@ -313,7 +299,10 @@ export function Layout({ children }: { children: ReactNode }): ReactNode {
         suppressHydrationWarning
       >
         <Provider store={store}>
-          <PersistGateWrapper>{children}</PersistGateWrapper>
+          {children}
+          <ClientOnlyGlobalLoader />
+          <ScrollRestoration />
+          <Scripts />
         </Provider>
       </body>
     </html>

@@ -86,3 +86,9 @@ export const makePersistor = (
 export type AppStore = ReturnType<typeof makeStore>;
 export type RootState = ReturnType<AppStore['getState']>;
 export type AppDispatch = AppStore['dispatch'];
+
+// True once redux-persist has restored the whitelisted slices from storage.
+// Always false during SSR and on the first client render, so consumers must not
+// use it to decide what to render — only to defer side effects that depend on
+// persisted state (e.g. auth redirects).
+export const selectIsRehydrated = (state: RootState): boolean => state._persist.rehydrated === true;
