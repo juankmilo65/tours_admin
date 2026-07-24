@@ -1,6 +1,7 @@
 # Análisis de Migración CSS - app/routes/bookings.tsx
 
 ## Resumen
+
 - **Total de estilos "quemados"**: 40 bloques de `style={{...}}`
 - **Patrones identificados**: 15+ patrones repetidos
 - **Prioridad de migración**: Alta (componente muy utilizado)
@@ -8,6 +9,7 @@
 ## Patrones de Estilos Identificados
 
 ### 1. Contenedores Flexbox (12 ocurrencias)
+
 ```tsx
 // ❌ ACTUAL
 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -20,6 +22,7 @@
 ```
 
 ### 2. Botones de Iconos (8 ocurrencias)
+
 ```tsx
 // ❌ ACTUAL
 <button style={{ width: 38, height: 38, borderRadius: 'var(--radius-lg, 10px)', ... }}>
@@ -30,6 +33,7 @@
 ```
 
 ### 3. Grid Layouts (4 ocurrencias)
+
 ```tsx
 // ❌ ACTUAL
 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)' }}>
@@ -40,6 +44,7 @@
 ```
 
 ### 4. Inputs de Fecha (3 ocurrencias)
+
 ```tsx
 // ❌ ACTUAL
 <input style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', color: '#111827', height: '40px' }}>
@@ -49,6 +54,7 @@
 ```
 
 ### 5. Badges de Estado (10+ ocurrencias)
+
 ```tsx
 // ❌ ACTUAL
 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: colors.bg, color: colors.text, width: 'fit-content' }}>
@@ -58,6 +64,7 @@
 ```
 
 ### 6. Labels (8 ocurrencias)
+
 ```tsx
 // ❌ ACTUAL
 <label style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-neutral-700)', marginBottom: 'var(--space-1)' }}>
@@ -67,6 +74,7 @@
 ```
 
 ### 7. Texto con Tipografía (15+ ocurrencias)
+
 ```tsx
 // ❌ ACTUAL
 <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827', maxWidth: 200 }}>
@@ -80,22 +88,23 @@
 ```
 
 ### 8. Colores "quemados" (20+ ocurrencias)
+
 ```tsx
 // ❌ ACTUAL
-backgroundColor: '#fef9c3'
-color: '#a16207'
-color: '#111827'
-color: '#6b7280'
-border: '1px solid #d1d5db'
-backgroundColor: '#f3f4f6'
+backgroundColor: '#fef9c3';
+color: '#a16207';
+color: '#111827';
+color: '#6b7280';
+border: '1px solid #d1d5db';
+backgroundColor: '#f3f4f6';
 
 // ✅ DEBERÍA SER
-backgroundColor: 'var(--color-warning-50)'
-color: 'var(--color-warning-700)'
-color: 'var(--color-neutral-900)'
-color: 'var(--color-neutral-500)'
-border: '1px solid var(--color-neutral-300)'
-backgroundColor: 'var(--color-neutral-100)'
+backgroundColor: 'var(--color-warning-50)';
+color: 'var(--color-warning-700)';
+color: 'var(--color-neutral-900)';
+color: 'var(--color-neutral-500)';
+border: '1px solid var(--color-neutral-300)';
+backgroundColor: 'var(--color-neutral-100)';
 ```
 
 ## Variables CSS Faltantes
@@ -132,10 +141,12 @@ Basado en el análisis, necesitamos agregar estas variables a `tokens.css`:
 ## Plan de Migración
 
 ### Fase 1: Variables CSS Faltantes
+
 1. Agregar variables faltantes a `tokens.css`
 2. Actualizar `README.md` con nuevos ejemplos
 
 ### Fase 2: Migración por Secciones
+
 1. **Sección de Columnas de Tabla** (líneas 350-600)
    - Migrar todos los estilos de render functions
    - Prioridad: Alta (más código duplicado)
@@ -153,6 +164,7 @@ Basado en el análisis, necesitamos agregar estas variables a `tokens.css`:
    - Prioridad: Media
 
 ### Fase 3: Validación
+
 1. Verificar que no hay errores de TypeScript
 2. Compilar el proyecto
 3. Verificar visualmente que el diseño no cambió

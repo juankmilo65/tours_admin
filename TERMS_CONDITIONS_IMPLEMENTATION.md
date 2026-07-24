@@ -1,11 +1,13 @@
 # Terms and Conditions Implementation
 
 ## Overview
+
 Complete implementation of terms and conditions flow for the registration page following existing project standards.
 
 ## Files Created/Modified
 
 ### 1. Created: `app/server/termsConditions.tsx`
+
 - Service to fetch terms and conditions from backend API
 - Follows the same pattern as other services (categories, cities, countries, etc.)
 - Uses the `createServiceREST` wrapper for consistent error handling
@@ -13,7 +15,9 @@ Complete implementation of terms and conditions flow for the registration page f
 - Accepts `X-Language` header for localization
 
 ### 2. Modified: `app/lib/i18n/es.ts`
+
 Added new translation keys:
+
 - `auth.acceptTerms`: "Acepto los términos y condiciones"
 - `auth.viewTerms`: "Ver términos y condiciones"
 - `auth.termsTitle`: "Términos y Condiciones"
@@ -22,25 +26,30 @@ Added new translation keys:
 - `auth.termsLoadingError`: "Error al cargar los términos y condiciones"
 
 ### 3. Modified: `app/lib/i18n/en.ts`
+
 Added corresponding English translations for all keys.
 
 ### 4. Modified: `app/routes/register.tsx`
 
 #### New State Variables
+
 - `termsAccepted`: Boolean for checkbox state
 - `showTermsModal`: Boolean to control modal visibility
 - `termsData`: String to store terms content
 - `termsTitle`: String to store terms title
 
 #### New Effects
+
 - Fetches terms and conditions on component mount using `getTermsConditions('registration', currentLang)`
 - Refetches when language changes
 
 #### New Functions
+
 - `handleOpenTermsModal()`: Opens the terms modal
 - `handleAcceptTermsFromModal()`: Accepts terms from modal, closes modal, checks checkbox
 
 #### UI Changes
+
 1. **Terms Checkbox** - Added below confirm password field:
    - Checkbox with label: "Acepto los términos y condiciones"
    - Link button: "Ver términos y condiciones" (opens modal)
@@ -56,28 +65,33 @@ Added corresponding English translations for all keys.
    - Hover effects on button
 
 #### Form Validation
+
 - Updated `isFormValid` to include `termsAccepted`
 - Submit button disabled until all fields are valid AND terms are accepted
 
 ## Features
 
 ### ✅ Automatic Terms Fetching
+
 - Terms are fetched on component mount
 - Language-aware (refetches when language changes)
 - Error handling with user-friendly message
 
 ### ✅ Checkbox with Link
+
 - Checkbox to accept terms
 - Link to view full terms in modal
 - Both are part of the validation flow
 
 ### ✅ Modal Display
+
 - Scrollable content for long terms
 - No close button (must accept to proceed)
 - "Accept" button that automatically checks the checkbox
 - Clean, modern design matching existing UI
 
 ### ✅ Validation
+
 - Form cannot be submitted without accepting terms
 - Submit button disabled until all conditions met
 - Clear visual feedback
@@ -85,6 +99,7 @@ Added corresponding English translations for all keys.
 ## API Contract
 
 ### Request
+
 ```bash
 GET http://localhost:3000/api/terms-conditions/type/registration
 Headers:
@@ -92,6 +107,7 @@ Headers:
 ```
 
 ### Response
+
 ```json
 {
   "success": true,
@@ -125,6 +141,7 @@ Headers:
 ## Styling
 
 The modal uses inline styles for simplicity and to match the existing CSS variable system:
+
 - `var(--color-primary-500)`: Primary color
 - `var(--color-primary-600)`: Primary hover color
 - `var(--color-neutral-200)`: Border color

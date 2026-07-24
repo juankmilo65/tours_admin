@@ -1,4 +1,5 @@
 # 🚀 SUPER PROMPT - MULTI-TOUR BOOKING FRONTEND REFACTORING
+
 ## Tours Admin | Claude Opus 4.6 | Remix + Redux + TypeScript
 
 **Status**: ✅ READY FOR IMPLEMENTATION  
@@ -25,7 +26,9 @@
 ## CONTEXTO EJECUTIVO
 
 ### Objetivo
+
 Refactorizar el sistema de reservas de single-tour a multi-tour con:
+
 - ✅ Múltiples tours por reserva (mismo día con validación 1h margin)
 - ✅ Split payments (depósito + pago final)
 - ✅ KYC integrado (verificación de usuarios owner)
@@ -34,13 +37,15 @@ Refactorizar el sistema de reservas de single-tour a multi-tour con:
 - ✅ Soporte completo i18n (ES/EN)
 
 ### Cambios NO Breaking
+
 - ✅ Backward compatible con booking único
 - ✅ Single-tour flow funciona igual
 - ✅ EditBookingModal usa el mismo 48h policy
 - ✅ BookingStatusModal extendida con más eventos
 
 ### Estado Actual
-- ✅ Backend + webhooks Stripe: LISTO  
+
+- ✅ Backend + webhooks Stripe: LISTO
 - ✅ Response JSON confirmado
 - ✅ Codebase patterns identificados
 - ✅ Redux structure definida
@@ -51,6 +56,7 @@ Refactorizar el sistema de reservas de single-tour a multi-tour con:
 ## ARQUITECTURA CONFIRMADA
 
 ### Stack Tecnológico
+
 ```
 Framework        → Remix (server + client)
 State Mgmt       → Redux + Redux Persist
@@ -135,17 +141,17 @@ app/
 
 ### Decisiones Arquitectónicas
 
-| Aspecto | Decisión | Justificación |
-|---------|----------|---------------|
-| **Services Location** | `app/server/` | Consistency con pattern actual (kyc.tsx + kycBusinessLogic.tsx) |
-| **Timestamps** | String "HH:MM" (timezone del país) | Backend maneja conversión, frontend display solo |
-| **Drag-Drop** | @dnd-kit/core | Como ActivitiesByDay.tsx (closestCorners collision) |
-| **Validation** | Frontend GET /api/tours/{id}/availability | Veloz + feedback inmediato al usuario |
-| **Polling** | .env configurable (default 5s) | VITE_PAYMENT_POLLING_INTERVAL |
-| **KYC Access** | role === 'owner' check | Privado; GET /api/kyc/status solo para owners |
-| **Pagination** | Full tour objects en booking.tours[] | Frontend accede sin fetches adicionales |
-| **Error Handling** | FetchError + useErrorHandler hook | Centralizado; Redux notifications |
-| **State Mgmt** | Slices separados (Opción A) | Escalable; clear separation of concerns |
+| Aspecto               | Decisión                                  | Justificación                                                   |
+| --------------------- | ----------------------------------------- | --------------------------------------------------------------- |
+| **Services Location** | `app/server/`                             | Consistency con pattern actual (kyc.tsx + kycBusinessLogic.tsx) |
+| **Timestamps**        | String "HH:MM" (timezone del país)        | Backend maneja conversión, frontend display solo                |
+| **Drag-Drop**         | @dnd-kit/core                             | Como ActivitiesByDay.tsx (closestCorners collision)             |
+| **Validation**        | Frontend GET /api/tours/{id}/availability | Veloz + feedback inmediato al usuario                           |
+| **Polling**           | .env configurable (default 5s)            | VITE_PAYMENT_POLLING_INTERVAL                                   |
+| **KYC Access**        | role === 'owner' check                    | Privado; GET /api/kyc/status solo para owners                   |
+| **Pagination**        | Full tour objects en booking.tours[]      | Frontend accede sin fetches adicionales                         |
+| **Error Handling**    | FetchError + useErrorHandler hook         | Centralizado; Redux notifications                               |
+| **State Mgmt**        | Slices separados (Opción A)               | Escalable; clear separation of concerns                         |
 
 ---
 
@@ -154,6 +160,7 @@ app/
 ### F1: Services Architecture Pattern
 
 **HTTP Layer Pattern** (`app/server/kyc.tsx`):
+
 ```typescript
 // Replicate from app/server/bookings.tsx pattern
 import { createServiceREST } from './_index';
@@ -168,6 +175,7 @@ const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 ```
 
 **Business Logic Pattern** (`app/server/businessLogic/kycBusinessLogic.tsx`):
+
 ```typescript
 // Replicate from app/server/businessLogic/bookingsBusinessLogic.tsx pattern
 import { getKycStatus, initKyc } from '../kyc';
@@ -198,6 +206,7 @@ export const getKycStatusBusiness = async (
 ```
 
 ### F2: Tour Timestamps
+
 ```typescript
 // Tours return times in format "HH:MM" (string)
 // Example: startTime: "17:30", endTime: "12:00"
@@ -215,7 +224,7 @@ const validateSameDayMargin = (tours: BookingTour[]): { valid: boolean; warning?
   for (let i = 0; i < sortedTours.length - 1; i++) {
     const current = sortedTours[i];
     const next = sortedTours[i + 1];
-    
+
     const currentEnd = parseTime(current.endTime);
     const nextStart = parseTime(next.startTime);
     const marginMinutes = nextStart - currentEnd;
@@ -223,7 +232,7 @@ const validateSameDayMargin = (tours: BookingTour[]): { valid: boolean; warning?
     if (marginMinutes < 60) {
       return {
         valid: true, // NO bloqueamos, just warning
-        warning: `Very tight schedule between tours: ${marginMinutes}min margin`
+        warning: `Very tight schedule between tours: ${marginMinutes}min margin`,
       };
     }
   }
@@ -234,6 +243,7 @@ const validateSameDayMargin = (tours: BookingTour[]): { valid: boolean; warning?
 ### F3: Drag-Drop Library (@dnd-kit)
 
 **Pattern from ActivitiesByDay.tsx**:
+
 ```typescript
 import type { DragEndEvent } from '@dnd-kit/core';
 import {
@@ -262,10 +272,10 @@ const sensors = useSensors(
 const handleDragEnd = (event: DragEndEvent) => {
   const { active, over } = event;
   if (!over || active.id === over.id) return;
-  
+
   const oldIndex = tours.findIndex(t => t.id === active.id);
   const newIndex = tours.findIndex(t => t.id === over.id);
-  
+
   const reorderedTours = arrayMove(tours, oldIndex, newIndex);
   // Call useMultiTourValidation(reorderedTours) to revalidate
   onTourReorder(reorderedTours);
@@ -289,7 +299,7 @@ const handleDragEnd = (event: DragEndEvent) => {
 
 const validateMultiTourAvailability = async (tours: BookingTour[]) => {
   const errors: Record<string, string> = {};
-  
+
   for (const tour of tours) {
     try {
       const availability = await getTourAvailability(tour.id, tour.startDate);
@@ -302,11 +312,11 @@ const validateMultiTourAvailability = async (tours: BookingTour[]) => {
   }
 
   // Check same-day margin validation
-  const sameDayTours = groupBy(tours, t => t.startDate);
+  const sameDayTours = groupBy(tours, (t) => t.startDate);
   for (const [date, dateTours] of Object.entries(sameDayTours)) {
     if (dateTours.length > 1) {
       const marginCheck = validateSameDayMargin(dateTours);
-      if (marginCheck.warning && dateTours.some(t => !errors[t.id])) {
+      if (marginCheck.warning && dateTours.some((t) => !errors[t.id])) {
         // Show inline warning (not blocking)
         showWarning(marginCheck.warning);
       }
@@ -320,19 +330,21 @@ const validateMultiTourAvailability = async (tours: BookingTour[]) => {
 ### F5: Polling Interval Configuration
 
 **In .env.local**:
+
 ```env
 VITE_PAYMENT_POLLING_INTERVAL=5000
 ```
 
 **In Redux modal polling**:
+
 ```typescript
-const pollingInterval = import.meta.env.VITE_PAYMENT_POLLING_INTERVAL 
-  ? Number(import.meta.env.VITE_PAYMENT_POLLING_INTERVAL) 
+const pollingInterval = import.meta.env.VITE_PAYMENT_POLLING_INTERVAL
+  ? Number(import.meta.env.VITE_PAYMENT_POLLING_INTERVAL)
   : 5000; // 5 seconds default
 
 useEffect(() => {
   if (!isModalOpen) return;
-  
+
   const timer = setInterval(async () => {
     const payment = await getBookingPaymentStatus(bookingId);
     if (payment.status === 'completed') {
@@ -348,6 +360,7 @@ useEffect(() => {
 ### F6: KYC Endpoint - Permissions
 
 **Backend responsibility** (pero frontend valida):
+
 ```typescript
 // GET /api/kyc/status - PRIVATE (role === 'owner' only)
 // Backend retorna 403 si no es owner
@@ -356,7 +369,7 @@ useEffect(() => {
 export const loader = async ({ request, context }) => {
   const session = await getSession(request.headers.get('Cookie'));
   const role = session.get('role'); // 'tourist' | 'owner' | 'admin'
-  
+
   let kycStatus = null;
   if (role === 'owner' && token) {
     try {
@@ -381,6 +394,7 @@ if (!kycStatus && role === 'owner') {
 ### F7: Pagination - Multi-Tour Response
 
 **Backend returns** (confirmado):
+
 ```json
 {
   "success": true,
@@ -420,6 +434,7 @@ if (!kycStatus && role === 'owner') {
 ```
 
 **Frontend treats tours as** (NO additional fetches):
+
 ```typescript
 booking.tours.map(tour => (
   <TourCard key={tour.id} tour={tour} booking={booking} />
@@ -448,7 +463,8 @@ interface ViteImportMeta {
   readonly env: ViteImportMetaEnv;
 }
 
-const BASE_URL = (import.meta as unknown as ViteImportMeta).env.VITE_BACKEND_URL ?? 'http://localhost:3000';
+const BASE_URL =
+  (import.meta as unknown as ViteImportMeta).env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
 /**
  * Get KYC status for current owner
@@ -461,7 +477,7 @@ export const getKycStatus = async (token: string, language = 'es'): Promise<unkn
   try {
     const kycEndpoint = 'kyc/status';
     const kycService = createServiceREST(BASE_URL, kycEndpoint, token);
-    
+
     const result = await kycService.get({
       headers: { 'X-Language': language },
     });
@@ -484,10 +500,13 @@ export const initKyc = async (token: string, language = 'es'): Promise<unknown> 
   try {
     const kycEndpoint = 'kyc/init';
     const kycService = createServiceREST(BASE_URL, kycEndpoint, token);
-    
-    const result = await kycService.create({}, {
-      headers: { 'X-Language': language },
-    });
+
+    const result = await kycService.create(
+      {},
+      {
+        headers: { 'X-Language': language },
+      }
+    );
 
     return result;
   } catch (error) {
@@ -507,7 +526,7 @@ export const getKycDashboardUrl = async (token: string, language = 'es'): Promis
   try {
     const kycEndpoint = 'kyc/dashboard-url';
     const kycService = createServiceREST(BASE_URL, kycEndpoint, token);
-    
+
     const result = await kycService.get({
       headers: { 'X-Language': language },
     });
@@ -528,11 +547,7 @@ export const getKycDashboardUrl = async (token: string, language = 'es'): Promis
  * Follows exact pattern from bookingsBusinessLogic.tsx
  */
 
-import {
-  getKycStatus,
-  initKyc,
-  getKycDashboardUrl,
-} from '../kyc';
+import { getKycStatus, initKyc, getKycDashboardUrl } from '../kyc';
 
 export interface KycStatusData {
   isRequired: boolean;
@@ -645,7 +660,10 @@ export const getKycDashboardUrlBusiness = async (
 
     return {
       success: false,
-      error: language === 'en' ? 'Could not get KYC dashboard URL' : 'No se pudo obtener URL dashboard KYC',
+      error:
+        language === 'en'
+          ? 'Could not get KYC dashboard URL'
+          : 'No se pudo obtener URL dashboard KYC',
     };
   } catch (error) {
     console.error('Error in getKycDashboardUrlBusiness:', error);
@@ -907,7 +925,7 @@ export const formatKycStatus = (kycStatus: KycStatusData | null, language = 'es'
     return language === 'en' ? 'Not started' : 'No iniciado';
   }
 
-  return language === 'en' 
+  return language === 'en'
     ? `${kycStatus.percentageComplete}% Complete`
     : `${kycStatus.percentageComplete}% Completado`;
 };
@@ -915,25 +933,28 @@ export const formatKycStatus = (kycStatus: KycStatusData | null, language = 'es'
 /**
  * Get KYC requirements message
  */
-export const getKycRequirementsMessage = (requirements: string[] | undefined, language = 'es'): string => {
+export const getKycRequirementsMessage = (
+  requirements: string[] | undefined,
+  language = 'es'
+): string => {
   if (!requirements || requirements.length === 0) {
     return language === 'en' ? 'No requirements pending' : 'Sin requerimientos pendientes';
   }
 
-  const items = requirements.map(req => {
+  const items = requirements.map((req) => {
     // Map backend requirement codes to user-friendly messages
     const requirementMap: Record<string, Record<string, string>> = {
-      'personal_id': {
-        'en': 'Personal ID',
-        'es': 'Identificación Personal'
+      personal_id: {
+        en: 'Personal ID',
+        es: 'Identificación Personal',
       },
-      'business_info': {
-        'en': 'Business Information',
-        'es': 'Información del Negocio'
+      business_info: {
+        en: 'Business Information',
+        es: 'Información del Negocio',
       },
-      'bank_account': {
-        'en': 'Bank Account',
-        'es': 'Cuenta Bancaria'
+      bank_account: {
+        en: 'Bank Account',
+        es: 'Cuenta Bancaria',
       },
     };
 
@@ -1015,7 +1036,7 @@ const bookingsSlice = createSlice({
       state.totalCount += 1;
     },
     updateBooking(state, action: PayloadAction<Booking>) {
-      const index = state.bookings.findIndex(b => b.id === action.payload.id);
+      const index = state.bookings.findIndex((b) => b.id === action.payload.id);
       if (index !== -1) {
         state.bookings[index] = action.payload;
       }
@@ -1024,19 +1045,22 @@ const bookingsSlice = createSlice({
       }
     },
     deleteBooking(state, action: PayloadAction<string>) {
-      state.bookings = state.bookings.filter(b => b.id !== action.payload);
+      state.bookings = state.bookings.filter((b) => b.id !== action.payload);
       state.totalCount = Math.max(0, state.totalCount - 1);
     },
     setSelectedBooking(state, action: PayloadAction<Booking | null>) {
       state.selectedBooking = action.payload;
     },
     // NEW: updateMultiTourBooking with full validation
-    updateMultiTourBooking(state, action: PayloadAction<{
-      bookingId: string;
-      tours: BookingTour[];
-      validation?: { warnings: string[] };
-    }>) {
-      const booking = state.bookings.find(b => b.id === action.payload.bookingId);
+    updateMultiTourBooking(
+      state,
+      action: PayloadAction<{
+        bookingId: string;
+        tours: BookingTour[];
+        validation?: { warnings: string[] };
+      }>
+    ) {
+      const booking = state.bookings.find((b) => b.id === action.payload.bookingId);
       if (booking) {
         booking.tours = action.payload.tours;
         if (booking.tours.length > 0) {
@@ -1090,10 +1114,13 @@ const paymentsSlice = createSlice({
     stopPolling(state, action: PayloadAction<string>) {
       state.pollingBookingIds.delete(action.payload);
     },
-    updatePaymentStatus(state, action: PayloadAction<{
-      bookingId: string;
-      payment: Payment;
-    }>) {
+    updatePaymentStatus(
+      state,
+      action: PayloadAction<{
+        bookingId: string;
+        payment: Payment;
+      }>
+    ) {
       state.payments[action.payload.bookingId] = action.payload.payment;
       state.lastPolledAt[action.payload.bookingId] = Date.now();
     },
@@ -1103,12 +1130,8 @@ const paymentsSlice = createSlice({
   },
 });
 
-export const {
-  startPolling,
-  stopPolling,
-  updatePaymentStatus,
-  paymentError,
-} = paymentsSlice.actions;
+export const { startPolling, stopPolling, updatePaymentStatus, paymentError } =
+  paymentsSlice.actions;
 
 export default paymentsSlice.reducer;
 ```
@@ -1155,12 +1178,7 @@ const kycSlice = createSlice({
   },
 });
 
-export const {
-  fetchKycStart,
-  fetchKycSuccess,
-  fetchKycError,
-  updateKycStatus,
-} = kycSlice.actions;
+export const { fetchKycStart, fetchKycSuccess, fetchKycError, updateKycStatus } = kycSlice.actions;
 
 export default kycSlice.reducer;
 ```
@@ -1201,11 +1219,8 @@ const cancellationPoliciesSlice = createSlice({
   },
 });
 
-export const {
-  fetchPoliciesStart,
-  fetchPoliciesSuccess,
-  fetchPoliciesError,
-} = cancellationPoliciesSlice.actions;
+export const { fetchPoliciesStart, fetchPoliciesSuccess, fetchPoliciesError } =
+  cancellationPoliciesSlice.actions;
 
 export default cancellationPoliciesSlice.reducer;
 ```
@@ -1223,7 +1238,7 @@ export interface BookingTour {
   name_en: string;
   startDate: string; // YYYY-MM-DD
   startTime: string; // HH:MM (backend provides timezone-adjusted)
-  endTime: string;   // HH:MM
+  endTime: string; // HH:MM
   price: number;
   currency: string;
   capacity: number;
@@ -1258,13 +1273,13 @@ export interface Booking {
   };
   confirmationCode: string;
   createdAt: string;
-  startDate: string;  // First tour's date
-  endDate: string;    // Last tour's date
+  startDate: string; // First tour's date
+  endDate: string; // Last tour's date
   totalPrice: number;
   currency: string;
   specialRequests?: string;
   countryCode?: string;
-  
+
   // Payment fields
   depositAmount?: number;
   depositPaid?: boolean;
@@ -1273,7 +1288,7 @@ export interface Booking {
   finalPaymentPaid?: boolean;
   finalPaymentPaidAt?: string;
   paymentIntentId?: string;
-  
+
   // Cancellation
   cancellationRequestedAt?: string;
   cancellationReason?: string;
@@ -1366,12 +1381,14 @@ export interface CancellationRefundCalculation {
 ### 1. CreateBookingModal.tsx (REFACTORIZADO)
 
 **Key Changes**:
+
 - Add multi-tour support (array of tours instead of single tourId)
 - Use MultiTourSelector sub-component for adding/removing/reordering tours
 - Call validateMultiTourBooking instead of single tour validation
 - Show inline warnings for same-day margin (not blocking)
 
 **Props**:
+
 ```typescript
 interface CreateBookingModalProps {
   isOpen: boolean;
@@ -1381,6 +1398,7 @@ interface CreateBookingModalProps {
 ```
 
 **State**:
+
 ```typescript
 const [selectedTours, setSelectedTours] = useState<BookingTour[]>([]);
 const [formError, setFormError] = useState<string>('');
@@ -1389,6 +1407,7 @@ const [isValidating, setIsValidating] = useState(false);
 ```
 
 **Flow**:
+
 1. User adds first tour via TourSelector
 2. Component calls getTourAvailability(tourId, startDate)
 3. Display TourAvailabilityDisplay component
@@ -1422,7 +1441,7 @@ export function MultiTourSelector({
 }: MultiTourSelectorProps): JSX.Element {
   const { language } = useTranslation();
   const [activeId, setActiveId] = useState<string | null>(null);
-  
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor)
@@ -1504,17 +1523,19 @@ export function MultiTourSelector({
 ### 3. BookingStatusModal.tsx (EXTENDIDO)
 
 **New Additions**:
+
 - Timeline includes payment events (Deposit Paid, Final Payment Paid, Transferred)
 - Show payment amounts for each event
 - Display refund info if cancelled
 - Polling logic for payment status updates
 
 **New Timeline Events**:
+
 ```typescript
-type TimelineEventType = 
-  | 'booking_created' 
+type TimelineEventType =
+  | 'booking_created'
   | 'deposit_charged'
-  | 'final_payment_charged' 
+  | 'final_payment_charged'
   | 'transferred_to_owner'
   | 'refund_initiated'
   | 'status_changed'
@@ -1538,7 +1559,7 @@ export function ProfileComponent(): JSX.Element {
   return (
     <div style={{ padding: '24px' }}>
       <h1>{language === 'en' ? 'Owner Profile' : 'Perfil del Propietario'}</h1>
-      
+
       <KycSection kycStatus={kycStatus} />
     </div>
   );
@@ -1732,18 +1753,18 @@ export function KycSection({ kycStatus }: KycSectionProps): JSX.Element {
 // app/lib/i18n/bookings/es.ts
 export const bookingEs = {
   // Existing strings...
-  
+
   // Multi-tour new strings
   addAnotherTourButton: 'Agregar Otro Tour',
   removeFromBundleButton: 'Remover de Paquete',
   reorderToursMessage: 'Arrastra para reordenar tours en el mismo día',
   sameDayWarning: 'Horarios muy ajustados entre tours: {minutes} minutos de margen',
   sameDayMarginCritical: '⚠️ Menos de 1 hora entre tours - revisa bien los horarios',
-  
+
   // Validation messages
   tourNotAvailable: 'Tour no disponible en esta fecha',
   multiTourValidationError: 'Error validando tours',
-  
+
   // Timeline
   depositPaidEvent: 'Depósito Pagado',
   finalPaymentPaidEvent: 'Pago Final',
@@ -1755,16 +1776,16 @@ export const bookingEs = {
 // app/lib/i18n/bookings/en.ts
 export const bookingEn = {
   // Existing strings...
-  
+
   addAnotherTourButton: 'Add Another Tour',
   removeFromBundleButton: 'Remove from Bundle',
   reorderToursMessage: 'Drag to reorder tours on the same day',
   sameDayWarning: 'Very tight schedule between tours: {minutes} minutes margin',
   sameDayMarginCritical: '⚠️ Less than 1 hour between tours - check schedules carefully',
-  
+
   tourNotAvailable: 'Tour not available on this date',
   multiTourValidationError: 'Error validating tours',
-  
+
   depositPaidEvent: 'Deposit Paid',
   finalPaymentPaidEvent: 'Final Payment',
   transferredToOwnerEvent: 'Transferred to Owner',
@@ -1918,6 +1939,7 @@ export const errorsEn = {
 ## IMPLEMENTATION CHECKLIST
 
 ### Phase 1: Foundation (2h)
+
 - [ ] Create new type files: payment.ts, kyc.ts, cancellationPolicy.ts
 - [ ] Extend booking.ts with multi-tour fields
 - [ ] Create app/server/kyc.tsx (HTTP layer, 50 lines)
@@ -1926,6 +1948,7 @@ export const errorsEn = {
 - [ ] Export all slices from store/index.ts
 
 ### Phase 2: Services & Utilities (3h)
+
 - [ ] Create app/services/bookingService.ts (validation logic)
 - [ ] Create app/services/paymentService.ts (payment polling logic)
 - [ ] Create app/services/kycService.ts (KYC helpers)
@@ -1935,6 +1958,7 @@ export const errorsEn = {
 - [ ] Refactor useDropdownCache to useAppCache.ts (if needed)
 
 ### Phase 3: i18n Modules (2h)
+
 - [ ] Create app/lib/i18n/payments/{en,es}.ts
 - [ ] Create app/lib/i18n/kyc/{en,es}.ts
 - [ ] Create app/lib/i18n/errors/{en,es}.ts
@@ -1942,6 +1966,7 @@ export const errorsEn = {
 - [ ] Export all modules from app/lib/i18n/index.ts
 
 ### Phase 4: Components - Multi-Tour (6h)
+
 - [ ] Refactor CreateBookingModal.tsx:
   - [ ] Add multi-tour state management
   - [ ] Add MultiTourSelector sub-component logic
@@ -1957,13 +1982,14 @@ export const errorsEn = {
   - [ ] Style with red/amber colors
 
 ### Phase 5: Components - Status & Profile (5h)
+
 - [ ] Extend BookingStatusModal.tsx:
   - [ ] Add payment timeline events
   - [ ] Implement polling logic (use .env VITE_PAYMENT_POLLING_INTERVAL)
   - [ ] Redux: startPolling/stopPolling dispatch
   - [ ] Show deposit + final payment events
   - [ ] Display refund info if cancelled
-- [ ] Create app/routes/profile._index.tsx:
+- [ ] Create app/routes/profile.\_index.tsx:
   - [ ] Route: `/profile`
   - [ ] Render ProfileComponent as Outlet
   - [ ] Loader: check role === 'owner', fetch KYC status
@@ -1977,6 +2003,7 @@ export const errorsEn = {
   - [ ] Display requirements list
 
 ### Phase 6: Modify Existing Components (3h)
+
 - [ ] Update EditBookingModal.tsx:
   - [ ] Check policy 48h constraint
   - [ ] Show disabled state + toast warning if < 48h
@@ -1985,11 +2012,12 @@ export const errorsEn = {
   - [ ] Add kycStatus to loader data (if role === 'owner')
   - [ ] Add cancellationPolicies to loader data
   - [ ] Optionally wrap with ErrorBoundary (Opción A)
-- [ ] Update _index.tsx (dashboard):
+- [ ] Update \_index.tsx (dashboard):
   - [ ] Add link to profile page: `/profile`
   - [ ] Show KYC notification if pending
 
 ### Phase 7: Testing & Polish (4h)
+
 - [ ] Test multi-tour creation flow end-to-end
 - [ ] Test same-day validation + warnings
 - [ ] Test drag-drop reordering
@@ -2007,6 +2035,7 @@ export const errorsEn = {
 ## INSTRUCCIONES PARA IMPLEMENTACIÓN
 
 ### Pre-requisitos
+
 - [ ] Node 18+ installed
 - [ ] pnpm >= 8.0.0
 - [ ] Backend API running and tested
@@ -2014,11 +2043,13 @@ export const errorsEn = {
 - [ ] @dnd-kit/core, @dnd-kit/sortable packages installed
 
 ### Installation
+
 ```bash
 pnpm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
 ```
 
 ### Environment Variables
+
 ```env
 # .env.local
 VITE_BACKEND_URL=http://localhost:3000
@@ -2026,14 +2057,15 @@ VITE_PAYMENT_POLLING_INTERVAL=5000
 ```
 
 ### Code Organization
+
 1. **Create files in this order**:
-   - Types first (types/*.ts)
-   - Redux slices (store/slices/*.ts)
-   - Services (services/*.ts, server/*.tsx, server/businessLogic/*.tsx)
-   - Hooks (hooks/*.ts)
-   - i18n modules (lib/i18n/*/*.ts)
-   - Components (components/**/*.tsx)
-   - Routes (routes/*.tsx)
+   - Types first (types/\*.ts)
+   - Redux slices (store/slices/\*.ts)
+   - Services (services/_.ts, server/_.tsx, server/businessLogic/\*.tsx)
+   - Hooks (hooks/\*.ts)
+   - i18n modules (lib/i18n/_/_.ts)
+   - Components (components/\*_/_.tsx)
+   - Routes (routes/\*.tsx)
 
 2. **Testing strategy**:
    - Unit test: validateMultiTourBooking() function
@@ -2046,6 +2078,7 @@ VITE_PAYMENT_POLLING_INTERVAL=5000
    - Backward compatible with current database
 
 ### Debugging Tips
+
 - Check browser console for Redux actions log
 - Check network tab for all API calls (especially polling in BookingStatusModal)
 - Check localStorage for Redux persist state
@@ -2053,6 +2086,7 @@ VITE_PAYMENT_POLLING_INTERVAL=5000
 - Verify .env variables loaded: `console.log(import.meta.env)`
 
 ### Rollback Plan
+
 - If issues arise: revert last commit or branch to `main`
 - Database changes: none (backward compatible)
 - API changes: backward compatible with updated types
@@ -2063,15 +2097,14 @@ VITE_PAYMENT_POLLING_INTERVAL=5000
 
 Las siguientes decisiones han sido validadas y están listas para implementación:
 
-| #  | Aspecto | Decisión | Confirmada |
-|----|---------|----------|-----------|
-| F1 | Services | app/server/kyc + businessLogic pattern | ✅ |
-| F2 | Timestamps | String "HH:MM", timezone del país | ✅ |
-| F3 | Drag-Drop | @dnd-kit/core como ActivitiesByDay | ✅ |
-| F4 | Validation | Frontend GET /api/tours/{id}/availability | ✅ |
-| F5 | Polling | .env configurable (default 5s) | ✅ |
-| F6 | KYC Access | role === 'owner' only (private) | ✅ |
-| F7 | Pagination | Full tour objects (booking.tours[]) | ✅ |
+| #   | Aspecto    | Decisión                                  | Confirmada |
+| --- | ---------- | ----------------------------------------- | ---------- |
+| F1  | Services   | app/server/kyc + businessLogic pattern    | ✅         |
+| F2  | Timestamps | String "HH:MM", timezone del país         | ✅         |
+| F3  | Drag-Drop  | @dnd-kit/core como ActivitiesByDay        | ✅         |
+| F4  | Validation | Frontend GET /api/tours/{id}/availability | ✅         |
+| F5  | Polling    | .env configurable (default 5s)            | ✅         |
+| F6  | KYC Access | role === 'owner' only (private)           | ✅         |
+| F7  | Pagination | Full tour objects (booking.tours[])       | ✅         |
 
 **Estado Final**: 100% CLARIDAD - Listo para implementación inmediata en Claude Opus 4.6
-
