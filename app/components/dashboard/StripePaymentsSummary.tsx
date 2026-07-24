@@ -21,7 +21,10 @@ interface StripePaymentsSummaryProps {
   }) => void;
 }
 
-const statusColors: Record<string, { bg: string; text: string; dot: string; accent: string }> = {
+const statusColors: Record<
+  'distributed' | 'pending' | 'failed',
+  { bg: string; text: string; dot: string; accent: string }
+> = {
   distributed: {
     bg: 'var(--color-success-50)',
     text: 'var(--color-success-700)',
@@ -382,8 +385,8 @@ export function StripePaymentsSummary({
       >
         <DashCard>
           <SummaryCard
-            label="Total Recibido"
-            value={summary.totalReceived}
+            label="Cobrado por Stripe"
+            value={summary.totalReceived ?? 0}
             icon="💳"
             color="var(--color-primary-500)"
           />
@@ -392,7 +395,7 @@ export function StripePaymentsSummary({
         <DashCard>
           <SummaryCard
             label="Transferido a Dueños"
-            value={summary.totalTransferredToOwners}
+            value={summary.totalTransferredToOwners ?? 0}
             icon="📤"
             color="var(--color-secondary-500)"
           />
@@ -402,18 +405,30 @@ export function StripePaymentsSummary({
           <DashCard>
             <SummaryCard
               label={
-                summary.platformEarnings >= 0 ? 'Ganancias de Plataforma' : 'Pérdida de Plataforma'
+                (summary.platformEarnings ?? 0) >= 0
+                  ? 'Ganancias de Plataforma'
+                  : 'Pérdida de Plataforma'
               }
-              value={summary.platformEarnings}
-              icon={summary.platformEarnings >= 0 ? '💰' : '📉'}
+              value={summary.platformEarnings ?? 0}
+              icon={(summary.platformEarnings ?? 0) >= 0 ? '💰' : '📉'}
               color={
-                summary.platformEarnings >= 0
+                (summary.platformEarnings ?? 0) >= 0
                   ? 'var(--color-success-500)'
                   : 'var(--color-error-500)'
               }
             />
           </DashCard>
         )}
+
+        {/* Cash collected — reported separately from Stripe totals, never summed in */}
+        <DashCard>
+          <SummaryCard
+            label="Cobrado en efectivo"
+            value={summary.cashCollected ?? 0}
+            icon="💵"
+            color="var(--color-warning-500)"
+          />
+        </DashCard>
       </div>
 
       {/* Breakdown Section */}
@@ -608,9 +623,11 @@ export function StripePaymentsSummary({
 
         {/* Table Rows */}
         {filteredBreakdown && filteredBreakdown.length > 0 ? (
-          filteredBreakdown.map((payment) => (
-            <PaymentRow key={payment.paymentId} payment={payment} />
-          ))
+          <>
+            {filteredBreakdown.map((payment) => (
+              <PaymentRow key={payment.paymentId} payment={payment} />
+            ))}
+          </>
         ) : (
           <div
             style={{

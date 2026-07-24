@@ -33,6 +33,7 @@ import {
   selectStripePaymentsBreakdown,
   selectStripePaymentsLoading,
 } from '~/store/slices/stripePaymentsSlice';
+import { StripePaymentsSummary } from '~/components/dashboard/StripePaymentsSummary';
 import { useTranslation } from '~/lib/i18n/utils';
 
 interface DashboardTranslations {
@@ -663,6 +664,9 @@ export default function Dashboard(): JSX.Element {
           )}
         </div>
       )}
+
+      {/* Stripe payments summary + breakdown (cash collected shown separately from Stripe) */}
+      <StripePaymentsSummary />
 
       {/* Row 2: Resumen de Reservas Card */}
       {bookingsLoading ? (

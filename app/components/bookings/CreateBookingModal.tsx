@@ -46,8 +46,13 @@ import { TourAvailabilityDisplay } from '~/components/bookings/TourAvailabilityD
 import type { TourAvailabilityData } from '~/types/tourAvailability';
 import type { BookingTourActivity, BookingTour } from '~/types/booking';
 import { MultiTourSelector } from '~/components/bookings/MultiTourSelector';
+import { StripeFeeNotice } from '~/components/bookings/StripeFeeNotice';
 import { useMultiTourValidation } from '~/hooks/useMultiTourValidation';
-import { calculateBookingTotal } from '~/services/bookingService';
+import {
+  calculateBookingTotal,
+  computeStripeChargeBreakdown,
+  stripeFeeRate,
+} from '~/services/bookingService';
 
 // Payment method option returned by /api/stripe/payment-methods
 interface PaymentMethodOption {
@@ -149,6 +154,8 @@ export function CreateBookingModal({
   const [hasSpecialRequests, setHasSpecialRequests] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  // Card origin for the informational Stripe fee estimate (display only).
+  const [cardType, setCardType] = useState<'local' | 'foreign'>('local');
   const [availablePaymentMethods, setAvailablePaymentMethods] = useState<PaymentMethodOption[]>([]);
   const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
@@ -178,6 +185,7 @@ export function CreateBookingModal({
     setTourBasePrice(null);
     setTourActivities([]);
     setSelectedPaymentMethod('');
+    setCardType('local');
     setAvailablePaymentMethods([]);
     setSelectedTours([]);
     // Invalidar caché de tipos de ID para que se recarguen frescos
@@ -644,9 +652,25 @@ export function CreateBookingModal({
     const validClients = filled.length;
     const subtotal = basePrice * validClients;
     const minorDiscount = basePrice * minors * 0.1;
-    const total = subtotal - minorDiscount;
-    return { basePrice, validClients, minors, subtotal, minorDiscount, total };
+    const total = subtotal - minorDiscount; // pre-IVA (kept for existing consumers)
+    const tax = Math.round(total * 0.16 * 100) / 100; // 16% IVA on the discounted base
+    const totalWithTax = Math.round((total + tax) * 100) / 100;
+    return { basePrice, validClients, minors, subtotal, minorDiscount, total, tax, totalWithTax };
   }, [tourBasePrice, formData.clients]);
+
+  // Multi-tour summary display totals — mirrors handleSubmit: per-tour price/minimum
+  // multiplied by client count, plus 16% IVA. Display-only; the submitted payload is
+  // computed independently inside handleSubmit.
+  const multiTourSummary = useMemo(() => {
+    const displayClientCount = formData.clients.length;
+    const displaySubtotal = calculateBookingTotal(selectedTours) * displayClientCount;
+    const displayTax = displaySubtotal * 0.16; // matches submit's tax = subtotal * 0.16
+    const displayTotal = displaySubtotal + displayTax;
+    const displayAnticipo =
+      selectedTours.reduce((sum, tour) => sum + (tour.minimumPayment ?? 0), 0) * displayClientCount;
+    const displayRemaining = displayTotal - displayAnticipo;
+    return { displaySubtotal, displayTax, displayTotal, displayAnticipo, displayRemaining };
+  }, [selectedTours, formData.clients.length]);
 
   // Determine when each section should be enabled
   const canEnableDates = useMemo(() => {
@@ -933,6 +957,14 @@ export function CreateBookingModal({
       );
       const tax = roundTo2(subtotal * 0.16);
       const total = roundTo2(subtotal + tax);
+      // Online charge breakdown for the deposit (anticipo): net + IVA + gross-up fee.
+      // The backend recomputes net/IVA from the reservation and trusts only feeAmount;
+      // net/IVA must match its calculation or it responds 422.
+      const feeBreakdown = computeStripeChargeBreakdown(
+        minimumPayment,
+        0.16,
+        stripeFeeRate(selectedPaymentMethod, cardType)
+      );
       const sortedByStart = [...items].sort((a, b) => a.startAt.localeCompare(b.startAt));
       const sortedByEnd = [...items].sort((a, b) => a.endAt.localeCompare(b.endAt));
       const bookingStartAt = sortedByStart[0]?.startAt ?? new Date().toISOString();
@@ -973,6 +1005,7 @@ export function CreateBookingModal({
             tax,
             total,
           },
+          feeBreakdown,
         },
       };
 
@@ -1910,6 +1943,36 @@ export function CreateBookingModal({
                       {/* Separator */}
                       <div style={{ borderTop: '1px solid #bbf7d0', marginTop: 4 }} />
 
+                      {/* Subtotal */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.8125rem',
+                          color: '#334155',
+                        }}
+                      >
+                        <span>{bookingsT.subtotal}</span>
+                        <span>
+                          {formatCurrency(multiTourSummary.displaySubtotal, formData.currency)}
+                        </span>
+                      </div>
+
+                      {/* IVA (16%) */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.8125rem',
+                          color: '#334155',
+                        }}
+                      >
+                        <span>{bookingsT.iva}</span>
+                        <span>
+                          {formatCurrency(multiTourSummary.displayTax, formData.currency)}
+                        </span>
+                      </div>
+
                       {/* Total */}
                       <div
                         style={{
@@ -1922,7 +1985,7 @@ export function CreateBookingModal({
                       >
                         <span>Total</span>
                         <span>
-                          {formatCurrency(calculateBookingTotal(selectedTours), formData.currency)}
+                          {formatCurrency(multiTourSummary.displayTotal, formData.currency)}
                         </span>
                       </div>
 
@@ -1942,13 +2005,7 @@ export function CreateBookingModal({
                           >
                             <span>{language === 'en' ? 'Pay now' : 'Pagar ahora'}</span>
                             <span>
-                              {formatCurrency(
-                                selectedTours.reduce(
-                                  (sum, tour) => sum + (tour.minimumPayment ?? 0),
-                                  0
-                                ),
-                                formData.currency
-                              )}
+                              {formatCurrency(multiTourSummary.displayAnticipo, formData.currency)}
                             </span>
                           </div>
                           <div
@@ -1965,18 +2022,22 @@ export function CreateBookingModal({
                                 : 'Restante (pago máximo el día del tour)'}
                             </span>
                             <span>
-                              {formatCurrency(
-                                calculateBookingTotal(selectedTours) -
-                                  selectedTours.reduce(
-                                    (sum, tour) => sum + (tour.minimumPayment ?? 0),
-                                    0
-                                  ),
-                                formData.currency
-                              )}
+                              {formatCurrency(multiTourSummary.displayRemaining, formData.currency)}
                             </span>
                           </div>
                         </>
                       )}
+
+                      {/* Informational Stripe fee disclosure — no amount changes */}
+                      <StripeFeeNotice
+                        anticipo={multiTourSummary.displayAnticipo}
+                        excedente={
+                          multiTourSummary.displaySubtotal - multiTourSummary.displayAnticipo
+                        }
+                        currency={formData.currency}
+                        method={selectedPaymentMethod}
+                        cardType={cardType}
+                      />
                     </div>
                   </div>
                 </>
@@ -2462,6 +2523,17 @@ export function CreateBookingModal({
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
+                      fontSize: '0.8125rem',
+                      color: '#374151',
+                    }}
+                  >
+                    <span>{bookingsT.iva}</span>
+                    <span>{formatCurrency(priceSummary.tax, formData.currency)}</span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
                       fontSize: '0.9375rem',
                       fontWeight: 700,
                       color: '#166534',
@@ -2471,7 +2543,7 @@ export function CreateBookingModal({
                     }}
                   >
                     <span>{bookingsT.totalPrice}</span>
-                    <span>{formatCurrency(priceSummary.total, formData.currency)}</span>
+                    <span>{formatCurrency(priceSummary.totalWithTax, formData.currency)}</span>
                   </div>
                   {tourMinimumPayment !== null && (
                     <div
@@ -2490,6 +2562,15 @@ export function CreateBookingModal({
                       <span>{formatCurrency(tourMinimumPayment, formData.currency)}</span>
                     </div>
                   )}
+
+                  {/* Informational Stripe fee disclosure — no amount changes */}
+                  <StripeFeeNotice
+                    anticipo={tourMinimumPayment ?? 0}
+                    excedente={priceSummary.subtotal - (tourMinimumPayment ?? 0)}
+                    currency={formData.currency}
+                    method={selectedPaymentMethod}
+                    cardType={cardType}
+                  />
                 </div>
               </div>
             )}
@@ -2714,6 +2795,60 @@ export function CreateBookingModal({
                         </button>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* Card origin selector — drives the informational fee estimate only */}
+                {selectedPaymentMethod === 'card' && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                      marginTop: 12,
+                    }}
+                  >
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      {bookingsT.stripeFee.cardTypeLabel}
+                    </span>
+                    <div style={{ display: 'inline-flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => setCardType('local')}
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: 6,
+                          border: cardType === 'local' ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                          background: cardType === 'local' ? '#eff6ff' : '#ffffff',
+                          color: cardType === 'local' ? '#1d4ed8' : '#64748b',
+                          fontWeight: cardType === 'local' ? 600 : 500,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {bookingsT.stripeFee.cardLocalOption}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCardType('foreign')}
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: 6,
+                          border:
+                            cardType === 'foreign' ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                          background: cardType === 'foreign' ? '#eff6ff' : '#ffffff',
+                          color: cardType === 'foreign' ? '#1d4ed8' : '#64748b',
+                          fontWeight: cardType === 'foreign' ? 600 : 500,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {bookingsT.stripeFee.cardForeignOption}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

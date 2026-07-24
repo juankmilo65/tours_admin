@@ -250,6 +250,17 @@ export interface CreateBookingTotalsDto {
   total: number;
 }
 
+// Online charge breakdown: net + IVA + gross-up Stripe fee (the customer covers
+// the fee). The backend recomputes net/IVA and trusts only feeAmount; totalAmount
+// must reconcile with net + IVA + feeAmount (±0.02) or the backend returns 422.
+export interface FeeBreakdown {
+  netAmount: number;
+  taxAmount: number;
+  taxRate: number;
+  feeAmount: number;
+  totalAmount: number;
+}
+
 export interface CreateBookingPayloadDto {
   countryCode: string;
   currency: string;
@@ -268,6 +279,8 @@ export interface CreateBookingPayloadDto {
   }>;
   items: CreateBookingItemDto[];
   totals: CreateBookingTotalsDto;
+  // Online charge breakdown (deposit) — see FeeBreakdown.
+  feeBreakdown: FeeBreakdown;
 }
 
 export interface CreateBookingDto {

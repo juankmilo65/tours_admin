@@ -38,6 +38,8 @@ import { CreateBookingModal } from '~/components/bookings/CreateBookingModal';
 import { BookingClientsModal } from '~/components/bookings/BookingClientsModal';
 import { EditBookingModal } from '~/components/bookings/EditBookingModal';
 import { BookingStatusModal } from '~/components/bookings/BookingStatusModal';
+import { CashPaymentModal } from '~/components/bookings/CashPaymentModal';
+import { BalancePaymentModal } from '~/components/bookings/BalancePaymentModal';
 import type { BookingClient } from '~/types/booking';
 import type { City } from '~/server/cities';
 
@@ -214,6 +216,7 @@ export default function Bookings(): JSX.Element {
   const countryId = selectedCountry?.id ?? loaderData.countryId ?? null;
 
   const isAdmin = currentUser?.role === 'admin';
+  const isOwner = currentUser?.role === 'owner';
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState('');
@@ -269,6 +272,18 @@ export default function Bookings(): JSX.Element {
 
   // Status modal state
   const [statusModal, setStatusModal] = useState<{ isOpen: boolean; booking: Booking | null }>({
+    isOpen: false,
+    booking: null,
+  });
+
+  // Cash payment modal state
+  const [cashModal, setCashModal] = useState<{ isOpen: boolean; booking: Booking | null }>({
+    isOpen: false,
+    booking: null,
+  });
+
+  // Online balance payment modal state
+  const [balanceModal, setBalanceModal] = useState<{ isOpen: boolean; booking: Booking | null }>({
     isOpen: false,
     booking: null,
   });
@@ -966,6 +981,93 @@ export default function Bookings(): JSX.Element {
                 </svg>
               </button>
             )}
+            {/* Register cash payment — owners/admins, when balance is collectible */}
+            {(isAdmin || isOwner) &&
+              (row.status === 'reservado' || row.status === 'partially_paid') && (
+                <button
+                  type="button"
+                  onClick={() => setCashModal({ isOpen: true, booking: row })}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 38,
+                    height: 38,
+                    borderRadius: 'var(--radius-lg, 10px)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    backgroundColor: '#f0fdf4',
+                    color: '#16a34a',
+                    transition: 'all .18s ease',
+                    lineHeight: 1,
+                  }}
+                  title={bookingsT.cashPayment.button}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = '#dcfce7';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f0fdf4';
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="2" y="6" width="20" height="12" rx="2" />
+                    <circle cx="12" cy="12" r="2.5" />
+                    <path d="M6 12h.01M18 12h.01" />
+                  </svg>
+                </button>
+              )}
+            {/* Pay balance online — owners/admins, when balance is collectible */}
+            {(isAdmin || isOwner) &&
+              (row.status === 'reservado' || row.status === 'partially_paid') && (
+                <button
+                  type="button"
+                  onClick={() => setBalanceModal({ isOpen: true, booking: row })}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 38,
+                    height: 38,
+                    borderRadius: 'var(--radius-lg, 10px)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    backgroundColor: '#eff6ff',
+                    color: '#2563eb',
+                    transition: 'all .18s ease',
+                    lineHeight: 1,
+                  }}
+                  title={bookingsT.balancePayment.button}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = '#dbeafe';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = '#eff6ff';
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                    <path d="M2 10h20" />
+                  </svg>
+                </button>
+              )}
           </div>
         );
       },
@@ -1387,6 +1489,21 @@ export default function Bookings(): JSX.Element {
         onSuccess={() => {
           void refreshBookings();
         }}
+      />
+
+      <CashPaymentModal
+        isOpen={cashModal.isOpen}
+        booking={cashModal.booking}
+        onClose={() => setCashModal({ isOpen: false, booking: null })}
+        onSuccess={() => {
+          void refreshBookings();
+        }}
+      />
+
+      <BalancePaymentModal
+        isOpen={balanceModal.isOpen}
+        booking={balanceModal.booking}
+        onClose={() => setBalanceModal({ isOpen: false, booking: null })}
       />
 
       {/* Resend payment link result modal */}

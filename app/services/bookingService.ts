@@ -85,3 +85,44 @@ export const calculateBookingTotal = (tours: BookingTour[]): number => {
 export const calculateDepositAmount = (total: number, depositPercentage = 0.3): number => {
   return Math.round(total * depositPercentage * 100) / 100;
 };
+
+export interface StripeChargeBreakdown {
+  netAmount: number;
+  taxAmount: number;
+  taxRate: number;
+  feeAmount: number;
+  totalAmount: number;
+}
+
+/**
+ * Breaks an online charge into net + IVA + Stripe fee. The fee is grossed up over
+ * (net + IVA) so that amount arrives intact after Stripe's cut. Informational on the
+ * front; the backend is the source of truth and reconciles the fee with the real
+ * balance_transaction. See PROMPT_BACKEND_STRIPE_FEE.md.
+ */
+export const computeStripeChargeBreakdown = (
+  net: number,
+  taxRate: number,
+  feeRate: number,
+  fixedFee = 3
+): StripeChargeBreakdown => {
+  const round2 = (value: number): number => Math.round(value * 100) / 100;
+  const netAmount = round2(net);
+  const taxAmount = round2(netAmount * taxRate);
+  const base = netAmount + taxAmount;
+  // No fee (and no fixed component) when there is no online processing rate.
+  const totalAmount = feeRate > 0 && feeRate < 1 ? round2((base + fixedFee) / (1 - feeRate)) : base;
+  const feeAmount = round2(totalAmount - base);
+  return { netAmount, taxAmount, taxRate, feeAmount, totalAmount };
+};
+
+/**
+ * Maps the selected payment method (+ card origin) to the Stripe MX processing rate.
+ * Official rates (backend-aligned): domestic card 3.6%, international card 6.1%
+ * (3.6% + 0.5% + 2% conversion, treated flat), OXXO 4.0% — all with a $3 fixed fee.
+ */
+export const stripeFeeRate = (method: string, cardType: 'local' | 'foreign'): number => {
+  if (method === 'oxxo') return 0.04;
+  if (method === 'card') return cardType === 'foreign' ? 0.061 : 0.036;
+  return 0;
+};

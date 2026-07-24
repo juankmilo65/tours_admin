@@ -3,7 +3,7 @@
  */
 
 import { createServiceREST } from './_index';
-import type { Booking, Payment, CreateBookingDto } from '~/types/booking';
+import type { Booking, Payment, CreateBookingDto, FeeBreakdown } from '~/types/booking';
 
 // Type declaration for Vite environment variables
 interface ViteImportMetaEnv {
@@ -207,8 +207,9 @@ export const createBooking = async (
     // Check if result contains an error (from createServiceREST catch)
     if (result !== null && typeof result === 'object' && 'error' in result) {
       const errorMessage = extractApiError(result.error);
+      const status = (result.error as { response?: { status?: number } })?.response?.status;
       console.error('❌ [CREATE BOOKING] Error in result:', errorMessage);
-      return { success: false, error: errorMessage };
+      return { success: false, error: errorMessage, status };
     }
 
     console.warn('✅ [CREATE BOOKING] Success! Result:', JSON.stringify(result, null, 2));
@@ -216,8 +217,9 @@ export const createBooking = async (
     return { success: true, ...(result as Record<string, unknown>) };
   } catch (error) {
     const errorMessage = extractApiError(error);
+    const status = (error as { response?: { status?: number } })?.response?.status;
     console.error('❌ [CREATE BOOKING] Error caught:', errorMessage);
-    return { success: false, error: errorMessage };
+    return { success: false, error: errorMessage, status };
   }
 };
 
@@ -258,6 +260,56 @@ export const updateBooking = async (
       }
     } else {
       console.error('❌ [UPDATE BOOKING] Unknown error:', error);
+    }
+    return { error, success: false };
+  }
+};
+
+/**
+ * Update booking payment status
+ * PATCHes bookings/:id/payment-status with the target status (e.g. 'paid').
+ * Used to register a cash payment that settles the booking's balance.
+ */
+export const updateBookingPaymentStatus = async (
+  id: string,
+  status: string,
+  token: string,
+  language = 'es'
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    console.warn(
+      '⚠️ [UPDATE BOOKING PAYMENT STATUS] BACKEND_URL is not configured, returning error'
+    );
+    return { success: false, error: 'Backend URL not configured' };
+  }
+
+  try {
+    const bookingsEndpoint = `bookings/${id}`;
+    const bookingsService = createServiceREST(BASE_URL, bookingsEndpoint, token);
+
+    const result = await bookingsService.update(
+      { status },
+      {
+        url: `bookings/${id}/payment-status`,
+        headers: {
+          'X-Language': language,
+        },
+      }
+    );
+
+    return result;
+  } catch (error) {
+    console.error('❌ [UPDATE BOOKING PAYMENT STATUS] Error caught:', error);
+    if (error instanceof Error) {
+      console.error('❌ [UPDATE BOOKING PAYMENT STATUS] Error message:', error.message);
+      if (error.message.includes('ECONNREFUSED')) {
+        console.warn(
+          '⚠️ [UPDATE BOOKING PAYMENT STATUS] Backend API is not available. Please ensure that backend server is running at:',
+          BASE_URL
+        );
+      }
+    } else {
+      console.error('❌ [UPDATE BOOKING PAYMENT STATUS] Unknown error:', error);
     }
     return { error, success: false };
   }
@@ -452,6 +504,37 @@ export const createPayment = async (
       console.error('❌ [CREATE PAYMENT] Unknown error:', error);
     }
     return { error, success: false };
+  }
+};
+
+/**
+ * Start an online payment for a booking's remaining balance.
+ * POSTs bookings/:id/complete-payment with the feeBreakdown; the backend replies
+ * with a Stripe payment link to redirect the customer to.
+ */
+export const completePayment = async (
+  bookingId: string,
+  feeBreakdown: FeeBreakdown,
+  token: string,
+  language = 'es'
+): Promise<unknown> => {
+  if (BASE_URL === '' || BASE_URL === undefined) {
+    return { success: false, error: 'Backend URL not configured' };
+  }
+  try {
+    const endpoint = `bookings/${bookingId}/complete-payment`;
+    const service = createServiceREST(BASE_URL, endpoint, token);
+    const result = await service.create({ feeBreakdown }, { headers: { 'X-Language': language } });
+    if (result !== null && typeof result === 'object' && 'error' in result) {
+      const errorMessage = extractApiError(result.error);
+      const status = (result.error as { response?: { status?: number } })?.response?.status;
+      return { success: false, error: errorMessage, status };
+    }
+    return { success: true, ...(result as Record<string, unknown>) };
+  } catch (error) {
+    const errorMessage = extractApiError(error);
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    return { success: false, error: errorMessage, status };
   }
 };
 

@@ -35,6 +35,11 @@ export interface StripePaymentsSummary {
   totalTransferredToOwners?: number; // Admin only
   platformEarnings?: number; // Admin only
   totalEarnings?: number; // Owner only - their total earnings
+  /**
+   * Cash collected directly by tour owners. Reported SEPARATELY from the Stripe
+   * totals above and never summed into them (Stripe and cash are distinct sources).
+   */
+  cashCollected?: number;
 }
 
 export interface StripePaymentsBreakdown {

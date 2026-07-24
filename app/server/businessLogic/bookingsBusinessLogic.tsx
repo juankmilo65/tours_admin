@@ -9,16 +9,19 @@ import type {
   BookingStatusHistory,
   BookingStatusHistoryEntry,
   CreateBookingDto,
+  FeeBreakdown,
 } from '~/types/booking';
 import {
   getAllBookings,
   getBookingById,
   createBooking,
   updateBooking,
+  updateBookingPaymentStatus,
   deleteBooking,
   getBookingStats,
   getBookingPayments,
   createPayment,
+  completePayment,
   getBookingStatusHistory,
   resendPaymentLink,
 } from '../bookings';
@@ -155,21 +158,124 @@ export const createBookingBusiness = async (
       message?: string;
       data?: Booking;
       error?: string;
+      status?: number;
     };
 
     if (result.success === true && result.data !== undefined) {
       return result as { success: boolean; message?: string; data?: Booking };
     }
 
-    return {
-      success: false,
-      message: result.message ?? result.error ?? 'Error creating booking',
-    };
+    const status = result.status;
+    let message =
+      result.message ??
+      result.error ??
+      (language === 'en' ? 'Error creating booking' : 'Error al crear la reserva');
+    if (status === 422) {
+      // Backend recomputed net/IVA and the front's totalAmount did not reconcile:
+      // the price breakdown is out of sync (see the calculateBookingTotal IVA bug).
+      console.error('❌ [createBookingBusiness] 422 fee/total mismatch:', result.error);
+      message =
+        language === 'en'
+          ? 'The total to charge does not match the backend calculation (price breakdown out of sync). Please review and retry.'
+          : 'El total a cobrar no coincide con el cálculo del backend (desglose de precios desalineado). Revisá y reintentá.';
+    } else if (status === 400) {
+      message =
+        language === 'en'
+          ? 'The booking request was rejected by validation (malformed payload).'
+          : 'La solicitud de reserva fue rechazada por validación (payload inválido).';
+    }
+    return { success: false, message };
   } catch (error) {
     console.error('❌ [createBookingBusiness] Exception caught:', error);
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Error creating booking',
+    };
+  }
+};
+
+/**
+ * Start an online payment for a booking's remaining balance. Returns the Stripe
+ * payment link to redirect the customer to. The customer covers the Stripe fee.
+ */
+export const completePaymentBusiness = async (
+  bookingId: string,
+  feeBreakdown: FeeBreakdown,
+  token: string | undefined,
+  language = 'es'
+): Promise<{ success: boolean; url?: string; message?: string }> => {
+  try {
+    const result = (await completePayment(bookingId, feeBreakdown, token ?? '', language)) as {
+      success?: boolean;
+      url?: string;
+      link?: string;
+      paymentUrl?: string;
+      checkoutUrl?: string;
+      redirectUrl?: string;
+      data?: { url?: string; link?: string; paymentUrl?: string; checkoutUrl?: string };
+      error?: string;
+      status?: number;
+    };
+
+    if (result.success === true) {
+      // Backend response field name is not final — accept the common variants.
+      const url =
+        result.url ??
+        result.link ??
+        result.paymentUrl ??
+        result.checkoutUrl ??
+        result.redirectUrl ??
+        result.data?.url ??
+        result.data?.link ??
+        result.data?.paymentUrl ??
+        result.data?.checkoutUrl;
+      if (url !== undefined && url !== '') {
+        return { success: true, url };
+      }
+      console.error('❌ [completePaymentBusiness] no payment link in response:', result);
+      return {
+        success: false,
+        message:
+          language === 'en'
+            ? 'The server did not return a payment link.'
+            : 'El servidor no devolvió el link de pago.',
+      };
+    }
+
+    const status = result.status;
+    let message =
+      result.error ??
+      (language === 'en' ? 'Error starting the payment' : 'Error al iniciar el pago');
+    if (status === 422) {
+      console.error('❌ [completePaymentBusiness] 422 fee/total mismatch:', result.error);
+      message =
+        language === 'en'
+          ? 'The total to charge does not match the backend calculation. Please retry.'
+          : 'El total a cobrar no coincide con el cálculo del backend. Reintentá.';
+    } else if (status === 400) {
+      message =
+        language === 'en'
+          ? 'The payment request was rejected by validation (malformed payload).'
+          : 'La solicitud de pago fue rechazada por validación (payload inválido).';
+    } else if (status === 403) {
+      message =
+        language === 'en'
+          ? 'You are not allowed to start this payment.'
+          : 'No tenés permiso para iniciar este pago.';
+    } else if (status === 409) {
+      message =
+        language === 'en'
+          ? 'The balance cannot be charged: it may already be settled or a payment is in progress.'
+          : 'No se puede cobrar el saldo: puede estar ya liquidado o con un pago en curso.';
+    } else if (status === 404) {
+      message = language === 'en' ? 'Booking not found' : 'Reserva no encontrada';
+    }
+    return { success: false, message };
+  } catch (error) {
+    console.error('Error in completePaymentBusiness:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Error starting the payment',
     };
   }
 };
@@ -224,6 +330,78 @@ export const updateBookingBusiness = async (
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Error updating booking',
+    };
+  }
+};
+
+/**
+ * Register cash payment for a booking's balance
+ * Transitions the booking to 'paid' via the payment-status endpoint.
+ * The backend computes the authoritative settled amount.
+ */
+export const registerCashPaymentBusiness = async (
+  bookingId: string,
+  token: string | undefined,
+  language = 'es'
+): Promise<{ success: boolean; message?: string; data?: Booking }> => {
+  try {
+    const result = (await updateBookingPaymentStatus(bookingId, 'paid', token ?? '', language)) as {
+      success?: boolean;
+      message?: string;
+      data?: Booking;
+      error?: {
+        response?: { data?: { error?: string }; status?: number };
+        message?: string;
+      };
+    };
+
+    if (result.success === true) {
+      return { success: true, message: result.message, data: result.data };
+    }
+
+    // Map HTTP status -> bilingual message (mirrors getBookingByIdBusiness's style)
+    let errorMessage =
+      language === 'en'
+        ? 'Error registering cash payment'
+        : 'Error al registrar el pago en efectivo';
+    if (result.error !== undefined) {
+      const err = result.error;
+      const status = err.response?.status;
+      if (status === 403) {
+        errorMessage =
+          language === 'en'
+            ? 'You are not an owner of any tour in this booking'
+            : 'No sos dueño de ningún tour de esta reserva';
+      } else if (status === 409) {
+        errorMessage =
+          language === 'en'
+            ? 'The balance cannot be settled in cash: it is already settled, a cash payment already exists, or an online payment is in progress'
+            : 'No se puede liquidar en efectivo: el saldo ya se liquidó, ya existe un pago en efectivo, o hay un pago online en curso';
+      } else if (status === 400) {
+        errorMessage =
+          language === 'en'
+            ? 'Invalid state or the balance amount could not be calculated'
+            : 'Estado inválido o no se pudo calcular el monto del saldo';
+      } else if (status === 404) {
+        errorMessage = language === 'en' ? 'Booking not found' : 'Reserva no encontrada';
+      } else if (err.response?.data?.error !== undefined) {
+        errorMessage = err.response.data.error;
+      } else if (err.message !== undefined) {
+        errorMessage = err.message;
+      }
+    }
+
+    return { success: false, message: errorMessage };
+  } catch (error) {
+    console.error('Error in registerCashPaymentBusiness:', error);
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : language === 'en'
+            ? 'Error registering cash payment'
+            : 'Error al registrar el pago en efectivo',
     };
   }
 };
