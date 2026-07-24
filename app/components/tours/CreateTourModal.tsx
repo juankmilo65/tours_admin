@@ -131,6 +131,10 @@ export function CreateTourModal({
 }: CreateTourModalProps): JSX.Element | null {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  // Stripe's minimum charge per currency. The deposit's total charge (net + IVA +
+  // fee) is always more than the deposit itself, so requiring the deposit to meet
+  // this floor guarantees any booking clears Stripe's minimum charge.
+  const stripeMinChargeByCurrency: Record<string, number> = { MXN: 10, USD: 0.5, EUR: 0.5 };
   const token = useAppSelector(selectAuthToken);
   const currentUser = useAppSelector(selectCurrentUser);
   const ownerKycStatus = useAppSelector(selectOwnerKycStatus);
@@ -612,13 +616,20 @@ export function CreateTourModal({
     }
     if (formData.basePrice <= 0)
       newErrors.basePrice = t('tours.basePriceRequired') ?? 'Base price is required';
+    const minPaymentFloor = stripeMinChargeByCurrency[formData.currency] ?? 0;
     if (
       formData.minimumPayment === undefined ||
       formData.minimumPayment === null ||
       formData.minimumPayment <= 0
-    )
+    ) {
       newErrors.minimumPayment =
         t('tours.minimumPaymentRequired') ?? 'El pago mínimo es obligatorio';
+    } else if (minPaymentFloor > 0 && formData.minimumPayment < minPaymentFloor) {
+      newErrors.minimumPayment =
+        currentLanguage === 'en'
+          ? `The minimum payment must be at least ${minPaymentFloor} ${formData.currency} (Stripe's minimum to charge the deposit).`
+          : `El pago mínimo debe ser al menos ${minPaymentFloor} ${formData.currency} (mínimo de Stripe para cobrar el anticipo).`;
+    }
     // Validate that at least 1 day exists
     if (formData.days.length === 0) {
       newErrors.activities = t('tours.daysMinRequired') ?? 'Se requiere al menos un día';
@@ -1952,7 +1963,7 @@ export function CreateTourModal({
                   name="minimumPayment"
                   value={formData.minimumPayment}
                   onChange={handleInputChange}
-                  min={0}
+                  min={stripeMinChargeByCurrency[formData.currency] ?? 0}
                   step={0.01}
                   style={{
                     width: '100%',
