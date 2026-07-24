@@ -925,8 +925,11 @@ export function CreateBookingModal({
         const endTime24 = to24Hour(tour.endTime);
         const startMinutes = startParts.hours * 60 + startParts.minutes;
         const endMinutes = endParts.hours * 60 + endParts.minutes;
+        // Roll the end to the next day when the tour's end time is not strictly after
+        // its start time (overnight tours, or tours with equal/unset times) so the
+        // range is always valid — the backend rejects endAt <= startAt.
         const endDate =
-          endMinutes < startMinutes ? addDaysToDateStr(tour.startDate, 1) : tour.startDate;
+          endMinutes <= startMinutes ? addDaysToDateStr(tour.startDate, 1) : tour.startDate;
 
         return {
           tourId: tour.id,
@@ -940,7 +943,7 @@ export function CreateBookingModal({
         };
       });
 
-      if (items.some((item) => item.endAt < item.startAt)) {
+      if (items.some((item) => item.endAt <= item.startAt)) {
         dispatch(setGlobalLoading({ isLoading: false }));
         setApiError(
           language === 'en'
