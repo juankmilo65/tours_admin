@@ -177,7 +177,7 @@ export const createBookingBusiness = async (
       message =
         language === 'en'
           ? 'The total to charge does not match the backend calculation (price breakdown out of sync). Please review and retry.'
-          : 'El total a cobrar no coincide con el cálculo del backend (desglose de precios desalineado). Revisá y reintentá.';
+          : 'El total a cobrar no coincide con el cálculo del backend (desglose de precios desalineado). Revisa y vuelve a intentar.';
     } else if (status === 400) {
       message =
         language === 'en'
@@ -251,7 +251,7 @@ export const completePaymentBusiness = async (
       message =
         language === 'en'
           ? 'The total to charge does not match the backend calculation. Please retry.'
-          : 'El total a cobrar no coincide con el cálculo del backend. Reintentá.';
+          : 'El total a cobrar no coincide con el cálculo del backend. Vuelve a intentar.';
     } else if (status === 400) {
       message =
         language === 'en'
@@ -261,7 +261,7 @@ export const completePaymentBusiness = async (
       message =
         language === 'en'
           ? 'You are not allowed to start this payment.'
-          : 'No tenés permiso para iniciar este pago.';
+          : 'No tienes permiso para iniciar este pago.';
     } else if (status === 409) {
       message =
         language === 'en'
@@ -371,7 +371,7 @@ export const registerCashPaymentBusiness = async (
         errorMessage =
           language === 'en'
             ? 'You are not an owner of any tour in this booking'
-            : 'No sos dueño de ningún tour de esta reserva';
+            : 'No eres dueño de ningún tour de esta reserva';
       } else if (status === 409) {
         errorMessage =
           language === 'en'

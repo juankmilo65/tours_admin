@@ -186,7 +186,7 @@ export const bookingEs = {
   balancePayment: {
     button: 'Pagar saldo online',
     title: 'Pagar saldo con tarjeta / OXXO',
-    chooseMethod: 'Elegí el método de pago',
+    chooseMethod: 'Elige el método de pago',
     methodLocal: 'Tarjeta nacional',
     methodForeign: 'Tarjeta internacional',
     methodOxxo: 'OXXO',
@@ -204,7 +204,7 @@ export const bookingEs = {
     meetingPointNote: 'Pago en efectivo en el punto de encuentro, sin comisión',
     conversionNote: '+2% si hay conversión de moneda',
     inclFee: 'incl. comisión',
-    selectMethodHint: 'Elegí el método de pago para ver la comisión estimada.',
+    selectMethodHint: 'Elige el método de pago para ver la comisión estimada.',
     balanceHowLabel: '¿Cómo se paga el excedente?',
     balanceCashOption: 'Efectivo',
     balanceCardOption: 'Tarjeta',
