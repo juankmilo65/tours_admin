@@ -19,8 +19,6 @@ import { computeStripeChargeBreakdown, resolveMethodFee } from '~/services/booki
 import { useCurrencyConfig } from '~/hooks/useCurrencyConfig';
 import type { Booking } from '~/types/booking';
 
-const TAX_RATE = 0.16;
-
 type MethodKey = 'card-local' | 'card-foreign' | 'oxxo';
 
 interface BalancePaymentModalProps {
@@ -40,7 +38,7 @@ export function BalancePaymentModal({
   const token = useAppSelector(selectAuthToken);
   const [selected, setSelected] = useState<MethodKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const { currencies: currencyConfigs } = useCurrencyConfig();
+  const { currencies: currencyConfigs, taxRates } = useCurrencyConfig();
 
   if (!isOpen || booking === null) return null;
 
@@ -48,11 +46,11 @@ export function BalancePaymentModal({
 
   const parse = (v: number | string | undefined): number =>
     typeof v === 'number' ? v : parseFloat(String(v ?? '0')) || 0;
-  // Net (pre-IVA) balance to collect; the backend recomputes the authoritative amount.
-  const net =
-    booking.remainingAfterDeposit !== undefined
-      ? parse(booking.remainingAfterDeposit)
-      : parse(booking.totalPrice) - parse(booking.depositAmount);
+  // Net (pre-IVA) balance to collect = totalPrice - deposit (minimumPayment); the
+  // backend recomputes the authoritative amount and validates it.
+  const net = parse(booking.totalPrice) - parse(booking.minimumPayment);
+  // IVA rate is keyed by COUNTRY (from the config), not by currency.
+  const taxRate = taxRates[booking.countryCode ?? ''] ?? 0;
 
   const methodFeeFor = (m: MethodKey) =>
     m === 'oxxo'
@@ -93,9 +91,10 @@ export function BalancePaymentModal({
       }
       const feeBreakdown = computeStripeChargeBreakdown(
         net,
-        TAX_RATE,
+        taxRate,
         methodFee.rate,
-        methodFee.fixedFee
+        methodFee.fixedFee,
+        decimals
       );
       if (feeBreakdown.totalAmount < currencyConfig.minCharge) {
         dispatch(
@@ -218,7 +217,7 @@ export function BalancePaymentModal({
               const mf = methodFeeFor(m.key);
               const breakdown =
                 mf !== undefined
-                  ? computeStripeChargeBreakdown(net, TAX_RATE, mf.rate, mf.fixedFee)
+                  ? computeStripeChargeBreakdown(net, taxRate, mf.rate, mf.fixedFee, decimals)
                   : undefined;
               const active = selected === m.key;
               return (

@@ -22,6 +22,8 @@ export interface CurrencyConfig {
   symbol: string;
   /** Decimal places for display (0 for CLP/PYG). */
   decimals: number;
+  /** True for zero-decimal currencies (CLP, PYG) — amounts are whole units. */
+  zeroDecimal?: boolean;
   /** Minimum chargeable amount in this currency (Stripe floor). */
   minCharge: number;
   /** Payment methods available for this currency. */
@@ -30,4 +32,6 @@ export interface CurrencyConfig {
 
 export interface CurrenciesConfigResponse {
   currencies: CurrencyConfig[];
+  /** IVA rate per ISO COUNTRY code (e.g. { MX: 0.16, CO: 0.19 }) — not per currency. */
+  taxRates: Record<string, number>;
 }

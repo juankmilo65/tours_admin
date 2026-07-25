@@ -105,15 +105,19 @@ export const computeStripeChargeBreakdown = (
   net: number,
   taxRate: number,
   feeRate: number,
-  fixedFee = 3
+  fixedFee = 3,
+  decimals = 2
 ): StripeChargeBreakdown => {
-  const round2 = (value: number): number => Math.round(value * 100) / 100;
-  const netAmount = round2(net);
-  const taxAmount = round2(netAmount * taxRate);
+  // Round to the currency's decimals: 2 normally, 0 for zero-decimal currencies
+  // (CLP/PYG) so amounts stay whole and match the backend (avoids 422).
+  const factor = Math.pow(10, decimals);
+  const round = (value: number): number => Math.round(value * factor) / factor;
+  const netAmount = round(net);
+  const taxAmount = round(netAmount * taxRate);
   const base = netAmount + taxAmount;
   // No fee (and no fixed component) when there is no online processing rate.
-  const totalAmount = feeRate > 0 && feeRate < 1 ? round2((base + fixedFee) / (1 - feeRate)) : base;
-  const feeAmount = round2(totalAmount - base);
+  const totalAmount = feeRate > 0 && feeRate < 1 ? round((base + fixedFee) / (1 - feeRate)) : base;
+  const feeAmount = round(totalAmount - base);
   return { netAmount, taxAmount, taxRate, feeAmount, totalAmount };
 };
 

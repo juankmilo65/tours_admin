@@ -8,10 +8,11 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from '~/store';
-import type { CurrencyConfig } from '~/types/currencyConfig';
+import type { CurrenciesConfigResponse, CurrencyConfig } from '~/types/currencyConfig';
 
 interface CurrencyConfigState {
   currencies: CurrencyConfig[];
+  taxRates: Record<string, number>;
   loading: boolean;
   loaded: boolean;
   error: string | null;
@@ -19,6 +20,7 @@ interface CurrencyConfigState {
 
 const initialState: CurrencyConfigState = {
   currencies: [],
+  taxRates: {},
   loading: false,
   loaded: false,
   error: null,
@@ -32,8 +34,9 @@ const currencyConfigSlice = createSlice({
       state.loading = true;
       state.error = null;
     },
-    fetchCurrencyConfigSuccess: (state, action: PayloadAction<CurrencyConfig[]>) => {
-      state.currencies = action.payload;
+    fetchCurrencyConfigSuccess: (state, action: PayloadAction<CurrenciesConfigResponse>) => {
+      state.currencies = action.payload.currencies;
+      state.taxRates = action.payload.taxRates ?? {};
       state.loading = false;
       state.loaded = true;
       state.error = null;
@@ -62,5 +65,14 @@ export const selectCurrencyByCode =
   (code: string) =>
   (state: RootState): CurrencyConfig | undefined =>
     state.currencyConfig.currencies.find((c) => c.code === code);
+
+export const selectTaxRates = (state: RootState): Record<string, number> =>
+  state.currencyConfig.taxRates;
+
+/** Selector factory: IVA rate for a country (ISO code); 0 if unknown. */
+export const selectTaxRateForCountry =
+  (countryCode: string) =>
+  (state: RootState): number =>
+    state.currencyConfig.taxRates[countryCode] ?? 0;
 
 export default currencyConfigSlice.reducer;

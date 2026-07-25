@@ -12,6 +12,7 @@ import {
   fetchCurrencyConfigSuccess,
   fetchCurrencyConfigFailure,
   selectCurrencies,
+  selectTaxRates,
   selectCurrencyConfigLoaded,
   selectCurrencyConfigLoading,
 } from '~/store/slices/currencyConfigSlice';
@@ -21,11 +22,13 @@ import type { CurrencyConfig } from '~/types/currencyConfig';
 
 export function useCurrencyConfig(): {
   currencies: CurrencyConfig[];
+  taxRates: Record<string, number>;
   loaded: boolean;
   loading: boolean;
 } {
   const dispatch = useAppDispatch();
   const currencies = useAppSelector(selectCurrencies);
+  const taxRates = useAppSelector(selectTaxRates);
   const loaded = useAppSelector(selectCurrencyConfigLoaded);
   const loading = useAppSelector(selectCurrencyConfigLoading);
   const token = useAppSelector(selectAuthToken);
@@ -48,5 +51,5 @@ export function useCurrencyConfig(): {
     };
   }, [loaded, loading, token, language, dispatch]);
 
-  return { currencies, loaded, loading };
+  return { currencies, taxRates, loaded, loading };
 }

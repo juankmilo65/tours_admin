@@ -27,19 +27,20 @@ interface StripeFeeNoticeProps {
   currency: string;
   /** Decimal places for this currency (from config); defaults to 2. */
   decimals?: number;
+  /** IVA rate for the booking's country (from config); defaults to 0. */
+  taxRate?: number;
   /** Resolved method fee (rate + fixedFee + label) from the backend config; null when unavailable. */
   methodFee?: CurrencyMethodConfig | null;
   /** Optional style overrides for spacing tweaks from the parent layout. */
   style?: CSSProperties;
 }
 
-const TAX_RATE = 0.16;
-
 export function StripeFeeNotice({
   anticipo,
   excedente,
   currency,
   decimals = 2,
+  taxRate = 0,
   methodFee,
   style,
 }: StripeFeeNoticeProps): JSX.Element | null {
@@ -91,7 +92,7 @@ export function StripeFeeNotice({
     if (!Number.isFinite(net) || net <= 0) {
       return null;
     }
-    const b = computeStripeChargeBreakdown(net, TAX_RATE, fee.rate, fee.fixedFee);
+    const b = computeStripeChargeBreakdown(net, taxRate, fee.rate, fee.fixedFee, decimals);
     return (
       <>
         <div style={feeRowStyle}>

@@ -5,14 +5,14 @@
  * The front consumes this and never hardcodes the currency/fee table.
  */
 
-import type { CurrenciesConfigResponse, CurrencyConfig } from '~/types/currencyConfig';
+import type { CurrenciesConfigResponse } from '~/types/currencyConfig';
 
 const API_BASE_URL = 'http://localhost:3000';
 
 export const getCurrenciesConfigBusiness = async (
   token?: string,
   language = 'es'
-): Promise<{ success: boolean; data?: CurrencyConfig[]; error?: string }> => {
+): Promise<{ success: boolean; data?: CurrenciesConfigResponse; error?: string }> => {
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -40,7 +40,10 @@ export const getCurrenciesConfigBusiness = async (
 
     const data = (await response.json()) as CurrenciesConfigResponse;
     if (Array.isArray(data.currencies)) {
-      return { success: true, data: data.currencies };
+      return {
+        success: true,
+        data: { currencies: data.currencies, taxRates: data.taxRates ?? {} },
+      };
     }
     return { success: false, error: 'Malformed currencies config response' };
   } catch (error) {

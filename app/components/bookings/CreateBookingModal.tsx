@@ -91,7 +91,7 @@ export function CreateBookingModal({
   onClose,
 }: CreateBookingModalProps): JSX.Element | null {
   const { t, language } = useTranslation();
-  const { currencies: currencyConfigs } = useCurrencyConfig();
+  const { currencies: currencyConfigs, taxRates } = useCurrencyConfig();
   const bookingsT = language === 'en' ? bookingEn : bookingEs;
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectAuthToken);
@@ -99,6 +99,8 @@ export function CreateBookingModal({
   const selectedCountryCurrency = useAppSelector(selectSelectedCurrencyCode);
   const selectedCountry = useAppSelector(selectSelectedCountry);
   const headerCountryCode = (selectedCountry?.code ?? 'MX').toUpperCase();
+  // IVA rate is keyed by COUNTRY (from the config), not by currency.
+  const taxRate = taxRates[headerCountryCode] ?? 0;
 
   // Today's date in local browser time (YYYY-MM-DD) — used as hard floor for date inputs
   const todayLocal = useMemo(() => {
@@ -655,10 +657,10 @@ export function CreateBookingModal({
     const subtotal = basePrice * validClients;
     const minorDiscount = basePrice * minors * 0.1;
     const total = subtotal - minorDiscount; // pre-IVA (kept for existing consumers)
-    const tax = Math.round(total * 0.16 * 100) / 100; // 16% IVA on the discounted base
+    const tax = Math.round(total * taxRate * 100) / 100; // IVA per country (from config)
     const totalWithTax = Math.round((total + tax) * 100) / 100;
     return { basePrice, validClients, minors, subtotal, minorDiscount, total, tax, totalWithTax };
-  }, [tourBasePrice, formData.clients]);
+  }, [tourBasePrice, formData.clients, taxRate]);
 
   // Multi-tour summary display totals — mirrors handleSubmit: per-tour price/minimum
   // multiplied by client count, plus 16% IVA. Display-only; the submitted payload is
@@ -666,13 +668,13 @@ export function CreateBookingModal({
   const multiTourSummary = useMemo(() => {
     const displayClientCount = formData.clients.length;
     const displaySubtotal = calculateBookingTotal(selectedTours) * displayClientCount;
-    const displayTax = displaySubtotal * 0.16; // matches submit's tax = subtotal * 0.16
+    const displayTax = displaySubtotal * taxRate; // IVA per country (from config)
     const displayTotal = displaySubtotal + displayTax;
     const displayAnticipo =
       selectedTours.reduce((sum, tour) => sum + (tour.minimumPayment ?? 0), 0) * displayClientCount;
     const displayRemaining = displayTotal - displayAnticipo;
     return { displaySubtotal, displayTax, displayTotal, displayAnticipo, displayRemaining };
-  }, [selectedTours, formData.clients.length]);
+  }, [selectedTours, formData.clients.length, taxRate]);
 
   // Currency config (rates, fixed fees, min charge, decimals) from the backend — the
   // single source of truth for fee math. Undefined until it loads.
@@ -966,7 +968,7 @@ export function CreateBookingModal({
       const minimumPayment = roundTo2(
         items.reduce((sum, item) => sum + item.lineMinimumPayment, 0)
       );
-      const tax = roundTo2(subtotal * 0.16);
+      const tax = roundTo2(subtotal * taxRate);
       const total = roundTo2(subtotal + tax);
       // Online charge breakdown for the deposit (anticipo): net + IVA + gross-up fee.
       // The backend recomputes net/IVA from the reservation and trusts only feeAmount;
@@ -986,9 +988,10 @@ export function CreateBookingModal({
       }
       const feeBreakdown = computeStripeChargeBreakdown(
         minimumPayment,
-        0.16,
+        taxRate,
         selectedMethodFee.rate,
-        selectedMethodFee.fixedFee
+        selectedMethodFee.fixedFee,
+        currencyConfig.decimals
       );
       if (feeBreakdown.totalAmount < currencyConfig.minCharge) {
         dispatch(setGlobalLoading({ isLoading: false }));
@@ -2072,6 +2075,7 @@ export function CreateBookingModal({
                         currency={formData.currency}
                         methodFee={selectedMethodFee}
                         decimals={currencyDecimals}
+                        taxRate={taxRate}
                       />
                     </div>
                   </div>
@@ -2600,6 +2604,7 @@ export function CreateBookingModal({
                     currency={formData.currency}
                     methodFee={selectedMethodFee}
                     decimals={currencyDecimals}
+                    taxRate={taxRate}
                   />
                 </div>
               </div>
